@@ -9,9 +9,9 @@
   --color-line: #d2d2cc;
   --color-accent: #b7d075;
   --color-accent-ink: #1a220c;
-  --font-display: "SF Pro Display", "Funnel Display", "Arial Narrow", system-ui, sans-serif;
-  --font-body: "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
-  --font-mono: "SF Mono", "Roboto Mono", ui-monospace, monospace;
+  --font-display-fallback: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-body-fallback: "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  --font-mono-fallback: "SF Mono", "Roboto Mono", ui-monospace, monospace;
   --text-hero: clamp(4.8rem, 13.5vw, 13.5rem);
   --text-page-title: clamp(3.4rem, 9vw, 8.5rem);
   --text-section-title: clamp(2rem, 4.4vw, 4.25rem);
@@ -56,7 +56,7 @@ body {
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-ink);
-  font-family: var(--font-body);
+  font-family: var(--font-body), var(--font-body-fallback);
   letter-spacing: 0;
 }
 
@@ -84,11 +84,10 @@ select {
 }
 
 .framed-page {
-  width: min(calc(100% - clamp(1.25rem, 4vw, 4rem)), 1720px);
-  min-height: calc(100dvh - clamp(1.25rem, 4vw, 4rem));
-  margin: clamp(0.65rem, 2vw, 2rem) auto;
-  border: var(--frame-border) solid var(--color-ink);
-  background: var(--color-surface);
+  width: min(100%, 1720px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: transparent;
 }
 
 .hairline {
@@ -96,30 +95,33 @@ select {
 }
 
 .display-type {
-  font-family: var(--font-display);
+  font-family: var(--font-display), var(--font-display-fallback);
   font-stretch: condensed;
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.84;
+  line-height: 0.78;
   text-transform: uppercase;
 }
 
 .poster-type {
-  font-family: var(--font-display);
+  font-family: var(--font-display), var(--font-display-fallback);
   font-stretch: condensed;
+  font-weight: 800;
   letter-spacing: 0;
-  line-height: 0.82;
+  line-height: 0.78;
   text-transform: uppercase;
 }
 
 .section-title {
-  font-family: var(--font-display);
+  font-family: var(--font-display), var(--font-display-fallback);
+  font-weight: 800;
   font-size: var(--text-section-title);
   line-height: 0.95;
   text-transform: uppercase;
 }
 
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), var(--font-mono-fallback);
   font-size: 0.72rem;
   line-height: 1;
   text-transform: uppercase;
@@ -236,6 +238,57 @@ select {
   color: var(--color-muted);
   font-size: clamp(0.95rem, 1.15vw, 1.08rem);
   line-height: 1.68;
+}
+
+.page-enter {
+  animation: reveal 860ms var(--ease-out) both;
+}
+
+.stagger-1 {
+  animation-delay: 120ms;
+}
+
+.stagger-2 {
+  animation-delay: 240ms;
+}
+
+.stagger-3 {
+  animation-delay: 360ms;
+}
+
+.float-in {
+  animation: float-in 900ms var(--ease-out) both;
+}
+
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.image-lift {
+  transition:
+    transform 620ms var(--ease-out),
+    filter 620ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+}
+
+.group:hover .image-lift {
+  transform: translate3d(6px, -6px, 0) scale(1.035);
+  filter: saturate(1.04) contrast(1.04);
+}
+
+@supports (animation-timeline: view()) {
+  .scroll-reveal {
+    animation: reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 12% cover 34%;
+  }
 }
 
 .notion-body h2,

@@ -19,7 +19,7 @@ export function WorksBrowser({ works }: { works: Work[] }) {
   });
 
   return (
-    <section className="framed-page relative overflow-hidden px-5 pb-5 pt-20 md:px-8">
+    <section className="framed-page page-enter relative overflow-hidden px-5 pb-8 pt-24 md:px-10">
       <div className="grid min-h-[calc(100dvh-8rem)] grid-rows-[auto_1fr_auto]">
         <div className="grid gap-5 lg:grid-cols-[1fr_auto]">
           <div className="max-w-3xl">
@@ -94,10 +94,11 @@ export function WorksBrowser({ works }: { works: Work[] }) {
                 <Link
                   href={`/works/${work.slug}`}
                   key={work.slug}
-                  className={`group absolute min-w-[130px] overflow-hidden border border-[var(--color-line)] bg-[var(--color-surface)] transition duration-500 ease-[var(--ease-out)] hover:z-20 hover:-translate-y-2 hover:border-[var(--color-accent)] ${placements[index % placements.length]}`}
+                  className={`group float-in absolute min-w-[130px] overflow-hidden border border-[var(--color-line)] bg-[var(--color-surface)] transition duration-500 ease-[var(--ease-out)] hover:z-20 hover:-translate-y-2 hover:border-[var(--color-accent)] ${placements[index % placements.length]}`}
+                  style={{ animationDelay: `${index * 70}ms` }}
                 >
                   <span className="relative block aspect-square overflow-hidden">
-                    <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index < 3} className="object-cover transition duration-500 group-hover:translate-x-1 group-hover:scale-[1.045]" sizes="24vw" />
+                    <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index < 3} className="image-lift object-cover" sizes="24vw" />
                     <span className="absolute inset-0 bg-black/0 transition group-hover:bg-black/45" />
                     <span className="absolute bottom-3 left-3 right-3 translate-y-3 text-white opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                       <span className="block text-xl uppercase leading-none">{work.title}</span>

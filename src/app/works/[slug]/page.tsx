@@ -32,14 +32,14 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
   const next = works[(currentIndex + 1) % works.length];
 
   return (
-    <main className="framed-page overflow-hidden px-5 pb-5 pt-20 md:px-8">
+    <main className="framed-page page-enter overflow-hidden px-5 pb-8 pt-24 md:px-10">
       <section className="grid min-h-[calc(100dvh-8rem)] gap-10 lg:grid-cols-[minmax(320px,0.82fr)_1fr]">
         <aside className="flex flex-col justify-between gap-8">
           <div>
             <Link className="underlined-link text-xs uppercase text-[var(--color-muted)]" href="/works">
               Back to works
             </Link>
-            <figure className="mt-10 max-w-[520px]">
+            <figure className="float-in stagger-1 mt-10 max-w-[520px]">
               <div className="relative aspect-square overflow-hidden border border-[var(--color-line)]">
                 <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority className="object-cover" sizes="44vw" />
               </div>
@@ -47,7 +47,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
             </figure>
           </div>
 
-          <div className="max-w-xl border-t border-[var(--color-line)] pt-6">
+          <div className="page-enter stagger-2 max-w-xl border-t border-[var(--color-line)] pt-6">
             <p className="eyebrow text-[var(--color-muted)]">
               {work.year} / {work.category}
             </p>
@@ -66,7 +66,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
           </div>
         </aside>
 
-        <section className="relative min-h-[60dvh] border-l border-[var(--color-line)] pl-0 lg:h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pl-10">
+        <section className="page-enter stagger-3 relative min-h-[60dvh] border-l border-[var(--color-line)] pl-0 lg:h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pl-10">
           <div className="pointer-events-none sticky top-0 z-10 hidden h-8 bg-gradient-to-b from-[var(--color-surface)] to-transparent lg:block" />
           <article className="notion-body mx-auto max-w-3xl pb-12 lg:pr-6">
             <p className="eyebrow mb-8 text-[var(--color-muted)]">Notion body</p>

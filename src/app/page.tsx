@@ -33,7 +33,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="page-shell min-h-[88dvh] py-24">
+      <section className="page-shell min-h-[88dvh] py-24 scroll-reveal">
         <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="max-w-lg">
             <h2 className="section-title">Selected work</h2>
@@ -58,7 +58,7 @@ export default async function Home() {
                 }}
               >
                 <span className="relative block aspect-square overflow-hidden">
-                  <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index < 2} className="object-cover transition duration-500 group-hover:scale-[1.04]" sizes="40vw" />
+                  <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index < 2} className="image-lift object-cover" sizes="40vw" />
                 </span>
                 <span className="flex justify-between gap-3 p-3 font-mono text-[10px] uppercase text-[var(--color-muted)]">
                   <span>{work.title}</span>
@@ -70,7 +70,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="page-shell py-24">
+      <section className="page-shell py-24 scroll-reveal">
         <div className="grid gap-16 lg:grid-cols-[1fr_0.85fr]">
           <div>
             <h2 className="poster-type text-[clamp(4rem,10vw,10rem)]">Brand / web / motion</h2>
@@ -86,7 +86,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="page-shell pb-28 pt-10">
+      <section className="page-shell pb-28 pt-10 scroll-reveal">
         <div className="grid gap-10 border-t border-[var(--color-line)] pt-10 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <h2 className="poster-type text-[clamp(4rem,10vw,10rem)]">About</h2>
