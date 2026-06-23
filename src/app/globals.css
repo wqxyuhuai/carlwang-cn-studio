@@ -1,20 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --color-bg: #f4f4ef;
+  --color-bg: #efefec;
   --color-surface: #ffffff;
-  --color-ink: #111111;
-  --color-muted: #6d6d66;
-  --color-line: #d8d8cf;
+  --color-ink: #202229;
+  --color-muted: #8b8b85;
+  --color-soft: #ddddda;
+  --color-line: #d2d2cc;
   --color-accent: #b7d075;
   --color-accent-ink: #1a220c;
   --font-display: "SF Pro Display", "Funnel Display", "Arial Narrow", system-ui, sans-serif;
   --font-body: "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
   --font-mono: "SF Mono", "Roboto Mono", ui-monospace, monospace;
-  --text-hero: clamp(4rem, 12vw, 11.25rem);
+  --text-hero: clamp(4.8rem, 13.5vw, 13.5rem);
   --text-page-title: clamp(3.4rem, 9vw, 8.5rem);
   --text-section-title: clamp(2rem, 4.4vw, 4.25rem);
-  --space-page: clamp(1rem, 3vw, 2rem);
+  --space-page: clamp(1rem, 3.2vw, 2.75rem);
+  --frame-border: clamp(8px, 0.85vw, 14px);
   --radius: 0px;
   --motion-fast: 120ms;
   --motion-base: 240ms;
@@ -29,6 +31,7 @@
   --color-surface: #171714;
   --color-ink: #f5f5ed;
   --color-muted: #aaa99c;
+  --color-soft: #2a2a24;
   --color-line: #38382f;
   --color-accent: #b7d075;
   --color-accent-ink: #10100e;
@@ -80,6 +83,14 @@ select {
   padding-inline: var(--space-page);
 }
 
+.framed-page {
+  width: min(calc(100% - clamp(1.25rem, 4vw, 4rem)), 1720px);
+  min-height: calc(100dvh - clamp(1.25rem, 4vw, 4rem));
+  margin: clamp(0.65rem, 2vw, 2rem) auto;
+  border: var(--frame-border) solid var(--color-ink);
+  background: var(--color-surface);
+}
+
 .hairline {
   border-color: var(--color-line);
 }
@@ -89,6 +100,14 @@ select {
   font-stretch: condensed;
   letter-spacing: 0;
   line-height: 0.84;
+  text-transform: uppercase;
+}
+
+.poster-type {
+  font-family: var(--font-display);
+  font-stretch: condensed;
+  letter-spacing: 0;
+  line-height: 0.82;
   text-transform: uppercase;
 }
 
@@ -144,6 +163,20 @@ select {
   background: color-mix(in srgb, var(--color-surface) 82%, transparent);
 }
 
+.underlined-link {
+  border-bottom: 1px solid currentColor;
+  transition:
+    color var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out);
+}
+
+.underlined-link:hover,
+.underlined-link:focus-visible {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+  outline: none;
+}
+
 .reveal {
   animation: reveal var(--motion-page) var(--ease-out) both;
 }
@@ -169,6 +202,64 @@ select {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes mask-up {
+  from {
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(32px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0);
+  }
+}
+
+.mask-line {
+  animation: mask-up var(--motion-page) var(--ease-out) both;
+}
+
+.mask-line:nth-child(2) {
+  animation-delay: 110ms;
+}
+
+.mask-line:nth-child(3) {
+  animation-delay: 220ms;
+}
+
+.mask-line:nth-child(4) {
+  animation-delay: 330ms;
+}
+
+.sparse-copy {
+  max-width: 34rem;
+  color: var(--color-muted);
+  font-size: clamp(0.95rem, 1.15vw, 1.08rem);
+  line-height: 1.68;
+}
+
+.notion-body h2,
+.notion-body h3,
+.notion-body h4 {
+  max-width: 42rem;
+}
+
+.notion-body p {
+  max-width: 42rem;
+}
+
+.notion-body figure {
+  max-width: 42rem;
+}
+
+.notion-body::-webkit-scrollbar,
+.framed-page *::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notion-body::-webkit-scrollbar-thumb,
+.framed-page *::-webkit-scrollbar-thumb {
+  background: var(--color-line);
 }
 
 @media (prefers-reduced-motion: reduce) {

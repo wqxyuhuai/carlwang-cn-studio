@@ -1,8 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 import { ContactForm } from "@/components/contact-form";
-import { ExperienceList } from "@/components/experience-list";
-import { FooterNavigation } from "@/components/footer-navigation";
 import { getStudioData } from "@/lib/site-data";
 
 export const metadata: Metadata = {
@@ -15,65 +13,70 @@ export default async function AboutPage() {
 
   return (
     <main>
-      <section className="page-shell grid min-h-[72dvh] gap-10 py-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-        <div>
-          <p className="eyebrow text-[var(--color-muted)]">{about.title}</p>
-          <h1 className="display-type mt-8 text-[var(--text-page-title)]">About</h1>
-        </div>
-        <div className="grid gap-6">
-          <div className="relative aspect-[4/3] overflow-hidden border border-[var(--color-line)]">
-            <Image src="/reference/A2 1.webp" alt="About visual reference" fill priority className="object-cover" sizes="60vw" />
-          </div>
-          <p className="max-w-2xl text-xl leading-8 text-[var(--color-muted)]">{about.bio}</p>
-        </div>
-      </section>
+      <section className="framed-page relative overflow-hidden px-5 pb-5 pt-20 md:px-8">
+        <div className="grid min-h-[calc(100dvh-8rem)] grid-cols-1 grid-rows-[auto_1fr_auto] gap-10">
+          <div className="grid gap-10 lg:grid-cols-[0.42fr_0.58fr]">
+            <aside className="hidden max-w-xs pt-10 lg:block">
+              <div className="border-l border-[var(--color-line)] pl-6 text-[var(--color-muted)]">
+                <span className="block text-5xl leading-none text-[var(--color-muted)]">“</span>
+                <p className="mt-3 text-2xl font-semibold leading-tight">Clear systems, enhanced by motion and detail</p>
+                <p className="mt-5 text-sm uppercase">Carl Wang Studio</p>
+              </div>
+            </aside>
 
-      <section className="page-shell border-y border-[var(--color-line)] py-16">
-        <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="section-title">Design Direction</h2>
-          <p className="max-w-3xl text-2xl leading-9">
-            {about.intro} I use strong type, structured image rhythm, and tokenized systems to make the work easier to maintain after launch.
-          </p>
-        </div>
-      </section>
-
-      <section className="page-shell py-20">
-        <div className="mb-10 grid gap-6 md:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="section-title">Skills</h2>
-          <p className="text-lg leading-8 text-[var(--color-muted)]">Each group maps to a repeatable service area and a concrete part of the production workflow.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {about.skills.map((group) => (
-            <section className="surface p-5" key={group.name}>
-              <h3 className="text-2xl uppercase leading-none">{group.name}</h3>
-              <ul className="mt-8 grid gap-3 text-sm text-[var(--color-muted)]">
-                {group.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
+            <section className="mx-auto w-full max-w-[520px]">
+              <h1 className="text-[clamp(1.9rem,2.4vw,3rem)] font-semibold leading-[1.05]">
+                Carl Wang designs visual systems, web experiences, and motion-driven digital products.
+              </h1>
+              <p className="mt-8 text-base leading-7 text-[var(--color-muted)]">{about.bio}</p>
+              <figure className="mt-8">
+                <div className="relative aspect-square overflow-hidden bg-[var(--color-soft)]">
+                  <Image src="/reference/A1 4.webp" alt="Carl Wang Studio about visual reference" fill priority className="object-cover grayscale" sizes="520px" />
+                </div>
+              </figure>
             </section>
-          ))}
+          </div>
+
+          <section className="mx-auto w-full max-w-[520px] self-start lg:ml-[45%] lg:mr-auto">
+            <h2 className="text-2xl font-semibold">Work Experience</h2>
+            <div className="mt-6 grid gap-7">
+              {about.experience.slice(0, 3).map((item) => (
+                <article key={item.company}>
+                  <h3 className="font-semibold">{item.company}</h3>
+                  <p className="text-sm text-[var(--color-muted)]">{item.period}</p>
+                  <p className="mt-2 text-sm leading-6">{item.summary}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div className="grid items-end gap-6 md:grid-cols-[1fr_auto]">
+            <h2 className="poster-type text-[clamp(5rem,15vw,14rem)] lowercase">about</h2>
+            <div className="flex gap-6 pb-5 text-sm text-[var(--color-muted)]">
+              {about.socialLinks.slice(0, 3).map((link) => (
+                <a className="underlined-link" href={link.href} key={link.label} target="_blank" rel="noreferrer">
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="page-shell pb-20">
-        <div className="mb-10">
-          <h2 className="section-title">Experience</h2>
-        </div>
-        <ExperienceList experience={about.experience} />
-      </section>
-
-      <section id="contact" className="page-shell pb-24 pt-6">
-        <div className="border-y border-[var(--color-line)] py-14">
-          <h2 className="display-type text-[clamp(4rem,12vw,12rem)]">Contact</h2>
-          <div className="mt-10 grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
+      <section id="contact" className="page-shell py-28">
+        <div className="grid gap-16 border-t border-[var(--color-line)] pt-12 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
+          <div>
+            <h2 className="poster-type text-[clamp(4.5rem,12vw,11rem)]">Contact</h2>
+            <p className="sparse-copy mt-6">For selected brand, web, interface, and motion work.</p>
+          </div>
+          <div className="grid min-w-0 gap-10">
             <div>
-              <a className="text-4xl uppercase leading-none md:text-6xl" href={`mailto:${about.email}`}>
+              <a className="break-words text-4xl uppercase leading-none md:text-5xl xl:text-6xl" href={`mailto:${about.email}`}>
                 {about.email}
               </a>
-              <div className="mt-8 flex flex-wrap gap-2">
+              <div className="mt-8 flex flex-wrap gap-5 text-sm uppercase">
                 {about.socialLinks.map((link) => (
-                  <a className="btn" href={link.href} key={link.label} target="_blank" rel="noreferrer">
+                  <a className="underlined-link" href={link.href} key={link.label} target="_blank" rel="noreferrer">
                     {link.label}
                   </a>
                 ))}
@@ -83,8 +86,6 @@ export default async function AboutPage() {
           </div>
         </div>
       </section>
-
-      <FooterNavigation />
     </main>
   );
 }

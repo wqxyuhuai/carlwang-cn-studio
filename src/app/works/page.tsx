@@ -12,17 +12,6 @@ export default async function WorksPage() {
 
   return (
     <main>
-      <section className="page-shell grid min-h-[58dvh] items-end pb-12 pt-14">
-        <div className="grid gap-8 lg:grid-cols-[1fr_0.7fr] lg:items-end">
-          <div>
-            <p className="eyebrow text-[var(--color-muted)]">Selected cases / Grid and list browsing</p>
-            <h1 className="display-type mt-8 text-[var(--text-page-title)]">Works</h1>
-          </div>
-          <p className="max-w-xl text-lg leading-8 text-[var(--color-muted)]">
-            Browse published projects by year and category. Grid mode is visual-first; list mode is for scanning project context quickly.
-          </p>
-        </div>
-      </section>
       <WorksBrowser works={works} />
     </main>
   );

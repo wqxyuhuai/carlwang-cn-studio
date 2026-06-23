@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { FooterNavigation } from "@/components/footer-navigation";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/site-data";
 import { NotionRenderer } from "@/lib/notion-renderer";
 
@@ -33,66 +32,69 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
   const next = works[(currentIndex + 1) % works.length];
 
   return (
-    <main>
-      <section className="page-shell py-10">
-        <Link className="btn" href="/works">
-          Back to works
-        </Link>
-        <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_0.46fr] lg:items-end">
+    <main className="framed-page overflow-hidden px-5 pb-5 pt-20 md:px-8">
+      <section className="grid min-h-[calc(100dvh-8rem)] gap-10 lg:grid-cols-[minmax(320px,0.82fr)_1fr]">
+        <aside className="flex flex-col justify-between gap-8">
           <div>
+            <Link className="underlined-link text-xs uppercase text-[var(--color-muted)]" href="/works">
+              Back to works
+            </Link>
+            <figure className="mt-10 max-w-[520px]">
+              <div className="relative aspect-square overflow-hidden border border-[var(--color-line)]">
+                <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority className="object-cover" sizes="44vw" />
+              </div>
+              <figcaption className="mt-3 font-mono text-[10px] uppercase text-[var(--color-muted)]">{work.coverImage.caption || work.title}</figcaption>
+            </figure>
+          </div>
+
+          <div className="max-w-xl border-t border-[var(--color-line)] pt-6">
             <p className="eyebrow text-[var(--color-muted)]">
               {work.year} / {work.category}
             </p>
-            <h1 className="display-type mt-8 text-[var(--text-page-title)]">{work.title}</h1>
-          </div>
-          <div className="grid gap-5 border-t border-[var(--color-line)] pt-5">
-            <p className="text-lg leading-8 text-[var(--color-muted)]">{work.intro}</p>
-            <dl className="grid gap-3 text-sm">
-              <div className="grid grid-cols-[100px_1fr] gap-4">
+            <h1 className="poster-type mt-4 text-[clamp(3.2rem,6vw,6.5rem)]">{work.title}</h1>
+            <p className="mt-5 text-base leading-7 text-[var(--color-muted)]">{work.intro}</p>
+            <dl className="mt-8 grid gap-3 text-sm">
+              <div className="grid grid-cols-[86px_1fr] gap-4 border-t border-[var(--color-line)] pt-3">
                 <dt className="text-[var(--color-muted)]">Role</dt>
                 <dd>{work.role}</dd>
               </div>
-              <div className="grid grid-cols-[100px_1fr] gap-4">
+              <div className="grid grid-cols-[86px_1fr] gap-4 border-t border-[var(--color-line)] pt-3">
                 <dt className="text-[var(--color-muted)]">Tools</dt>
                 <dd>{work.tools.join(", ")}</dd>
               </div>
             </dl>
           </div>
-        </div>
-      </section>
+        </aside>
 
-      <section className="page-shell">
-        <div className="relative aspect-[16/9] overflow-hidden border border-[var(--color-line)]">
-          <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority className="object-cover" sizes="100vw" />
-        </div>
+        <section className="relative min-h-[60dvh] border-l border-[var(--color-line)] pl-0 lg:h-[calc(100dvh-8rem)] lg:overflow-y-auto lg:pl-10">
+          <div className="pointer-events-none sticky top-0 z-10 hidden h-8 bg-gradient-to-b from-[var(--color-surface)] to-transparent lg:block" />
+          <article className="notion-body mx-auto max-w-3xl pb-12 lg:pr-6">
+            <p className="eyebrow mb-8 text-[var(--color-muted)]">Notion body</p>
+            <NotionRenderer blocks={work.content} />
+            <nav className="mt-16 grid gap-3 border-t border-[var(--color-line)] pt-5 md:grid-cols-2" aria-label="Adjacent works">
+              <Link className="group grid grid-cols-[64px_1fr] gap-3 text-left" href={`/works/${previous.slug}`}>
+                <span className="relative aspect-square overflow-hidden border border-[var(--color-line)]">
+                  <Image src={previous.coverImage.src} alt={previous.coverImage.alt} fill className="object-cover transition group-hover:scale-[1.04]" sizes="64px" />
+                </span>
+                <span>
+                  <span className="eyebrow block text-[var(--color-muted)]">Previous</span>
+                  <strong className="mt-2 block uppercase leading-none">{previous.title}</strong>
+                </span>
+              </Link>
+              <Link className="group grid grid-cols-[64px_1fr] gap-3 text-left md:text-right" href={`/works/${next.slug}`}>
+                <span className="relative aspect-square overflow-hidden border border-[var(--color-line)] md:order-2">
+                  <Image src={next.coverImage.src} alt={next.coverImage.alt} fill className="object-cover transition group-hover:scale-[1.04]" sizes="64px" />
+                </span>
+                <span>
+                  <span className="eyebrow block text-[var(--color-muted)]">Next</span>
+                  <strong className="mt-2 block uppercase leading-none">{next.title}</strong>
+                </span>
+              </Link>
+            </nav>
+          </article>
+          <div className="pointer-events-none sticky bottom-0 hidden h-10 bg-gradient-to-t from-[var(--color-surface)] to-transparent lg:block" />
+        </section>
       </section>
-
-      <section className="page-shell grid gap-5 py-20 md:grid-cols-6">
-        {work.gallery.map((media, index) => (
-          <figure key={`${media.src}-${index}`} className={index === 0 ? "md:col-span-4" : "md:col-span-2"}>
-            <div className="relative aspect-[4/3] overflow-hidden border border-[var(--color-line)]">
-              <Image src={media.src} alt={media.alt} fill className="object-cover" sizes="(min-width: 768px) 50vw, 100vw" />
-            </div>
-            {media.caption ? <figcaption className="mt-2 font-mono text-xs uppercase text-[var(--color-muted)]">{media.caption}</figcaption> : null}
-          </figure>
-        ))}
-      </section>
-
-      <section className="page-shell pb-24">
-        <NotionRenderer blocks={work.content} />
-      </section>
-
-      <nav className="page-shell grid gap-4 pb-20 md:grid-cols-2" aria-label="Adjacent works">
-        <Link className="surface p-5 transition hover:border-[var(--color-accent)]" href={`/works/${previous.slug}`}>
-          <span className="eyebrow text-[var(--color-muted)]">Previous</span>
-          <strong className="mt-8 block text-4xl uppercase leading-none">{previous.title}</strong>
-        </Link>
-        <Link className="surface p-5 text-right transition hover:border-[var(--color-accent)]" href={`/works/${next.slug}`}>
-          <span className="eyebrow text-[var(--color-muted)]">Next</span>
-          <strong className="mt-8 block text-4xl uppercase leading-none">{next.title}</strong>
-        </Link>
-      </nav>
-      <FooterNavigation />
     </main>
   );
 }

@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FooterNavigation } from "@/components/footer-navigation";
-import { WorkCard } from "@/components/work-card";
 import { getStudioData } from "@/lib/site-data";
 
 export default async function Home() {
@@ -10,99 +9,98 @@ export default async function Home() {
 
   return (
     <main>
-      <section className="page-shell grid min-h-[calc(100dvh-4rem)] gap-10 pb-14 pt-10 lg:grid-cols-[1fr_0.78fr] lg:items-end">
-        <div className="reveal">
-          <p className="eyebrow text-[var(--color-muted)]">Based in China / Available for selected collaborations</p>
-          <h1 className="display-type mt-8 text-[var(--text-hero)]">{data.settings.homeHeroTitle}</h1>
-          <p className="mt-7 max-w-2xl text-xl leading-8 text-[var(--color-muted)]">{data.settings.homeHeroDescription}</p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Link className="btn btn-primary" href="/works">
-              View works
-            </Link>
-            <Link className="btn" href="/about#contact">
-              Start a project
-            </Link>
-          </div>
-        </div>
-        <div className="relative min-h-[540px] reveal reveal-delay-1">
-          {featuredWorks.slice(0, 3).map((work, index) => (
-            <Link
-              href={`/works/${work.slug}`}
-              key={work.slug}
-              className="absolute block border border-[var(--color-line)] bg-[var(--color-surface)] p-2 shadow-[0_24px_70px_rgb(0_0_0_/_0.12)] transition duration-500 hover:-translate-y-2"
-              style={{
-                width: index === 0 ? "72%" : index === 1 ? "58%" : "48%",
-                right: index === 0 ? "8%" : index === 1 ? "0%" : "42%",
-                top: index === 0 ? "0%" : index === 1 ? "36%" : "58%",
-                zIndex: 3 - index,
-              }}
-            >
-              <span className="relative block aspect-[4/3] overflow-hidden">
-                <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index === 0} className="object-cover" sizes="50vw" />
-              </span>
-              <span className="mt-2 flex justify-between gap-3 font-mono text-xs uppercase text-[var(--color-muted)]">
-                <span>{work.title}</span>
-                <span>{work.year}</span>
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="page-shell border-y border-[var(--color-line)] py-16">
-        <div className="grid gap-10 md:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="section-title">Featured Works</h2>
-          <p className="max-w-2xl text-lg leading-8 text-[var(--color-muted)]">
-            Selected work is arranged as a visual rhythm rather than a flat card wall. The same data model powers list browsing, details, and admin review.
-          </p>
-        </div>
-        <div className="mt-12 grid gap-5 md:grid-cols-6">
-          {featuredWorks.map((work, index) => (
-            <WorkCard key={work.slug} work={work} priority={index < 2} className={index === 0 ? "md:col-span-3" : index === 1 ? "md:col-span-3 md:mt-20" : "md:col-span-2"} />
-          ))}
-        </div>
-      </section>
-
-      <section className="page-shell grid gap-12 py-20 lg:grid-cols-[1.1fr_0.9fr]">
-        <div>
-          <p className="eyebrow text-[var(--color-muted)]">Work fields</p>
-          <h2 className="section-title mt-6">Brand, web, interface, motion</h2>
-        </div>
-        <div className="grid gap-4">
-          {["Brand & Visual", "Web & Interaction", "Product & Experience", "Motion & Content", "Design Workflow & AI Tools"].map((item) => (
-            <div className="grid grid-cols-[auto_1fr] gap-5 border-b border-[var(--color-line)] py-4" key={item}>
-              <span className="h-4 w-4 bg-[var(--color-accent)]" />
-              <span className="text-3xl uppercase leading-none">{item}</span>
+      <section className="page-shell grid min-h-[100dvh] grid-rows-[1fr_auto] pb-10 pt-24">
+        <div className="flex items-center">
+          <div className="w-full max-w-[1180px]">
+            <div className="mb-10 flex items-center gap-4 reveal">
+              <span className="h-4 w-4 bg-[var(--color-accent)]" aria-hidden />
+              <p className="eyebrow text-[var(--color-muted)]">Selected collaborations / 2026</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="page-shell grid gap-8 pb-24 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="surface p-5">
-          <div className="relative aspect-[4/5] overflow-hidden">
-            <Image src="/reference/A2 1.webp" alt="About page visual reference" fill className="object-cover" sizes="50vw" />
+            <h1 className="poster-type text-[clamp(4.7rem,13vw,13.25rem)]">
+              <span className="mask-line block">Carl Wang</span>
+              <span className="mask-line block">Studio</span>
+              <span className="mask-line block text-[color-mix(in_srgb,var(--color-ink)_84%,var(--color-bg))]">Visual Systems</span>
+            </h1>
+            <p className="mt-8 max-w-2xl text-xl leading-8 text-[var(--color-muted)] reveal reveal-delay-3">
+              {data.settings.homeHeroDescription}
+            </p>
           </div>
         </div>
-        <div className="flex flex-col justify-end border-t border-[var(--color-line)] pt-8">
-          <h2 className="display-type text-[clamp(4rem,10vw,10rem)]">About</h2>
-          <p className="mt-6 max-w-2xl text-xl leading-8 text-[var(--color-muted)]">{data.about.bio}</p>
-          <Link className="btn mt-8 w-fit" href="/about">
-            Read about Carl
-          </Link>
+        <div className="grid gap-3 border-t border-[var(--color-line)] pt-4 text-xs text-[var(--color-muted)] md:grid-cols-3 reveal reveal-delay-3">
+          <span>Based in China</span>
+          <span>Web experiences / motion content</span>
+          <span className="md:text-right">Available for selected collaborations</span>
         </div>
       </section>
 
-      <section className="page-shell pb-20">
-        <div className="border-y border-[var(--color-line)] py-14">
-          <h2 className="display-type text-[clamp(4rem,12vw,12rem)]">Contact</h2>
-          <div className="mt-8 grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
-            <p className="max-w-2xl text-xl leading-8 text-[var(--color-muted)]">
-              Have a brand, web, interface, or motion project that needs a clear system and a strong visual direction?
+      <section className="page-shell min-h-[88dvh] py-24">
+        <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="max-w-lg">
+            <h2 className="section-title">Selected work</h2>
+            <p className="sparse-copy mt-8">
+              A quieter second screen gives the work room to appear. The index keeps a poster-like rhythm instead of a packed card wall.
             </p>
-            <Link className="btn btn-primary" href="/about#contact">
-              Open contact form
+            <Link className="underlined-link mt-10 inline-block text-sm uppercase" href="/works">
+              View all works
             </Link>
+          </div>
+          <div className="relative min-h-[620px]">
+            {featuredWorks.slice(0, 4).map((work, index) => (
+              <Link
+                href={`/works/${work.slug}`}
+                key={work.slug}
+                className="group absolute block overflow-hidden border border-[var(--color-line)] bg-[var(--color-surface)] transition duration-500 ease-[var(--ease-out)] hover:-translate-y-2 hover:border-[var(--color-accent)]"
+                style={{
+                  width: index === 0 ? "42%" : index === 1 ? "36%" : index === 2 ? "31%" : "27%",
+                  right: index === 0 ? "42%" : index === 1 ? "10%" : index === 2 ? "0%" : "55%",
+                  top: index === 0 ? "3%" : index === 1 ? "28%" : index === 2 ? "55%" : "66%",
+                  zIndex: 4 - index,
+                }}
+              >
+                <span className="relative block aspect-square overflow-hidden">
+                  <Image src={work.coverImage.src} alt={work.coverImage.alt} fill priority={index < 2} className="object-cover transition duration-500 group-hover:scale-[1.04]" sizes="40vw" />
+                </span>
+                <span className="flex justify-between gap-3 p-3 font-mono text-[10px] uppercase text-[var(--color-muted)]">
+                  <span>{work.title}</span>
+                  <span>{work.year}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="page-shell py-24">
+        <div className="grid gap-16 lg:grid-cols-[1fr_0.85fr]">
+          <div>
+            <h2 className="poster-type text-[clamp(4rem,10vw,10rem)]">Brand / web / motion</h2>
+          </div>
+          <div className="grid content-end gap-5">
+            {["Brand & Visual", "Web & Interaction", "Product & Experience", "Motion & Content", "Design Workflow & AI Tools"].map((item) => (
+              <div className="grid grid-cols-[auto_1fr] gap-5 border-b border-[var(--color-line)] py-4" key={item}>
+                <span className="mt-1 h-3 w-3 bg-[var(--color-accent)]" />
+                <span className="text-2xl uppercase leading-none">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="page-shell pb-28 pt-10">
+        <div className="grid gap-10 border-t border-[var(--color-line)] pt-10 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <h2 className="poster-type text-[clamp(4rem,10vw,10rem)]">About</h2>
+          </div>
+          <div className="max-w-2xl">
+            <p className="text-2xl leading-9">{data.about.bio}</p>
+            <div className="mt-10 flex flex-wrap gap-5 text-sm uppercase">
+              <Link className="underlined-link" href="/about">
+                Read about Carl
+              </Link>
+              <Link className="underlined-link" href="/about#contact">
+                Contact
+              </Link>
+            </div>
           </div>
         </div>
       </section>

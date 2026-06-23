@@ -34,7 +34,7 @@ const themeScript = `
 (() => {
   try {
     const stored = localStorage.getItem("cws-theme");
-    const theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    const theme = stored || "light";
     document.documentElement.dataset.theme = theme;
   } catch {
     document.documentElement.dataset.theme = "light";
