@@ -7,20 +7,32 @@ type FormState = "idle" | "loading" | "success" | "error";
 export function ContactForm() {
   const [state, setState] = useState<FormState>("idle");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setState("loading");
-    window.setTimeout(() => {
-      const form = event.currentTarget;
-      const data = new FormData(form);
-      const email = String(data.get("email") || "");
-      if (!email.includes("@")) {
+
+    const form = event.currentTarget;
+    const data = new FormData(form);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(Object.fromEntries(data))
+      });
+
+      if (!response.ok) {
         setState("error");
         return;
       }
+
       form.reset();
       setState("success");
-    }, 360);
+    } catch {
+      setState("error");
+    }
   }
 
   return (
@@ -54,6 +66,10 @@ export function ContactForm() {
       <label className="form-field">
         <span>Message</span>
         <textarea className="form-control textarea-message" name="message" required />
+      </label>
+      <label className="form-field contact-honeypot">
+        <span>Website</span>
+        <input className="form-control" name="website" tabIndex={-1} />
       </label>
       {state === "error" ? <p className="text-muted">Please add a valid email before sending.</p> : null}
       {state === "success" ? <p className="text-muted">Thanks, I will get back to you.</p> : null}

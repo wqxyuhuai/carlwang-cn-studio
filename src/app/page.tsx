@@ -1,16 +1,48 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { CSSProperties } from "react";
+import { FieldHoverShowcase } from "@/components/home/field-hover-showcase";
+import { HomeMotionLayer } from "@/components/home/home-motion-layer";
 import { FooterNavigation } from "@/components/footer-navigation";
 
 const figmaImage = "/figma/pw2-work-image.png";
-const fieldLabels = ["Website & Interface", "Brand & Visual System", "Motion & Video", "Exhibition & Spatial", "Creative Experiments"];
+const heroSlices = Array.from({ length: 14 }, (_, index) => index);
+const featuredThumbs = [
+  { alt: "Interface work preview", src: "/field-media/a1-2.webp" },
+  { alt: "Studio web system preview", src: figmaImage },
+  { alt: "Brand visual system preview", src: "/field-media/a2-1.webp" },
+  { alt: "Motion work preview", src: "/field-media/a1-1.webp" },
+  { alt: "Spatial design preview", src: "/field-media/b1-1.webp" },
+  { alt: "Creative experiment preview", src: "/field-media/c1-5.webp" },
+  { alt: "PW2 work thumbnail", src: "/figma/pw2-work-thumb.png" },
+  { alt: "Interface detail preview", src: "/field-media/a1-1.webp" },
+  { alt: "Studio detail preview", src: figmaImage },
+  { alt: "Visual system detail preview", src: "/field-media/a2-1.webp" },
+  { alt: "Experiment detail preview", src: "/field-media/c1-5.webp" },
+  { alt: "Spatial detail preview", src: "/field-media/b1-1.webp" },
+  { alt: "Selected work preview", src: "/figma/pw2-work-thumb.png" },
+  { alt: "Interface rhythm preview", src: "/field-media/a1-2.webp" },
+  { alt: "Motion rhythm preview", src: "/field-media/a1-1.webp" },
+  { alt: "Visual rhythm preview", src: "/field-media/a2-1.webp" },
+  { alt: "Creative rhythm preview", src: "/field-media/c1-5.webp" },
+  { alt: "Spatial rhythm preview", src: "/field-media/b1-1.webp" }
+];
 
 export default function Home() {
   return (
-    <main className="pw-page">
-      <section className="pw-home-hero">
+    <main className="pw-page pw-home-motion-root">
+      <HomeMotionLayer />
+
+      <section className="pw-home-hero" data-home-hero>
+        <div className="pw-home-hero-visual" data-home-hero-visual aria-hidden="true">
+          <div className="pw-home-raster-grid">
+            {heroSlices.map((index) => (
+              <span className="pw-home-raster-slice" key={index} style={{ "--slice-index": index } as CSSProperties} />
+            ))}
+          </div>
+        </div>
         <div className="pw-home-hero-inner">
-          <h1 className="pw-home-title">
+          <h1 className="pw-home-title" data-home-title>
             Designing clarity for complex systems.
             <br />
             <br />
@@ -18,20 +50,28 @@ export default function Home() {
             <br />
             Creative Builder
           </h1>
-          <div className="pw-meta-row caption-copy">
+          <div className="pw-meta-row caption-copy" data-home-meta>
             <span>Build with love @2026</span>
             <span>Based in Wuxi</span>
           </div>
         </div>
       </section>
 
-      <section className="pw-home-strip" aria-label="Featured works">
-        <div className="pw-thumb-track">
-          {Array.from({ length: 9 }, (_, index) => (
-            <Link className="pw-thumb" href="/works" key={index}>
-              <Image alt="PW2 selected work thumbnail" height={400} priority={index === 0} src={figmaImage} width={400} />
-            </Link>
-          ))}
+      <section className="pw-home-strip" data-home-second data-home-work-strip aria-label="Featured works">
+        <div className="pw-home-strip-stage" data-home-work-stage>
+          <div className="pw-thumb-track" data-home-thumb-track>
+            {featuredThumbs.map((thumb, index) => (
+              <Link
+                className="pw-thumb"
+                data-cursor-hover
+                href="/works"
+                key={`${thumb.src}-${index}`}
+                style={{ "--thumb-index": index } as CSSProperties}
+              >
+                <Image alt={thumb.alt} height={400} priority={index < 4} src={thumb.src} width={400} />
+              </Link>
+            ))}
+          </div>
         </div>
         <h2 className="pw-feature-link">
           <Link className="pw-link-arrow" href="/works">
@@ -59,18 +99,7 @@ export default function Home() {
         </h2>
       </section>
 
-      <section className="pw-fields-band" aria-label="Design fields">
-        <span className="pw-figma-image">
-          <Image alt="PW2 motion field image" height={400} src={figmaImage} width={400} />
-        </span>
-        <div className="pw-field-list">
-          {fieldLabels.map((label) => (
-            <span className={label === "Motion & Video" ? "is-active" : undefined} key={label}>
-              {label}
-            </span>
-          ))}
-        </div>
-      </section>
+      <FieldHoverShowcase />
 
       <FooterNavigation />
     </main>

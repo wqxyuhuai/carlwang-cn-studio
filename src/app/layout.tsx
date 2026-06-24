@@ -1,6 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
 import { SiteNav } from "@/components/site-nav";
+
+const themeInitScript = `(() => {
+  try {
+    const storedTheme = window.localStorage.getItem("theme");
+    const theme = storedTheme === "dark" || storedTheme === "light"
+      ? storedTheme
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    document.documentElement.dataset.theme = theme;
+  } catch {
+  }
+})();`;
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://studio.carlwang.cn"),
@@ -29,8 +43,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html data-scroll-behavior="smooth" lang="en">
+    <html data-scroll-behavior="smooth" lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body>
+        <GlassDistortionFilter />
         <div className="site-frame">
           <SiteNav />
           {children}

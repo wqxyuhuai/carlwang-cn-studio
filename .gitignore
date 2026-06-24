@@ -1,6 +1,7 @@
 .next/
 out/
 node_modules/
+.admin/
 .env
 .env.local
 .env.*.local

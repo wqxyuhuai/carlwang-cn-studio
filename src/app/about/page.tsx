@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import { DirectionShowcase } from "@/components/about/direction-showcase";
+import { CascadeText } from "@/components/cascade-text";
 import { FooterNavigation } from "@/components/footer-navigation";
 
 export const metadata: Metadata = {
@@ -10,7 +12,6 @@ export const metadata: Metadata = {
 const aboutImage = "/figma/about-main.png";
 const quoteMark = "/figma/about-quote.svg";
 const quoteLine = "/figma/about-quote-line.svg";
-const directionImage = "/figma/about-direction.png";
 const experienceThumb = "/figma/about-experience-thumb.png";
 
 const bodyCopy = [
@@ -19,7 +20,6 @@ const bodyCopy = [
   "I am interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
 ];
 
-const directions = ["Digital Experience", "Visual System", "Motion & Content", "Spatial Thinking"];
 const experienceRows = [
   { id: "designer-primary", role: "Designer", title: "Wattsonic", year: "2025-2026" },
   { id: "uiux", role: "UI UX Designer", title: "Wattsonic", year: "2025-2026" },
@@ -68,21 +68,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="pw-about-direction">
-        <span className="pw-figma-image">
-          <Image alt="PW2 design direction visual" height={420} src={directionImage} width={420} />
-        </span>
-        <div>
-          <h2 className="pw-kicker-line">Design Direction</h2>
-          <div className="pw-direction-list">
-            {directions.map((direction) => (
-              <span className={direction === "Motion & Content" ? "is-active" : undefined} key={direction}>
-                {direction}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <DirectionShowcase />
 
       <section className="pw-about-experience">
         <div className="pw-experience-heading">
@@ -92,13 +78,17 @@ export default function AboutPage() {
         <div className="pw-experience-rows">
           {experienceRows.map((row) => (
             <div className="pw-experience-item" key={row.id} tabIndex={0}>
-              <span className="pw-experience-role">{row.role}</span>
+              <span className="pw-experience-role">
+                <CascadeText text={row.role} underline={false} wrap />
+              </span>
               <span className="pw-experience-thumb-slot">
                 <span className="pw-role-thumb">
                   <Image alt="PW2 role thumbnail" height={80} src={experienceThumb} width={80} />
                 </span>
               </span>
-              <strong className="pw-experience-company">{row.title}</strong>
+              <strong className="pw-experience-company">
+                <CascadeText text={row.title} />
+              </strong>
               <span className="pw-experience-year">{row.year}</span>
             </div>
           ))}
