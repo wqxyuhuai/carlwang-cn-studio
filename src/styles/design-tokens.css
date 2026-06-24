@@ -1,0 +1,148 @@
+@font-face {
+  font-family: "Bebas Neue Local";
+  src: url("/fonts/bebas-neue/BebasNeue-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Local";
+  src: url("/fonts/sf-pro/SF-Pro-Display-Regular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Local";
+  src: url("/fonts/sf-pro/SF-Pro-Display-Medium.otf") format("opentype");
+  font-style: normal;
+  font-weight: 510;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Local";
+  src: url("/fonts/sf-pro/SF-Pro-Display-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --figma-white: #fff;
+  --figma-black: #000;
+  --figma-black-60: rgb(0 0 0 / 60%);
+  --figma-black-40: rgb(0 0 0 / 40%);
+  --figma-black-20: rgb(0 0 0 / 20%);
+  --figma-black-10: rgb(0 0 0 / 10%);
+  --figma-bg: #f2f3f0;
+  --figma-green: #b7d075;
+  --figma-hero-green-deep: rgb(39 76 38);
+  --figma-hero-green-mid: rgb(171 197 64);
+  --figma-hero-green-soft: rgb(211 223 164);
+
+  --color-white: var(--figma-white);
+  --color-black: var(--figma-black);
+  --color-black-60: var(--figma-black-60);
+  --color-black-40: var(--figma-black-40);
+  --color-black-20: var(--figma-black-20);
+  --color-black-10: var(--figma-black-10);
+  --color-bg: var(--figma-bg);
+  --color-green: var(--figma-green);
+  --color-line: var(--color-black-40);
+  --gradient-home-hero: linear-gradient(
+      180deg,
+      transparent 0%,
+      transparent 46%,
+      var(--color-bg) 84%,
+      var(--color-bg) 100%
+    ),
+    linear-gradient(
+      105deg,
+      var(--figma-hero-green-soft) 0%,
+      var(--figma-hero-green-mid) 56%,
+      var(--figma-hero-green-deep) 100%
+    );
+
+  --font-display: "Bebas Neue Local", "Arial Narrow", sans-serif;
+  --font-body: "SF Pro Local", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --text-caption: 0.75rem;
+  --text-body-r: 1rem;
+  --text-body-m: 1rem;
+  --text-title: 1.625rem;
+  --text-subtitle: clamp(1.125rem, 2.8125vw, 2.25rem);
+  --text-display-hero: clamp(3.75rem, 7.8125vw, 6.25rem);
+  --text-display-field: clamp(2.5rem, 6.25vw, 6.25rem);
+  --text-display-category: clamp(1.25rem, 3.125vw, 2.5rem);
+  --text-display-works-year: clamp(3.125rem, 7.8125vw, 6.25rem);
+  --text-footer-logo: clamp(1.875rem, 4.6875vw, 3.75rem);
+  --text-detail-title: 1.625rem;
+
+  --line-caption: 1.8333;
+  --line-body: 1.25;
+  --line-subtitle: 1.45;
+  --line-display: 1;
+
+  --tracking-body: 0;
+  --tracking-body-active: -0.01em;
+  --tracking-subtitle: -0.005em;
+  --tracking-display: -0.005em;
+
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-15: 3.75rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-30: 7.5rem;
+  --space-45: 11.25rem;
+
+  --page-pad-x: clamp(var(--space-8), 5vw, var(--space-16));
+  --section-y: clamp(var(--space-20), 9.375vw, var(--space-45));
+  --frame-hero-h: 62.375rem;
+  --frame-mobile-hero-h: 57rem;
+  --frame-footer-h: 25rem;
+  --frame-footer-mobile-h: 26.875rem;
+  --figma-section-gap: 3.125rem;
+  --figma-section-y-desktop: 12.5rem;
+  --figma-about-hero-h: 62.375rem;
+  --figma-direction-h: 51.25rem;
+  --figma-experience-h: 57.5rem;
+  --figma-contact-h: 54.0625rem;
+  --figma-social-h: 41.25rem;
+  --figma-form-field-h: 3.125rem;
+  --figma-message-h: 10.875rem;
+  --figma-send-h: 3.8125rem;
+  --figma-social-icon: 6.25rem;
+  --figma-social-icon-mobile: 3.9096875rem;
+  --work-thumb-size: 12.5rem;
+  --nav-h: 5.125rem;
+  --nav-mobile-h: 7.25rem;
+  --figma-pad-desktop: 4rem;
+  --figma-pad-mobile: 2rem;
+  --radius-none: 0;
+
+  --motion-fast: 120ms;
+  --motion-base: 240ms;
+  --motion-slow: 480ms;
+  --motion-page: 720ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --section-y: var(--space-30);
+    --work-thumb-size: 12.5rem;
+  }
+}
