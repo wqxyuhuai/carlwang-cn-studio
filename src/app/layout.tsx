@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
+import { SiteCursor } from "@/components/site-cursor";
 import { SiteNav } from "@/components/site-nav";
 
 const themeInitScript = `(() => {
@@ -49,6 +50,7 @@ export default function RootLayout({
       </head>
       <body>
         <GlassDistortionFilter />
+        <SiteCursor />
         <div className="site-frame">
           <SiteNav />
           {children}

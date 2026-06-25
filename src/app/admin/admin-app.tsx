@@ -6,6 +6,7 @@ import {
   collectionConfigs,
   getCollectionConfig,
   isCollectionKey,
+  mediaUsageOptions,
   type AdminCollectionConfig,
   type AdminCollectionKey,
   type AdminField,
@@ -30,16 +31,23 @@ type CollectionPayload = {
 type IntegrationDatabaseStatus = {
   key: string;
   label?: string;
+  tableName?: string;
+  legacyTableNames?: string[];
   status: string;
   databaseId?: string;
   env?: string;
   error?: string;
+  expectedFields?: number;
+  writableFields?: number;
+  missingFields?: string[];
+  typeMismatches?: string[];
 };
 
 type IntegrationStatus = {
   notion: {
     status: string;
     token: string;
+    workspaceName: string;
     sourceMode: string;
     databases: IntegrationDatabaseStatus[];
   };
@@ -102,9 +110,9 @@ function blankRecord(config: AdminCollectionConfig): Partial<AdminRecord> {
     else record[field.key] = "";
   }
 
-  if ("status" in record && config.key !== "contact-messages") record.status = "Draft";
+  if ("status" in record) record.status = config.key === "works" ? "Draft" : config.key === "contact-messages" ? "New" : "Published";
   if ("visible" in record) record.visible = true;
-  if ("active" in record) record.active = true;
+  if ("homeVisible" in record) record.homeVisible = true;
   return record;
 }
 
@@ -126,9 +134,10 @@ export function AdminApp() {
   const [selected, setSelected] = useState<AdminRecord | null>(null);
   const [form, setForm] = useState<Partial<AdminRecord>>({});
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [dirty, setDirty] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadUsage, setUploadUsage] = useState("general");
+  const [uploadUsage, setUploadUsage] = useState("General");
 
   const csrf = session?.csrf || "";
 
@@ -199,6 +208,7 @@ export function AdminApp() {
         setCollectionPayload(payload);
         setSelected(null);
         setForm({});
+        setStatusFilter("All");
         setDirty(false);
       } catch (error) {
         showToast("error", error instanceof Error ? error.message : "Collection failed.");
@@ -277,16 +287,31 @@ export function AdminApp() {
     setDirty(true);
   }
 
-  async function saveRecord(config: AdminCollectionConfig) {
+  function shouldRevalidateAfterSave(config: AdminCollectionConfig) {
+    return !["contact-messages", "media-assets"].includes(config.key);
+  }
+
+  async function revalidateAfterSave(config: AdminCollectionConfig) {
+    if (!shouldRevalidateAfterSave(config)) return true;
+    try {
+      await adminFetch<{ revalidatedAt: string }>("/api/admin/revalidate", { method: "POST" });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function saveRecord(config: AdminCollectionConfig, patch: Partial<AdminRecord> = {}) {
     setLoading(true);
     try {
       const method = selected ? "PUT" : "POST";
       const path = selected ? `/api/admin/${config.apiPath}/${selected.id}` : `/api/admin/${config.apiPath}`;
       await adminFetch(path, {
         method,
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, ...patch })
       });
-      showToast("success", "Saved.");
+      const revalidated = await revalidateAfterSave(config);
+      showToast(revalidated ? "success" : "info", revalidated ? "Saved and updated." : "Saved. Public cache may update later.");
       await loadCollection(config.key);
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Save failed.");
@@ -320,9 +345,21 @@ export function AdminApp() {
     delete duplicated.updatedAt;
     if (typeof duplicated[config.titleField] === "string") duplicated[config.titleField] = `${duplicated[config.titleField]} Copy`;
     if (typeof duplicated.slug === "string") duplicated.slug = `${duplicated.slug}-copy`;
+    if (config.key === "works") duplicated.status = "Draft";
     setSelected(null);
     setForm(duplicated);
     setDirty(true);
+  }
+
+  async function copyText(value: AdminValue | undefined, label: string) {
+    const text = valueToString(value);
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("success", `${label} copied.`);
+    } catch {
+      showToast("error", `Unable to copy ${label.toLowerCase()}.`);
+    }
   }
 
   async function uploadMedia(config: AdminCollectionConfig) {
@@ -336,11 +373,31 @@ export function AdminApp() {
       const data = new FormData();
       data.set("file", uploadFile);
       data.set("usage", uploadUsage);
-      await adminFetch("/api/admin/media/upload", {
+      const result = await adminFetch<{ item?: AdminRecord }>("/api/admin/media/upload", {
         method: "POST",
         body: data
       });
       setUploadFile(null);
+      if (config.key === "works" && typeof result.item?.url === "string") {
+        if (uploadUsage === "Work Cover") {
+          setForm((current) => ({ ...current, coverImage: result.item?.url || "" }));
+        } else {
+          setForm((current) => ({
+            ...current,
+            galleryImages: [valueToString(current.galleryImages), result.item?.url || ""].filter(Boolean).join("\n")
+          }));
+        }
+        setDirty(true);
+        showToast("success", "Uploaded and attached.");
+        return;
+      }
+      if (typeof result.item?.url === "string" && ["tools", "social-links", "page-sections"].includes(config.key)) {
+        const targetField = config.key === "page-sections" ? "mediaUrl" : "iconUrl";
+        setForm((current) => ({ ...current, [targetField]: result.item?.url || "" }));
+        setDirty(true);
+        showToast("success", "Uploaded and attached.");
+        return;
+      }
       showToast("success", "Uploaded.");
       await loadCollection(config.key);
     } catch (error) {
@@ -458,15 +515,18 @@ export function AdminApp() {
               selected,
               form,
               search,
+              statusFilter,
               uploadFile,
               uploadUsage,
               onSearch: setSearch,
+              onStatusFilter: setStatusFilter,
               onOpen: openRecord,
               onNew: startNew,
               onChange: updateField,
               onSave: saveRecord,
               onDelete: deleteSelected,
               onDuplicate: duplicateSelected,
+              onCopyText: copyText,
               onUploadFile: setUploadFile,
               onUploadUsage: setUploadUsage,
               onUpload: uploadMedia
@@ -575,15 +635,18 @@ type CollectionRenderProps = {
   selected: AdminRecord | null;
   form: Partial<AdminRecord>;
   search: string;
+  statusFilter: string;
   uploadFile: File | null;
   uploadUsage: string;
   onSearch: (value: string) => void;
+  onStatusFilter: (value: string) => void;
   onOpen: (record: AdminRecord) => void;
   onNew: (config: AdminCollectionConfig) => void;
   onChange: (field: AdminField, value: AdminValue) => void;
-  onSave: (config: AdminCollectionConfig) => void;
+  onSave: (config: AdminCollectionConfig, patch?: Partial<AdminRecord>) => void;
   onDelete: (config: AdminCollectionConfig) => void;
   onDuplicate: (config: AdminCollectionConfig) => void;
+  onCopyText: (value: AdminValue | undefined, label: string) => void;
   onUploadFile: (file: File | null) => void;
   onUploadUsage: (usage: string) => void;
   onUpload: (config: AdminCollectionConfig) => void;
@@ -591,6 +654,7 @@ type CollectionRenderProps = {
 
 function renderCollection(props: CollectionRenderProps) {
   const filteredItems = props.payload.items.filter((item) => {
+    if (props.config.key === "contact-messages" && props.statusFilter !== "All" && item.status !== props.statusFilter) return false;
     if (!props.search.trim()) return true;
     const haystack = Object.values(item).map((value) => valueToString(value)).join(" ").toLowerCase();
     return haystack.includes(props.search.toLowerCase());
@@ -609,6 +673,13 @@ function renderCollection(props: CollectionRenderProps) {
 
         <div className="admin-toolbar">
           <input aria-label="Search records" onChange={(event) => props.onSearch(event.target.value)} placeholder="Search" value={props.search} />
+          {props.config.key === "contact-messages" ? (
+            <select aria-label="Filter messages by status" onChange={(event) => props.onStatusFilter(event.target.value)} value={props.statusFilter}>
+              {["All", "New", "Read", "Replied", "Archived"].map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          ) : null}
           {props.config.allowCreate ? (
             <button className="admin-button admin-button-primary" onClick={() => props.onNew(props.config)} type="button">
               Add New
@@ -616,7 +687,7 @@ function renderCollection(props: CollectionRenderProps) {
           ) : null}
         </div>
 
-        {props.config.key === "media-assets" ? renderUploadPanel(props) : null}
+        {["media-assets", "works", "tools", "social-links", "page-sections"].includes(props.config.key) ? renderUploadPanel(props) : null}
 
         <div className="admin-table-scroll">
           <table className="admin-table">
@@ -644,6 +715,16 @@ function renderCollection(props: CollectionRenderProps) {
                       <button className="admin-link-button" onClick={() => props.onOpen(item)} type="button">
                         Edit
                       </button>
+                      {props.config.key === "media-assets" && typeof item.url === "string" && item.url ? (
+                        <>
+                          <button className="admin-link-button" onClick={() => props.onCopyText(item.url, "File URL")} type="button">
+                            Copy URL
+                          </button>
+                          <a className="admin-link-button" href={item.url} rel="noreferrer" target="_blank">
+                            Preview
+                          </a>
+                        </>
+                      ) : null}
                     </td>
                   </tr>
                 ))
@@ -667,10 +748,38 @@ function renderCollection(props: CollectionRenderProps) {
             event.preventDefault();
             props.onSave(props.config);
           }}>
-            {props.config.fields.map((field) => renderField(field, props.form[field.key], (value) => props.onChange(field, value)))}
-            <div className="admin-editor-actions">
-              <button className="admin-button admin-button-primary" type="submit">Save</button>
-              {props.selected ? <button className="admin-button" onClick={() => props.onDuplicate(props.config)} type="button">Duplicate</button> : null}
+              {props.config.fields.map((field) => renderField(field, props.form[field.key], (value) => props.onChange(field, value)))}
+              {props.config.key === "media-assets" && typeof props.form.url === "string" && props.form.url ? (
+                <figure className="admin-media-preview">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img alt={valueToString(props.form.altEn) || valueToString(props.form.title) || "Media preview"} src={props.form.url} />
+                  <figcaption>{valueToString(props.form.objectKey)}</figcaption>
+                </figure>
+              ) : null}
+              <div className="admin-editor-actions">
+                <button className="admin-button admin-button-primary" type="submit">Save</button>
+                {props.config.key === "works" ? (
+                  <>
+                    <button className="admin-button" onClick={() => props.onSave(props.config, { status: "Draft" })} type="button">Save as Draft</button>
+                    <button className="admin-button" onClick={() => props.onSave(props.config, { status: "Published" })} type="button">Publish</button>
+                  </>
+                ) : null}
+                {props.config.key === "contact-messages" ? (
+                  <>
+                    <button className="admin-button" onClick={() => props.onSave(props.config, { status: "Read" })} type="button">Mark Read</button>
+                    <button className="admin-button" onClick={() => props.onSave(props.config, { status: "Replied" })} type="button">Mark Replied</button>
+                    <button className="admin-button" onClick={() => props.onCopyText(props.form.email, "Email")} type="button">Copy Email</button>
+                  </>
+                ) : null}
+                {props.config.key === "media-assets" ? (
+                  <>
+                    <button className="admin-button" onClick={() => props.onCopyText(props.form.url, "File URL")} type="button">Copy URL</button>
+                    {typeof props.form.url === "string" && props.form.url ? (
+                      <a className="admin-button" href={props.form.url} rel="noreferrer" target="_blank">Preview</a>
+                    ) : null}
+                  </>
+                ) : null}
+                {props.selected ? <button className="admin-button" onClick={() => props.onDuplicate(props.config)} type="button">Duplicate</button> : null}
               {props.selected && props.config.allowDelete ? (
                 <button className="admin-button admin-button-danger" onClick={() => props.onDelete(props.config)} type="button">
                   {props.config.deleteLabel}
@@ -694,11 +803,9 @@ function renderUploadPanel(props: CollectionRenderProps) {
   return (
     <div className="admin-upload-panel">
       <select aria-label="Media usage" onChange={(event) => props.onUploadUsage(event.target.value)} value={props.uploadUsage}>
-        <option value="works">works</option>
-        <option value="about">about</option>
-        <option value="tools">tools</option>
-        <option value="social">social</option>
-        <option value="general">general</option>
+        {mediaUsageOptions.map((usage) => (
+          <option key={usage} value={usage}>{usage}</option>
+        ))}
       </select>
       <input
         aria-label="Upload media"
@@ -761,11 +868,25 @@ function renderField(field: AdminField, value: AdminValue | undefined, onChange:
       <input
         onChange={(event) => onChange(field.type === "number" ? Number(event.target.value) : event.target.value)}
         placeholder={field.placeholder}
-        type={field.type === "number" ? "number" : field.type === "email" ? "email" : field.type === "url" ? "url" : "text"}
+        type={field.type === "number" ? "number" : field.type === "email" ? "email" : field.type === "url" ? "url" : field.type === "date" ? "date" : "text"}
         value={text}
       />
     </label>
   );
+}
+
+function schemaStatusText(database: IntegrationDatabaseStatus) {
+  const issueCount = (database.missingFields?.length || 0) + (database.typeMismatches?.length || 0);
+  if (issueCount === 0) return `${database.expectedFields || 0} fields`;
+  return `${issueCount} issue${issueCount === 1 ? "" : "s"}`;
+}
+
+function schemaDetails(database: IntegrationDatabaseStatus) {
+  const details = [
+    ...(database.missingFields || []).map((field) => `Missing ${field}`),
+    ...(database.typeMismatches || []).map((field) => `Mismatch ${field}`)
+  ];
+  return details.slice(0, 3).join(" | ");
 }
 
 function renderIntegrations(
@@ -789,17 +910,19 @@ function renderIntegrations(
           <div className="admin-meta-grid">
             <span>Mode</span><strong>{integrations.notion.sourceMode}</strong>
             <span>Status</span><strong>{integrations.notion.status}</strong>
+            <span>Workspace</span><strong>{integrations.notion.workspaceName || "Not configured"}</strong>
           </div>
           <table className="admin-table admin-compact-table">
             <thead>
-              <tr><th>Database</th><th>Status</th><th>ID</th></tr>
+              <tr><th>Database</th><th>Status</th><th>ID</th><th>Schema</th></tr>
             </thead>
             <tbody>
               {integrations.notion.databases.map((database) => (
                 <tr key={database.key}>
-                  <td>{database.label || database.key}</td>
+                  <td>{database.tableName || database.label || database.key}</td>
                   <td>{database.status}</td>
                   <td>{database.databaseId || "Missing"}</td>
+                  <td title={schemaDetails(database)}>{schemaStatusText(database)}</td>
                 </tr>
               ))}
             </tbody>
@@ -837,7 +960,7 @@ function renderIntegrations(
                   <tr key={result.key}>
                     <td>{result.key}</td>
                     <td>{result.status}</td>
-                    <td>{result.error || result.databaseId || ""}</td>
+                    <td>{result.error || schemaDetails(result) || result.databaseId || ""}</td>
                   </tr>
                 ))}
               </tbody>

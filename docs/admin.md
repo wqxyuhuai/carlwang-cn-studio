@@ -29,6 +29,12 @@ Generate a bcrypt password hash locally:
 npm run admin:hash -- "A-Strong-Password-123!"
 ```
 
+When writing the hash to `.env.local`, escape every `$` as `\$` because Next expands `$VARIABLE` syntax in env files:
+
+```env
+ADMIN_PASSWORD_HASH=\$2b\$12\$...
+```
+
 Password rules enforced by the helper:
 
 - At least 12 characters.
@@ -66,17 +72,15 @@ Required server-only Notion variable:
 NOTION_TOKEN=
 ```
 
-Database IDs are configured with the variables in `.env.example`, including:
+Active Notion database IDs are configured with the variables in `.env.example`:
 
 - `NOTION_WORKS_DATABASE_ID`
 - `NOTION_WORK_TYPES_DATABASE_ID`
 - `NOTION_TOOLS_DATABASE_ID`
-- `NOTION_PAGE_SECTIONS_DATABASE_ID`
 - `NOTION_SOCIAL_LINKS_DATABASE_ID`
-- `NOTION_MEDIA_ASSETS_DATABASE_ID`
 - `NOTION_CONTACT_MESSAGES_DATABASE_ID`
 
-Legacy aliases such as `NOTION_PROJECTS_DATA_SOURCE_ID` are still supported.
+Current user-provided aliases such as `NOTION_STUDIO_PROJECTS_DATABASE_ID` are still supported. Page Content, About fallback rows and Media Library are local-only unless a future schema reintroduces dedicated Notion databases.
 
 ## OSS uploads
 

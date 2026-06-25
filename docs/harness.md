@@ -1,5 +1,7 @@
 # Harness
 
+The root `HARNESS.md` is the canonical project validation checklist. This file keeps the original Figma and token-specific harness notes for visual regression checks.
+
 ## Figma Match Harness
 
 - Home uses Figma background, green square mark, Bebas hero type and bottom metadata.
@@ -18,7 +20,7 @@
 
 ## Content Harness
 
-- Published works require Title, Slug, Status, Year, Category, Featured, Order, Cover, Intro, Role and Tools.
+- Published works require Title, Slug, Date, Category, Cover and `展示状态 = 展示`; Featured and Tools are optional display metadata.
 - Draft works are hidden from public route generation.
 - Notion renderer shows fallback for unsupported blocks.
 - Missing or invalid OSS JSON must not white screen.

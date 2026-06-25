@@ -16,10 +16,6 @@ type AuthResult =
   | { ok: true; session: SessionPayload }
   | { ok: false; response: NextResponse };
 
-const failedLogins = new Map<string, { count: number; lockedUntil: number }>();
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_MS = 10 * 60 * 1000;
-
 function base64UrlEncode(value: Buffer | string) {
   return Buffer.from(value).toString("base64url");
 }
@@ -122,47 +118,7 @@ export function clearSessionCookie(response: NextResponse) {
   });
 }
 
-function clientKey(request: NextRequest) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-}
-
-export function getLockoutState(request: NextRequest) {
-  const state = failedLogins.get(clientKey(request));
-
-  if (!state || state.lockedUntil <= Date.now()) {
-    return { locked: false, retryAfterSeconds: 0 };
-  }
-
-  return {
-    locked: true,
-    retryAfterSeconds: Math.ceil((state.lockedUntil - Date.now()) / 1000)
-  };
-}
-
-function recordFailedLogin(request: NextRequest) {
-  const key = clientKey(request);
-  const state = failedLogins.get(key);
-  const nextCount = (state?.lockedUntil && state.lockedUntil > Date.now() ? state.count : state?.count || 0) + 1;
-  failedLogins.set(key, {
-    count: nextCount,
-    lockedUntil: nextCount >= MAX_LOGIN_ATTEMPTS ? Date.now() + LOCKOUT_MS : 0
-  });
-}
-
-function clearFailedLogins(request: NextRequest) {
-  failedLogins.delete(clientKey(request));
-}
-
-export async function verifyAdminPassword(request: NextRequest, password: string) {
-  const lockout = getLockoutState(request);
-
-  if (lockout.locked) {
-    return {
-      ok: false,
-      message: `Too many failed attempts. Try again in ${lockout.retryAfterSeconds} seconds.`
-    };
-  }
-
+export async function verifyAdminPassword(_request: NextRequest, password: string) {
   const hash = process.env.ADMIN_PASSWORD_HASH;
   if (!hash) {
     return { ok: false, message: "ADMIN_PASSWORD_HASH is not configured." };
@@ -170,11 +126,9 @@ export async function verifyAdminPassword(request: NextRequest, password: string
 
   const valid = await bcrypt.compare(password, hash);
   if (!valid) {
-    recordFailedLogin(request);
     return { ok: false, message: "Invalid password." };
   }
 
-  clearFailedLogins(request);
   return { ok: true, message: "Authenticated." };
 }
 

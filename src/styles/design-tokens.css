@@ -69,10 +69,41 @@
   --font-display: "Bebas Neue Local", "Arial Narrow", sans-serif;
   --font-body: "SF Pro Local", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 
-  --text-caption: 0.75rem;
-  --text-body-r: 1rem;
-  --text-body-m: 1rem;
-  --text-title: 1.625rem;
+  --type-body-r-family: var(--font-body);
+  --type-body-r-size: 1rem;
+  --type-body-r-weight: 400;
+  --type-body-r-line: 1.25;
+  --type-body-r-tracking: 0;
+  --type-body-m-family: var(--font-body);
+  --type-body-m-size: 1rem;
+  --type-body-m-weight: 510;
+  --type-body-m-line: 1.25;
+  --type-body-m-tracking: 0;
+  --type-small-family: var(--font-body);
+  --type-small-size: 0.75rem;
+  --type-small-weight: 400;
+  --type-small-line: 1.8333;
+  --type-small-tracking: 0;
+  --type-title-family: var(--font-body);
+  --type-title-size: 1.625rem;
+  --type-title-weight: 510;
+  --type-title-line: 1.2;
+  --type-title-tracking: -0.025rem;
+  --type-subtitle-family: var(--font-body);
+  --type-subtitle-size: clamp(1.125rem, 2.8125vw, 2.25rem);
+  --type-subtitle-weight: 510;
+  --type-subtitle-line: 1.45;
+  --type-subtitle-tracking: -0.005em;
+  --type-display-family: var(--font-display);
+  --type-display-size: clamp(3.75rem, 7.8125vw, 6.25rem);
+  --type-display-weight: 700;
+  --type-display-line: 1;
+  --type-display-tracking: -0.005em;
+
+  --text-caption: var(--type-small-size);
+  --text-body-r: var(--type-body-r-size);
+  --text-body-m: var(--type-body-m-size);
+  --text-title: var(--type-title-size);
   --text-subtitle: clamp(1.125rem, 2.8125vw, 2.25rem);
   --text-display-hero: clamp(3.75rem, 7.8125vw, 6.25rem);
   --text-display-field: clamp(2.5rem, 6.25vw, 6.25rem);
@@ -81,15 +112,14 @@
   --text-footer-logo: clamp(1.875rem, 4.6875vw, 3.75rem);
   --text-detail-title: 1.625rem;
 
-  --line-caption: 1.8333;
-  --line-body: 1.25;
-  --line-subtitle: 1.45;
-  --line-display: 1;
+  --line-caption: var(--type-small-line);
+  --line-body: var(--type-body-r-line);
+  --line-subtitle: var(--type-subtitle-line);
+  --line-display: var(--type-display-line);
 
-  --tracking-body: 0;
-  --tracking-body-active: -0.01em;
-  --tracking-subtitle: -0.005em;
-  --tracking-display: -0.005em;
+  --tracking-body: var(--type-body-r-tracking);
+  --tracking-subtitle: var(--type-subtitle-tracking);
+  --tracking-display: var(--type-display-tracking);
 
   --space-0: 0;
   --space-1: 0.25rem;

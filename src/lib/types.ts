@@ -1,4 +1,4 @@
-export type WorkStatus = "Draft" | "Ready" | "Published" | "Archived";
+export type WorkStatus = "Draft" | "Published" | "Archived";
 
 export type MediaItem = {
   type: "image" | "video";
@@ -39,30 +39,58 @@ export type Work = {
   slug: string;
   status: WorkStatus;
   year: number;
-  category: "Website" | "Brand" | "UI Product" | "Motion" | "3D Render" | "Campaign" | "Experiment";
+  publishedAt?: string;
+  viewCount: number;
+  likeCount: number;
+  category: string;
+  primaryType?: string;
+  primaryTypeSlug?: string;
+  tags?: string[];
   featured: boolean;
+  featuredOrder?: number;
   order: number;
   cover: MediaItem;
   intro: string;
+  introCn?: string;
+  overview?: string;
+  overviewCn?: string;
   role: string;
+  roleCn?: string;
+  clientBrand?: string;
   tools: string[];
   gallery: MediaItem[];
   content: NotionBlock[];
+  externalUrl?: string;
+  notionUrl?: string;
+  notionPageId?: string;
 };
 
 export type Tool = {
+  id?: string;
   name: string;
   category: string;
+  iconUrl?: string;
+  description?: string;
+  descriptionCn?: string;
+  homeVisible?: boolean;
+  status?: "Published" | "Archived";
   active: boolean;
   order: number;
 };
 
 export type SocialLink = {
+  id?: string;
   platform: string;
   label: string;
+  labelCn?: string;
   url: string;
   handle?: string;
-  group: "Social" | "Portfolio" | "Contact" | "Footer";
+  group: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
+  type?: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
+  iconUrl?: string;
+  footerVisible?: boolean;
+  contactVisible?: boolean;
+  status?: "Published" | "Archived";
   active: boolean;
   order: number;
 };
@@ -75,6 +103,13 @@ export type SiteSettings = {
   homeHeroDescription: string;
   seoTitle: string;
   seoDescription: string;
+  defaultLanguage?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  footerCopyright?: string;
+  contactEmail?: string;
+  ossPublicBaseUrl?: string;
+  notionWorkspaceName?: string;
 };
 
 export type StudioData = {

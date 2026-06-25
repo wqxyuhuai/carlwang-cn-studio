@@ -13,64 +13,47 @@ function mediaUrl(value: unknown): string {
   return "";
 }
 
-const pageSections: AdminRecord[] = [
-  {
-    id: "home-hero",
-    title: "Home hero",
-    page: "Home",
-    sectionKey: "home_hero",
-    sectionName: "Hero",
-    titleEn: fallbackData.settings.homeHeroTitle,
-    subtitleEn: fallbackData.settings.homeHeroDescription,
-    bodyEn: "Opening statement for the home page.",
-    order: 1,
-    visible: true,
-    locked: true,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: "home-featured-works",
-    title: "Featured works",
-    page: "Home",
-    sectionKey: "home_featured_works",
-    sectionName: "Featured Works",
-    titleEn: "Featured Works",
-    bodyEn: "Selected projects from the studio archive.",
-    order: 2,
-    visible: true,
-    locked: true,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: "about-intro",
-    title: "About intro",
-    page: "About",
-    sectionKey: "about_intro",
-    sectionName: "Intro",
-    titleEn: "About",
-    bodyEn: "A designer working across visual, digital and spatial systems.",
-    order: 10,
-    visible: true,
-    locked: true,
-    createdAt: now,
-    updatedAt: now
-  },
-  {
-    id: "footer-main",
-    title: "Footer main",
-    page: "Footer",
-    sectionKey: "footer_main",
-    sectionName: "Footer",
-    bodyEn: "Carl Wang Studio. All rights reserved.",
-    order: 100,
-    visible: true,
-    locked: true,
-    createdAt: now,
-    updatedAt: now
-  }
-];
+const requiredPageSections = [
+  ["home-hero", "Home", "home_hero", "Home hero", "Designing clarity for complex systems.", 1],
+  ["home-featured-works", "Home", "home_featured_works", "Featured works", "Featured Works", 2],
+  ["home-project-types", "Home", "home_project_types", "Project types", "Project Types", 3],
+  ["home-tools", "Home", "home_tools", "Tools", "Tools", 4],
+  ["home-intro-contact", "Home", "home_intro_contact", "Intro contact", "Start a project", 5],
+  ["works-hero", "Works", "works_hero", "Works hero", "Works", 10],
+  ["works-filter-intro", "Works", "works_filter_intro", "Works filter intro", "Browse by type", 11],
+  ["work-detail-template", "Work Detail", "work_detail_template", "Work detail template", "Project detail", 20],
+  ["about-intro", "About", "about_intro", "About intro", "About", 30],
+  ["about-portrait", "About", "about_portrait", "About portrait", "Portrait", 31],
+  ["about-design-direction", "About", "about_design_direction", "Design direction", "Design Direction", 32],
+  ["about-skills", "About", "about_skills", "About skills", "Skills", 33],
+  ["about-experience", "About", "about_experience", "About experience", "Experience", 34],
+  ["about-contact", "About", "about_contact", "About contact", "Get in touch", 35],
+  ["footer-main", "Footer", "footer_main", "Footer main", "Carl Wang Studio", 100],
+  ["footer-navigation", "Footer", "footer_navigation", "Footer navigation", "Navigation", 101],
+  ["footer-contact", "Footer", "footer_contact", "Footer contact", "Contact", 102]
+] as const;
+
+const pageSections: AdminRecord[] = requiredPageSections.map(([id, page, sectionKey, title, titleEn, order]) => ({
+  id,
+  title,
+  page,
+  sectionKey,
+  titleEn,
+  titleCn: "",
+  subtitleEn: "",
+  subtitleCn: "",
+  bodyEn: "",
+  bodyCn: "",
+  ctaLabelEn: "",
+  ctaLabelCn: "",
+  ctaUrl: "",
+  mediaUrl: "",
+  order,
+  visible: true,
+  locked: true,
+  createdAt: now,
+  updatedAt: now
+}));
 
 const works: AdminRecord[] = fallbackData.works.map((work) => ({
   id: work.id,
@@ -78,49 +61,68 @@ const works: AdminRecord[] = fallbackData.works.map((work) => ({
   slug: work.slug,
   status: work.status,
   year: work.year,
-  category: work.category,
+  publishedAt: work.publishedAt,
+  viewCount: work.viewCount,
+  likeCount: work.likeCount,
+  primaryType: work.category,
+  tags: "",
   featured: work.featured,
+  featuredOrder: work.featured ? work.order : 0,
   order: work.order,
-  cover: mediaUrl(work.cover),
-  gallery: work.gallery.map((item) => item.src).join("\n"),
-  intro: work.intro,
-  role: work.role,
-  tools: work.tools.join(", "),
+  coverImage: mediaUrl(work.cover),
+  galleryImages: work.gallery.map((item) => item.src).join("\n"),
+  shortIntroEn: work.intro,
+  shortIntroCn: "",
+  overviewEn: "",
+  overviewCn: "",
+  roleEn: work.role,
+  roleCn: "",
+  clientBrand: "",
+  tools: work.tools.join("\n"),
   externalUrl: "",
   createdAt: now,
   updatedAt: now
 }));
 
 const workTypes: AdminRecord[] = [
-  ["Brand Design", "品牌设计", "brand-design"],
-  ["Web Design", "网站设计", "web-design"],
-  ["App & Platform Design", "App 与平台设计", "app-platform-design"],
-  ["Product Design", "产品设计", "product-design"],
-  ["Exhibition Design", "展览设计", "exhibition-design"],
-  ["Motion & Video", "动效与视频", "motion-video"],
-  ["AI & Personal Projects", "AI 与个人项目", "ai-personal-projects"]
-].map(([titleEn, titleCn, slug], index) => ({
+  ["Brand Design", "品牌设计", "brand-design", "Brand"],
+  ["Web Design", "网站设计", "web-design", "Web"],
+  ["App & Platform Design", "App 与平台设计", "app-platform-design", "App"],
+  ["Product Design", "产品设计", "product-design", "Product"],
+  ["Exhibition Design", "展会设计", "exhibition-design", "Exhibition"],
+  ["Motion & Video", "视频与动效", "motion-video", "Motion"],
+  ["AI & Personal Projects", "AI 与个人项目", "ai-personal-projects", "AI"]
+].map(([nameEn, nameCn, slug, shortLabel], index) => ({
   id: slug,
-  titleEn,
-  titleCn,
+  nameEn,
+  nameCn,
   slug,
-  description: "",
+  shortLabel,
+  descriptionEn: "",
+  descriptionCn: "",
+  iconUrl: "",
   status: "Published",
   homeVisible: true,
   filterVisible: true,
-  footerVisible: true,
   order: index + 1,
   createdAt: now,
   updatedAt: now
 }));
 
+function normalizeToolCategory(category: string) {
+  if (["Design", "Motion", "3D", "Development", "AI", "Workflow"].includes(category)) return category;
+  return "Design";
+}
+
 const tools: AdminRecord[] = fallbackData.tools.map((tool) => ({
   id: tool.name.toLowerCase().replaceAll(" ", "-"),
   name: tool.name,
-  category: tool.category,
-  icon: "",
-  website: "",
-  active: tool.active,
+  category: normalizeToolCategory(tool.category),
+  iconUrl: "",
+  descriptionEn: "",
+  descriptionCn: "",
+  homeVisible: tool.active,
+  status: tool.active ? "Published" : "Archived",
   order: tool.order,
   createdAt: now,
   updatedAt: now
@@ -129,12 +131,15 @@ const tools: AdminRecord[] = fallbackData.tools.map((tool) => ({
 const aboutExperience: AdminRecord[] = [
   {
     id: "designer-product-systems",
-    role: "Product / Visual Designer",
-    company: "Independent Studio",
-    period: "2024 - Now",
+    title: "Product / Visual Designer",
+    organization: "Independent Studio",
+    location: "Shanghai / Remote",
+    startDate: "2024-01-01",
+    endDate: "",
+    isCurrent: true,
     descriptionEn: "Designing identity systems, web interfaces and portfolio storytelling.",
     descriptionCn: "负责品牌系统、网站界面与作品叙事设计。",
-    imageUrl: "/figma/about-experience-thumb.png",
+    tags: "Brand, Web, Product",
     visible: true,
     order: 1,
     createdAt: now,
@@ -142,12 +147,15 @@ const aboutExperience: AdminRecord[] = [
   },
   {
     id: "motion-content",
-    role: "Motion & Content",
-    company: "Selected Projects",
-    period: "2022 - 2024",
+    title: "Motion & Content",
+    organization: "Selected Projects",
+    location: "",
+    startDate: "2022-01-01",
+    endDate: "2024-12-31",
+    isCurrent: false,
     descriptionEn: "Motion-led campaign visuals, launch pages and social content systems.",
     descriptionCn: "动效驱动的活动视觉、发布页与社媒内容系统。",
-    imageUrl: "/figma/about-direction.png",
+    tags: "Motion, Campaign",
     visible: true,
     order: 2,
     createdAt: now,
@@ -156,31 +164,87 @@ const aboutExperience: AdminRecord[] = [
 ];
 
 const aboutSkills: AdminRecord[] = [
-  { id: "visual-system", group: "Design", nameEn: "Visual System", nameCn: "视觉系统", level: "Advanced", visible: true, order: 1, createdAt: now, updatedAt: now },
-  { id: "interface-direction", group: "Design", nameEn: "Interface Direction", nameCn: "界面方向", level: "Advanced", visible: true, order: 2, createdAt: now, updatedAt: now },
-  { id: "motion-content", group: "Motion", nameEn: "Motion & Content", nameCn: "动效与内容", level: "Working", visible: true, order: 3, createdAt: now, updatedAt: now }
+  {
+    id: "design-systems",
+    groupNameEn: "Design Systems",
+    groupNameCn: "设计系统",
+    items: "Visual System\nInterface Direction\nBrand Guidelines",
+    descriptionEn: "",
+    descriptionCn: "",
+    visible: true,
+    order: 1,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "motion-content",
+    groupNameEn: "Motion & Content",
+    groupNameCn: "动效与内容",
+    items: "Motion Direction\nCampaign Visuals\nSocial Content",
+    descriptionEn: "",
+    descriptionCn: "",
+    visible: true,
+    order: 2,
+    createdAt: now,
+    updatedAt: now
+  },
+  {
+    id: "digital-production",
+    groupNameEn: "Digital Production",
+    groupNameCn: "数字制作",
+    items: "Web Design\nPrototype\nFrontend Collaboration",
+    descriptionEn: "",
+    descriptionCn: "",
+    visible: true,
+    order: 3,
+    createdAt: now,
+    updatedAt: now
+  }
 ];
 
-const socialLinks: AdminRecord[] = fallbackData.socials.map((social) => ({
-  id: social.platform.toLowerCase().replaceAll(" ", "-"),
-  platform: social.platform,
-  label: social.label,
-  url: social.url,
-  handle: social.handle || "",
-  group: social.group,
-  active: social.active,
-  footerVisible: social.group === "Footer" || social.group === "Portfolio" || social.group === "Contact",
-  contactVisible: social.group === "Contact" || social.group === "Portfolio" || social.group === "Social",
-  order: social.order,
-  createdAt: now,
-  updatedAt: now
-}));
+const socialLinks: AdminRecord[] = [
+  {
+    id: "contact-form",
+    platform: "Contact Form",
+    labelEn: "Contact Form",
+    labelCn: "联系表单",
+    url: "/about#contact",
+    type: "Form",
+    iconUrl: "",
+    footerVisible: true,
+    contactVisible: true,
+    status: "Published",
+    order: 0,
+    createdAt: now,
+    updatedAt: now
+  },
+  ...fallbackData.socials.map((social) => ({
+    id: social.platform.toLowerCase().replaceAll(" ", "-"),
+    platform: social.platform,
+    labelEn: social.label,
+    labelCn: social.platform === "Xiaohongshu" ? "小红书" : social.label,
+    url: social.url,
+    type: social.group,
+    iconUrl: "",
+    footerVisible: social.group === "Footer" || social.group === "Portfolio" || social.group === "Contact",
+    contactVisible: social.group === "Contact" || social.group === "Portfolio" || social.group === "Social",
+    status: social.active ? "Published" : "Archived",
+    order: social.order,
+    createdAt: now,
+    updatedAt: now
+  }))
+];
 
 const siteSettings: AdminRecord[] = [
-  { id: "site-title", name: "site_title", group: "General", type: "Text", value: fallbackData.settings.seoTitle, public: true, description: "Website title", order: 1, createdAt: now, updatedAt: now },
-  { id: "site-description", name: "site_description", group: "SEO", type: "Text", value: fallbackData.settings.seoDescription, public: true, description: "Website SEO description", order: 2, createdAt: now, updatedAt: now },
-  { id: "content-url", name: "content_url", group: "Integration", type: "URL", value: fallbackData.settings.contentUrl, public: true, description: "Public OSS JSON source", order: 3, createdAt: now, updatedAt: now },
-  { id: "footer-copyright", name: "footer_copyright", group: "Footer", type: "Text", value: "© Carl Wang. All rights reserved.", public: true, description: "Footer copyright text", order: 4, createdAt: now, updatedAt: now }
+  { id: "site-title", name: "site_title", group: "General", type: "Text", value: fallbackData.settings.seoTitle, public: true, locked: true, description: "Website title", order: 1, createdAt: now, updatedAt: now },
+  { id: "site-description", name: "site_description", group: "SEO", type: "Text", value: fallbackData.settings.seoDescription, public: true, locked: true, description: "Website description", order: 2, createdAt: now, updatedAt: now },
+  { id: "default-language", name: "default_language", group: "General", type: "Text", value: "en", public: true, locked: true, description: "Default language", order: 3, createdAt: now, updatedAt: now },
+  { id: "logo-url", name: "logo_url", group: "General", type: "URL", value: "", public: true, locked: true, description: "Logo URL", order: 4, createdAt: now, updatedAt: now },
+  { id: "favicon-url", name: "favicon_url", group: "General", type: "URL", value: "/icon.svg", public: true, locked: true, description: "Favicon URL", order: 5, createdAt: now, updatedAt: now },
+  { id: "footer-copyright", name: "footer_copyright", group: "Footer", type: "Text", value: "© Carl Wang. All rights reserved.", public: true, locked: true, description: "Footer copyright text", order: 6, createdAt: now, updatedAt: now },
+  { id: "contact-email", name: "contact_email", group: "Contact", type: "Text", value: "hello@carlwang.cn", public: true, locked: true, description: "Public contact email", order: 7, createdAt: now, updatedAt: now },
+  { id: "oss-public-base-url", name: "oss_public_base_url", group: "Integration", type: "URL", value: process.env.ALIYUN_OSS_PUBLIC_BASE_URL || "", public: true, locked: true, description: "Aliyun OSS public base URL only, never credentials", order: 8, createdAt: now, updatedAt: now },
+  { id: "notion-workspace-name", name: "notion_workspace_name", group: "Integration", type: "Text", value: process.env.NOTION_WORKSPACE_NAME || "", public: false, locked: true, description: "Read-only Notion workspace display name", order: 9, createdAt: now, updatedAt: now }
 ];
 
 export const adminSeedData: AdminStoreData = {
@@ -192,6 +256,5 @@ export const adminSeedData: AdminStoreData = {
   "about-skills": aboutSkills,
   "social-links": socialLinks,
   "media-assets": [],
-  "contact-messages": [],
-  "site-settings": siteSettings
+  "contact-messages": []
 };

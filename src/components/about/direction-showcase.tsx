@@ -14,7 +14,7 @@ type DirectionItem = {
   media: DirectionMedia;
 };
 
-const directionItems: DirectionItem[] = [
+const fallbackDirectionItems: DirectionItem[] = [
   {
     label: "Digital Experience",
     media: {
@@ -47,9 +47,10 @@ const directionItems: DirectionItem[] = [
 
 const defaultDirectionIndex = 2;
 
-export function DirectionShowcase() {
+export function DirectionShowcase({ heading = "Design Direction", items = fallbackDirectionItems }: { heading?: string; items?: DirectionItem[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const visibleIndex = activeIndex ?? defaultDirectionIndex;
+  const directionItems = items.length > 0 ? items : fallbackDirectionItems;
+  const visibleIndex = Math.min(activeIndex ?? defaultDirectionIndex, directionItems.length - 1);
 
   return (
     <section className="pw-about-direction" onMouseLeave={() => setActiveIndex(null)}>
@@ -61,7 +62,7 @@ export function DirectionShowcase() {
         ))}
       </span>
       <div>
-        <h2 className="pw-kicker-line">Design Direction</h2>
+        <h2 className="pw-kicker-line">{heading}</h2>
         <div className="pw-direction-list">
           {directionItems.map((item, index) => (
             <button

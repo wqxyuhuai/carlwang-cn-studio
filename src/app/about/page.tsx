@@ -2,41 +2,55 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { DirectionShowcase } from "@/components/about/direction-showcase";
 import { CascadeText } from "@/components/cascade-text";
+import { ContactForm } from "@/components/contact-form";
 import { FooterNavigation } from "@/components/footer-navigation";
+import { aboutPlaceholderImage, getPublicContent, sectionByKey } from "@/lib/public-content";
 
-export const metadata: Metadata = {
-  title: "About",
-  description: "About Carl Wang Studio and contact."
-};
-
-const aboutImage = "/figma/about-main.png";
 const quoteMark = "/figma/about-quote.svg";
 const quoteLine = "/figma/about-quote-line.svg";
 const experienceThumb = "/figma/about-experience-thumb.png";
+const fallbackDirectionMedia = ["/field-media/a1-2.webp", "/field-media/a2-1.webp", "/figma/about-direction.png", "/field-media/b1-1.webp"];
+const fallbackSocialIcon = "/figma/social-email.svg";
 
-const bodyCopy = [
+const aboutBodyCopy = [
   "and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
   "My work often starts with structure: understanding what needs to be communicated, how people will see it, and what kind of feeling the design should leave behind. From there, I focus on layout, rhythm, details and interaction, trying to make the final result feel clear, refined and purposeful.",
-  "I am interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
+  "I'm interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
 ];
 
 const experienceRows = [
-  { id: "designer-primary", role: "Designer", title: "Wattsonic", year: "2025-2026" },
-  { id: "uiux", role: "UI UX Designer", title: "Wattsonic", year: "2025-2026" },
-  { id: "graphic", role: "Graphic Designer", title: "Wattsonic", year: "2025-2026" },
-  { id: "designer-secondary", role: "Designer", title: "Wattsonic", year: "2025-2026" }
+  { id: "designer", role: "Designer", company: "Wattsonic", period: "2025-2026", image: experienceThumb },
+  { id: "ui-ux-designer", role: "UI UX Designer", company: "Wattsonic", period: "2025-2026", image: experienceThumb },
+  { id: "graphic-designer", role: "Graphic Designer", company: "Wattsonic", period: "2025-2026", image: experienceThumb },
+  { id: "designer-2", role: "Designer", company: "Wattsonic", period: "2025-2026", image: experienceThumb }
 ];
 
-const socialIconLinks = [
-  { label: "Behance", href: "https://www.behance.net/", src: "/figma/social-behance.svg" },
-  { label: "Zcool", href: "https://www.zcool.com.cn/", src: "/figma/social-zcool.svg" },
-  { label: "Xiaohongshu", href: "https://www.xiaohongshu.com/", src: "/figma/social-xiaohongshu.svg" },
-  { label: "GitHub", href: "https://github.com/", src: "/figma/social-github.svg" },
-  { label: "LinkedIn", href: "https://www.linkedin.com/", src: "/figma/social-linkedin.svg" },
-  { label: "Email", href: "mailto:hello@carlwang.cn", src: "/figma/social-email.svg" }
-];
+export async function generateMetadata(): Promise<Metadata> {
+  const content = await getPublicContent();
+  const aboutIntro = sectionByKey(content, "about_intro");
+  return {
+    title: aboutIntro?.titleEn || "About",
+    description: aboutIntro?.subtitleEn || "About Carl Wang Studio and contact."
+  };
+}
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const content = await getPublicContent();
+  const aboutIntro = sectionByKey(content, "about_intro");
+  const portrait = sectionByKey(content, "about_portrait");
+  const direction = sectionByKey(content, "about_design_direction");
+  const experienceSection = sectionByKey(content, "about_experience");
+  const contactSection = sectionByKey(content, "about_contact");
+  const skillGroups = content.skillGroups.filter((group) => group.visible);
+  const directionItems = (skillGroups.length > 0 ? skillGroups : []).slice(0, 4).map((group, index) => ({
+    label: group.groupNameEn,
+    media: {
+      alt: `${group.groupNameEn} direction visual`,
+      src: direction?.mediaUrl || fallbackDirectionMedia[index % fallbackDirectionMedia.length]
+    }
+  }));
+  const socialLinks = content.socials.filter((link) => link.contactVisible && link.status !== "Archived");
+
   return (
     <main className="pw-about-page">
       <section className="pw-about-hero">
@@ -47,33 +61,31 @@ export default function AboutPage() {
               <Image alt="" className="pw-about-quote-line" height={84} src={quoteLine} width={1} />
             </span>
             <span className="pw-about-quote-copy">
-              <span>
-                A designer working across digital interfaces, brand visuals, motion content and spatial experiences.
-              </span>
+              <span>{aboutIntro?.subtitleEn || "A designer working across digital interfaces, brand visuals, motion content and spatial experiences."}</span>
               <span className="caption-copy">Carl Wang</span>
             </span>
           </div>
-          <h1 className="pw-about-title">About</h1>
+          <h1 className="pw-about-title">{aboutIntro?.titleEn || "About"}</h1>
         </div>
 
         <div className="pw-about-body body-copy">
           <div className="pw-about-body-copy">
-            {bodyCopy.map((paragraph) => (
+            {aboutBodyCopy.map((paragraph) => (
               <p key={paragraph}>{paragraph}</p>
             ))}
           </div>
           <span className="pw-figma-image">
-            <Image alt="PW2 about visual" height={449} src={aboutImage} width={371} />
+            <Image alt={portrait?.titleEn || "Carl Wang Studio portrait visual"} height={449} src={portrait?.mediaUrl || aboutPlaceholderImage} width={371} />
           </span>
         </div>
       </section>
 
-      <DirectionShowcase />
+      <DirectionShowcase heading={direction?.titleEn || "Design Direction"} items={directionItems} />
 
       <section className="pw-about-experience">
         <div className="pw-experience-heading">
           <span aria-hidden="true" />
-          <h2 className="pw-kicker-line">Experience</h2>
+          <h2 className="pw-kicker-line">{experienceSection?.titleEn || "Experience"}</h2>
         </div>
         <div className="pw-experience-rows">
           {experienceRows.map((row) => (
@@ -82,14 +94,12 @@ export default function AboutPage() {
                 <CascadeText text={row.role} underline={false} wrap />
               </span>
               <span className="pw-experience-thumb-slot">
-                <span className="pw-role-thumb">
-                  <Image alt="PW2 role thumbnail" height={80} src={experienceThumb} width={80} />
+                <span className="pw-role-thumb" aria-hidden="true">
+                  <Image alt="" height={80} src={row.image} width={80} />
                 </span>
               </span>
-              <strong className="pw-experience-company">
-                <CascadeText text={row.title} />
-              </strong>
-              <span className="pw-experience-year">{row.year}</span>
+              <strong className="pw-experience-company">{row.company}</strong>
+              <span className="pw-experience-year">{row.period}</span>
             </div>
           ))}
         </div>
@@ -102,21 +112,12 @@ export default function AboutPage() {
         </div>
         <div className="pw-section-content-grid">
           <div>
-            <h3 className="pw-contact-title">Get in touch</h3>
+            <h3 className="pw-contact-title">{contactSection?.titleEn || "Get in touch"}</h3>
             <p className="pw-contact-subtitle">
-              For product, interface, brand, and visual system work.
+              {contactSection?.subtitleEn || "For product, interface, brand, and visual system work."}
             </p>
           </div>
-          <form className="pw-static-form">
-            <div className="pw-form-grid">
-              <input aria-label="Name" className="pw-static-input" placeholder="Name*" readOnly />
-              <input aria-label="Email" className="pw-static-input" placeholder="Email*" readOnly />
-            </div>
-            <textarea aria-label="Message" className="pw-static-textarea" placeholder="Message*" readOnly />
-            <button className="pw-static-submit" type="button">
-              Send Message
-            </button>
-          </form>
+          <ContactForm sourcePage="/about#contact" variant="about" />
         </div>
       </section>
 
@@ -128,16 +129,16 @@ export default function AboutPage() {
         <div className="pw-section-content-grid">
           <span aria-hidden="true" />
           <div className="pw-social-grid" aria-label="Social links">
-            {socialIconLinks.map((link) => (
+            {socialLinks.map((link) => (
               <a
                 aria-label={link.label}
                 className="pw-social-tile"
-                href={link.href}
-                key={link.label}
-                rel={link.href.startsWith("mailto:") ? undefined : "noreferrer"}
-                target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+                href={link.url}
+                key={link.id || link.url}
+                rel={link.url.startsWith("mailto:") ? undefined : "noreferrer"}
+                target={link.url.startsWith("mailto:") ? undefined : "_blank"}
               >
-                <Image alt="" height={100} loading="eager" src={link.src} width={100} />
+                <Image alt="" height={100} loading="eager" src={link.iconUrl || fallbackSocialIcon} width={100} />
               </a>
             ))}
           </div>

@@ -28,21 +28,63 @@ The Home hero gradient is also tokenized as `--gradient-home-hero`. Its three gr
 - Display: `Bebas Neue Local`
 - Body and UI: `SF Pro Local`
 
-Current SF Pro source is SF Pro Display. The `--font-body` token is intentionally stable so SF Pro Text can replace it later without page rewrites.
+Current SF Pro source is SF Pro Display. Do not add another SF Pro family unless the Figma file introduces and uses it.
 
-Measured type scale tokens:
+Figma text-style mapping:
 
 ```css
---text-body-r: 1rem;
---text-body-m: 1rem;
---text-title: 1.625rem;
---text-subtitle: clamp(1.125rem, 2.8125vw, 2.25rem);
---text-display-hero: clamp(3.75rem, 7.8125vw, 6.25rem);
---text-display-field: clamp(2.5rem, 6.25vw, 6.25rem);
---text-display-category: clamp(1.25rem, 3.125vw, 2.5rem);
---text-display-works-year: clamp(3.125rem, 7.8125vw, 6.25rem);
---text-footer-logo: clamp(1.875rem, 4.6875vw, 3.75rem);
+/* 正文 r */
+--type-body-r-family: var(--font-body);
+--type-body-r-size: 1rem;
+--type-body-r-weight: 400;
+--type-body-r-line: 1.25;
+--type-body-r-tracking: 0;
+
+/* 正文 m */
+--type-body-m-family: var(--font-body);
+--type-body-m-size: 1rem;
+--type-body-m-weight: 510;
+--type-body-m-line: 1.25;
+--type-body-m-tracking: 0;
+
+/* 小字 */
+--type-small-family: var(--font-body);
+--type-small-size: 0.75rem;
+--type-small-weight: 400;
+--type-small-line: 1.8333;
+--type-small-tracking: 0;
+
+/* 标题 */
+--type-title-family: var(--font-body);
+--type-title-size: 1.625rem;
+--type-title-weight: 510;
+--type-title-line: 1.2;
+--type-title-tracking: -0.025rem;
+
+/* 小标题 */
+--type-subtitle-family: var(--font-body);
+--type-subtitle-size: clamp(1.125rem, 2.8125vw, 2.25rem);
+--type-subtitle-weight: 510;
+--type-subtitle-line: 1.45;
+--type-subtitle-tracking: -0.005em;
+
+/* be display styles */
+--type-display-family: var(--font-display);
+--type-display-weight: 700;
+--type-display-line: 1;
+--type-display-tracking: -0.005em;
 ```
+
+Usage constraints:
+
+- Body copy, footer copy, footer links and ordinary UI text use `正文 r` through `.body-copy` or `.caption-copy`.
+- Navigation, footer group titles and emphasized UI labels use `正文 m`.
+- Compact metadata, admin helper text, image captions and dense stats use `小字` through scoped CSS with `--text-caption` / `--type-small-*`.
+- Public link headings such as `Featured Works` and `About` use `小标题`.
+- Work titles and detail titles use `标题`.
+- Hero, section kicker and works category display text use the Bebas Neue display tokens.
+- Do not create one-off `font-size`, `line-height` or `letter-spacing` values for public pages when one of the mapped Figma styles applies.
+- Do not treat `.caption-copy` as small text. In this project it maps to Figma `正文 r` because footer and body-adjacent text are 16px in the design.
 
 ## Spacing and Motion
 

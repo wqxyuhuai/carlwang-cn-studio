@@ -1,5 +1,5 @@
 import { collectionConfigList } from "./schema";
-import { getDatabaseId, hasNotionToken, testNotionDatabase } from "./notion-store";
+import { getDatabaseId, getExpectedNotionSchema, hasNotionToken, testNotionDatabase } from "./notion-store";
 import { getOssConfig, hasOssConfig, testOssConnection } from "./oss";
 
 function mask(value: string, visible = 4) {
@@ -20,15 +20,20 @@ export async function getIntegrationStatus() {
     notion: {
       status: hasNotionToken() ? "configured" : "missing",
       token: hasNotionToken() ? mask(process.env.NOTION_TOKEN || "") : "",
+      workspaceName: process.env.NOTION_WORKSPACE_NAME || "",
       sourceMode: process.env.ADMIN_CONTENT_SOURCE || "local",
       databases: collectionConfigList.map((config) => {
         const databaseId = getDatabaseId(config);
+        const expected = getExpectedNotionSchema(config);
         return {
           key: config.key,
           label: config.label,
-          status: databaseId ? "configured" : "missing",
+          tableName: config.notionTableName,
+          legacyTableNames: config.legacyTableNames || [],
+          status: config.databaseEnv.length === 0 ? "local" : databaseId ? "configured" : "missing",
           databaseId: shortId(databaseId),
-          env: config.databaseEnv.join(" / ")
+          env: config.databaseEnv.join(" / "),
+          ...expected
         };
       })
     },

@@ -19,10 +19,11 @@ type FieldMedia =
 
 type FieldItem = {
   label: string;
+  href?: string;
   media: FieldMedia;
 };
 
-const fieldItems: FieldItem[] = [
+const fallbackFieldItems: FieldItem[] = [
   {
     label: "Website & Interface",
     media: {
@@ -68,9 +69,10 @@ const fieldItems: FieldItem[] = [
 
 const defaultMediaIndex = 2;
 
-export function FieldHoverShowcase() {
+export function FieldHoverShowcase({ items = fallbackFieldItems }: { items?: FieldItem[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const visibleIndex = activeIndex ?? defaultMediaIndex;
+  const fieldItems = items.length > 0 ? items : fallbackFieldItems;
+  const visibleIndex = Math.min(activeIndex ?? defaultMediaIndex, fieldItems.length - 1);
 
   return (
     <section className="pw-fields-band" aria-label="Design fields" onMouseLeave={() => setActiveIndex(null)}>

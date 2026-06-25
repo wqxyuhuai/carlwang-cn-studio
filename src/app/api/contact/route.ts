@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       email?: string;
       company?: string;
       projectType?: string;
+      sourcePage?: string;
       message?: string;
       website?: string;
     };
@@ -53,16 +54,25 @@ export async function POST(request: NextRequest) {
     if (!message) return NextResponse.json({ error: "Message is required." }, { status: 400 });
     if (message.length > 2000) return NextResponse.json({ error: "Message is too long." }, { status: 400 });
 
+    const rawSource = String(body.sourcePage || request.headers.get("referer") || "/").trim();
+    const sourcePage = (() => {
+      try {
+        return new URL(rawSource, request.url).toString();
+      } catch {
+        return request.url;
+      }
+    })();
+
     await createRecord(
       "contact-messages",
       {
         name,
         email,
-        company: String(body.company || "").trim(),
-        projectType: String(body.projectType || "").trim(),
+        sourcePage,
         message,
         status: "New",
-        note: "",
+        mailNotifyStatus: "未通知",
+        notionNotifyStatus: "未通知",
         createdAt: new Date().toISOString()
       },
       { includeReadOnly: true }

@@ -1,5 +1,35 @@
+import { randomBytes } from "crypto";
+
 type OssClient = {
   put: (name: string, file: Buffer, options?: { headers?: Record<string, string> }) => Promise<{ name?: string; url?: string }>;
+};
+
+const usagePathMap: Record<string, string> = {
+  "Work Cover": "works/covers",
+  Gallery: "works/gallery",
+  Portrait: "about/portrait",
+  "Tool Icon": "tools/icons",
+  "Social Icon": "social/icons",
+  General: "general",
+  works: "works/gallery",
+  about: "about/portrait",
+  tools: "tools/icons",
+  social: "social/icons",
+  general: "general"
+};
+
+const usageLabelMap: Record<string, string> = {
+  "Work Cover": "Work Cover",
+  Gallery: "Gallery",
+  Portrait: "Portrait",
+  "Tool Icon": "Tool Icon",
+  "Social Icon": "Social Icon",
+  General: "General",
+  works: "Gallery",
+  about: "Portrait",
+  tools: "Tool Icon",
+  social: "Social Icon",
+  general: "General"
 };
 
 function getEnv(...keys: string[]) {
@@ -24,7 +54,7 @@ export function getOssConfig() {
 
 export function hasOssConfig() {
   const config = getOssConfig();
-  return Boolean(config.accessKeyId && config.accessKeySecret && config.bucket && (config.region || config.endpoint));
+  return Boolean(config.accessKeyId && config.accessKeySecret && config.bucket && config.publicBaseUrl && (config.region || config.endpoint));
 }
 
 async function createOssClient(): Promise<OssClient> {
@@ -63,6 +93,67 @@ function sanitizeSegment(value: string) {
     .slice(0, 48) || "asset";
 }
 
+function imageDimensions(buffer: Buffer, mimeType: string) {
+  try {
+    if (mimeType === "image/png" && buffer.length >= 24 && buffer.toString("ascii", 1, 4) === "PNG") {
+      return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    }
+
+    if (mimeType === "image/gif" && buffer.length >= 10) {
+      return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) };
+    }
+
+    if (mimeType === "image/jpeg") {
+      let offset = 2;
+      while (offset < buffer.length) {
+        if (buffer[offset] !== 0xff) break;
+        const marker = buffer[offset + 1];
+        const length = buffer.readUInt16BE(offset + 2);
+        if ([0xc0, 0xc1, 0xc2, 0xc3].includes(marker)) {
+          return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+        }
+        offset += 2 + length;
+      }
+    }
+
+    if (mimeType === "image/webp" && buffer.length >= 30 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+      const chunk = buffer.toString("ascii", 12, 16);
+      if (chunk === "VP8X" && buffer.length >= 30) {
+        return {
+          width: 1 + buffer.readUIntLE(24, 3),
+          height: 1 + buffer.readUIntLE(27, 3)
+        };
+      }
+      if (chunk === "VP8 " && buffer.length >= 30) {
+        return {
+          width: buffer.readUInt16LE(26) & 0x3fff,
+          height: buffer.readUInt16LE(28) & 0x3fff
+        };
+      }
+      if (chunk === "VP8L" && buffer.length >= 25) {
+        const bits = buffer.readUInt32LE(21);
+        return {
+          width: (bits & 0x3fff) + 1,
+          height: ((bits >> 14) & 0x3fff) + 1
+        };
+      }
+    }
+
+    if (mimeType === "image/svg+xml") {
+      const source = buffer.toString("utf8", 0, Math.min(buffer.length, 4096));
+      const width = Number(source.match(/\bwidth=["']?([\d.]+)/i)?.[1] || 0);
+      const height = Number(source.match(/\bheight=["']?([\d.]+)/i)?.[1] || 0);
+      if (width > 0 && height > 0) return { width, height };
+      const viewBox = source.match(/\bviewBox=["'][^"']*?\s([\d.]+)\s([\d.]+)["']/i);
+      if (viewBox) return { width: Number(viewBox[1]), height: Number(viewBox[2]) };
+    }
+  } catch {
+    return {};
+  }
+
+  return {};
+}
+
 export async function uploadFileToOss(file: File, usage: string) {
   const allowedTypes = [
     "image/jpeg",
@@ -85,10 +176,13 @@ export async function uploadFileToOss(file: File, usage: string) {
   }
 
   const config = getOssConfig();
-  const prefix = `${config.uploadPrefix.replace(/^\/+|\/+$/g, "")}/${sanitizeSegment(usage)}`;
-  const objectKey = `${prefix}/${Date.now()}-${sanitizeSegment(file.name.replace(/\.[^.]+$/, ""))}.${extensionFromFile(file)}`;
+  const usagePath = usagePathMap[usage] || "general";
+  const normalizedUsage = usageLabelMap[usage] || "General";
+  const prefix = `${config.uploadPrefix.replace(/^\/+|\/+$/g, "")}/${usagePath}`;
   const client = await createOssClient();
   const buffer = Buffer.from(await file.arrayBuffer());
+  const safeName = `${Date.now()}-${randomBytes(4).toString("hex")}-${sanitizeSegment(file.name.replace(/\.[^.]+$/, ""))}.${extensionFromFile(file)}`;
+  const objectKey = `${prefix}/${safeName}`;
   const result = await client.put(objectKey, buffer, {
     headers: {
       "Content-Type": file.type
@@ -102,9 +196,11 @@ export async function uploadFileToOss(file: File, usage: string) {
     title: file.name,
     url,
     objectKey: result.name || objectKey,
-    type: file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : "file",
-    usage,
-    size: `${Math.round(file.size / 1024)} KB`
+    type: file.type.startsWith("video/") ? "Video" : file.type === "image/svg+xml" && normalizedUsage.includes("Icon") ? "Icon" : file.type.startsWith("image/") ? "Image" : "Document",
+    usage: normalizedUsage,
+    size: `${Math.round(file.size / 1024)} KB`,
+    ...imageDimensions(buffer, file.type),
+    uploadedAt: new Date().toISOString()
   };
 }
 

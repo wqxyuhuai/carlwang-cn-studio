@@ -6,20 +6,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 
-const interactiveSelector = [
-  "a",
-  "button",
-  "input",
-  "select",
-  "textarea",
-  "[role='button']",
-  "[data-cursor-hover]"
-].join(",");
-
 export function HomeMotionLayer() {
   const rootRef = useRef<HTMLDivElement>(null);
-  const cursorRef = useRef<HTMLSpanElement>(null);
-  const displacementRef = useRef<SVGFEDisplacementMapElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -39,10 +27,9 @@ export function HomeMotionLayer() {
     const overlay = root.querySelector<HTMLElement>(".home-intro-overlay");
     const square = root.querySelector<HTMLElement>(".home-intro-square");
     const ripples = root.querySelector<HTMLElement>(".home-intro-ripples");
-    const displacement = displacementRef.current;
     const slices = gsap.utils.toArray<HTMLElement>(".pw-home-raster-slice");
 
-    if (!hero || !heroVisual || !heroTitle || !heroMeta || !overlay || !square || !ripples || !displacement) {
+    if (!hero || !heroVisual || !heroTitle || !heroMeta || !overlay || !square || !ripples) {
       return;
     }
 
@@ -53,18 +40,15 @@ export function HomeMotionLayer() {
       gsap.set([heroTitle, heroMeta], { autoAlpha: 0, y: 20 });
       gsap.set(heroVisual, {
         autoAlpha: 0,
-        filter: "url(#home-ripple-displacement) blur(10px)",
         scale: 1.03,
         y: 20
       });
       gsap.set(slices, { autoAlpha: 0, scaleY: 0.94, transformOrigin: "50% 100%", yPercent: 10 });
-      gsap.set(displacement, { attr: { scale: 7 } });
 
       const intro = gsap.timeline({
         defaults: { ease: "power3.out" },
         onComplete: () => {
           gsap.set(overlay, { display: "none" });
-          gsap.set(heroVisual, { clearProps: "filter" });
           document.documentElement.classList.remove("is-home-intro-running");
           document.documentElement.classList.add("is-home-intro-complete");
         }
@@ -73,15 +57,14 @@ export function HomeMotionLayer() {
       intro
         .fromTo(square, { autoAlpha: 0, scale: 0.92 }, { autoAlpha: 1, duration: 0.28, scale: 1 })
         .to(square, { duration: 0.66 })
-        .to(square, { autoAlpha: 0, duration: 0.38, filter: "blur(6px)", scale: 1.08 }, "+=0.04")
+        .to(square, { autoAlpha: 0, duration: 0.38, scale: 1.08 }, "+=0.04")
         .to(overlay, { "--intro-ripple-radius": "145%", duration: 0.9, ease: "power2.inOut" }, "<0.02")
         .fromTo(
           heroVisual,
-          { autoAlpha: 0, filter: "url(#home-ripple-displacement) blur(10px)", scale: 1.03, y: 20 },
-          { autoAlpha: 1, duration: 0.9, filter: "url(#home-ripple-displacement) blur(0px)", scale: 1, y: 0 },
+          { autoAlpha: 0, scale: 1.03, y: 20 },
+          { autoAlpha: 1, duration: 0.9, force3D: true, scale: 1, y: 0 },
           "<"
         )
-        .to(displacement, { attr: { scale: 0 }, duration: 0.9, ease: "power2.out" }, "<")
         .to(ripples, { autoAlpha: 0.55, duration: 0.26 }, "<0.08")
         .to(
           slices,
@@ -110,7 +93,7 @@ export function HomeMotionLayer() {
             invalidateOnRefresh: true,
             pin: true,
             pinSpacing: false,
-            scrub: 0.8,
+            scrub: true,
             start: "top top",
             trigger: hero
           }
@@ -125,8 +108,8 @@ export function HomeMotionLayer() {
           )
           .fromTo(
             heroVisual,
-            { autoAlpha: 1, filter: "blur(0px)", scale: 1, yPercent: 0 },
-            { autoAlpha: 0.08, duration: 1, ease: "none", filter: "blur(8px)", immediateRender: false, scale: 1.06, yPercent: -35 },
+            { autoAlpha: 1, scale: 1, yPercent: 0 },
+            { autoAlpha: 0.08, duration: 1, ease: "none", force3D: true, immediateRender: false, scale: 1.06, yPercent: -35 },
             0
           )
           .fromTo(
@@ -143,7 +126,7 @@ export function HomeMotionLayer() {
             scrollTrigger: {
               end: "bottom top",
               invalidateOnRefresh: true,
-              scrub: 0.75,
+              scrub: true,
               start: "top bottom",
               trigger: strip
             }
@@ -175,67 +158,12 @@ export function HomeMotionLayer() {
     };
   }, []);
 
-  useEffect(() => {
-    const cursor = cursorRef.current;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
-
-    if (!cursor || reduceMotion.matches || !finePointer.matches) {
-      return;
-    }
-
-    let targetX = window.innerWidth / 2;
-    let targetY = window.innerHeight / 2;
-    let currentX = targetX;
-    let currentY = targetY;
-    let frame = 0;
-
-    const setHoverState = (target: EventTarget | null) => {
-      const element = target instanceof Element ? target : null;
-      document.body.classList.toggle("is-cursor-hovering", Boolean(element?.closest(interactiveSelector)));
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      targetX = event.clientX;
-      targetY = event.clientY;
-      document.body.classList.add("is-cursor-visible");
-      setHoverState(event.target);
-    };
-
-    const animateCursor = () => {
-      currentX += (targetX - currentX) * 0.16;
-      currentY += (targetY - currentY) * 0.16;
-      cursor.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) translate(-50%, -50%)`;
-      frame = window.requestAnimationFrame(animateCursor);
-    };
-
-    document.documentElement.classList.add("has-home-custom-cursor");
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    frame = window.requestAnimationFrame(animateCursor);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("pointermove", handlePointerMove);
-      document.documentElement.classList.remove("has-home-custom-cursor");
-      document.body.classList.remove("is-cursor-hovering", "is-cursor-visible");
-    };
-  }, []);
-
   return (
     <div className="home-motion-layer" ref={rootRef}>
-      <svg aria-hidden="true" className="home-motion-defs" focusable="false">
-        <filter id="home-ripple-displacement">
-          <feTurbulence baseFrequency="0.012 0.018" numOctaves="2" result="noise" seed="7" type="fractalNoise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" ref={displacementRef} scale="0" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </svg>
-
       <div className="home-intro-overlay" aria-hidden="true">
         <span className="home-intro-ripples" />
         <span className="home-intro-square" />
       </div>
-
-      <span className="custom-cursor" ref={cursorRef} aria-hidden="true" />
     </div>
   );
 }
