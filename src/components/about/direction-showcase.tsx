@@ -53,7 +53,7 @@ export function DirectionShowcase({ heading = "Design Direction", items = fallba
   const visibleIndex = Math.min(activeIndex ?? defaultDirectionIndex, directionItems.length - 1);
 
   return (
-    <section className="pw-about-direction" onMouseLeave={() => setActiveIndex(null)}>
+    <section className="pw-about-direction" onMouseLeave={() => setActiveIndex(null)} style={{ marginTop: "100px" }}>
       <span className="pw-figma-image pw-direction-media" aria-live="polite">
         {directionItems.map((item, index) => (
           <span className="pw-direction-media-item" data-active={visibleIndex === index} key={item.label}>

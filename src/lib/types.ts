@@ -88,6 +88,9 @@ export type SocialLink = {
   group: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
   type?: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
   iconUrl?: string;
+  colorIconUrl?: string;
+  cardBackgroundColor?: string;
+  cardLogoColor?: string;
   footerVisible?: boolean;
   contactVisible?: boolean;
   status?: "Published" | "Archived";

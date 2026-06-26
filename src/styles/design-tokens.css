@@ -52,6 +52,7 @@
   --color-bg: var(--figma-bg);
   --color-green: var(--figma-green);
   --color-line: var(--color-black-40);
+  --color-error: #ff5a5a;
   --gradient-home-hero: linear-gradient(
       180deg,
       transparent 0%,
@@ -179,6 +180,7 @@ html[data-theme="dark"] {
   --color-black-10: rgb(244 245 239 / 14%);
   --color-bg: #20231f;
   --color-line: rgb(244 245 239 / 34%);
+  --color-error: #ff5a5a;
   --gradient-home-hero: linear-gradient(
       180deg,
       transparent 0%,

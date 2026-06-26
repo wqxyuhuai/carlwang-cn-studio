@@ -11,6 +11,8 @@ const quoteLine = "/figma/about-quote-line.svg";
 const experienceThumb = "/figma/about-experience-thumb.png";
 const fallbackDirectionMedia = ["/field-media/a1-2.webp", "/field-media/a2-1.webp", "/figma/about-direction.png", "/field-media/b1-1.webp"];
 const fallbackSocialIcon = "/figma/social-email.svg";
+const defaultSocialCardBackground = "var(--color-black-10)";
+const defaultSocialLogoColor = "var(--color-black)";
 
 const aboutBodyCopy = [
   "and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
@@ -41,12 +43,12 @@ export default async function AboutPage() {
   const direction = sectionByKey(content, "about_design_direction");
   const experienceSection = sectionByKey(content, "about_experience");
   const contactSection = sectionByKey(content, "about_contact");
-  const skillGroups = content.skillGroups.filter((group) => group.visible);
-  const directionItems = (skillGroups.length > 0 ? skillGroups : []).slice(0, 4).map((group, index) => ({
-    label: group.groupNameEn,
+  const directionTypes = content.workTypes.filter((type) => type.status !== "Archived" && type.filterVisible);
+  const directionItems = (directionTypes.length > 0 ? directionTypes : []).slice(0, 4).map((type, index) => ({
+    label: type.shortLabel || type.nameEn,
     media: {
-      alt: `${group.groupNameEn} direction visual`,
-      src: direction?.mediaUrl || fallbackDirectionMedia[index % fallbackDirectionMedia.length]
+      alt: `${type.shortLabel || type.nameEn} direction visual`,
+      src: type.iconUrl || fallbackDirectionMedia[index % fallbackDirectionMedia.length]
     }
   }));
   const socialLinks = content.socials.filter((link) => link.contactVisible && link.status !== "Archived");
@@ -129,18 +131,33 @@ export default async function AboutPage() {
         <div className="pw-section-content-grid">
           <span aria-hidden="true" />
           <div className="pw-social-grid" aria-label="Social links">
-            {socialLinks.map((link) => (
-              <a
-                aria-label={link.label}
-                className="pw-social-tile"
-                href={link.url}
-                key={link.id || link.url}
-                rel={link.url.startsWith("mailto:") ? undefined : "noreferrer"}
-                target={link.url.startsWith("mailto:") ? undefined : "_blank"}
-              >
-                <Image alt="" height={100} loading="eager" src={link.iconUrl || fallbackSocialIcon} width={100} />
-              </a>
-            ))}
+            {socialLinks.map((link) => {
+              const socialLogoColor = link.cardLogoColor || defaultSocialLogoColor;
+              const socialIconUrl = link.colorIconUrl || link.iconUrl || fallbackSocialIcon;
+              return (
+                <a
+                  aria-label={link.label}
+                  className="pw-social-tile"
+                  href={link.url}
+                  style={{
+                    backgroundColor: link.cardBackgroundColor || defaultSocialCardBackground
+                  }}
+                  key={link.id || link.url}
+                  rel={link.url.startsWith("mailto:") ? undefined : "noreferrer"}
+                  target={link.url.startsWith("mailto:") ? undefined : "_blank"}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="pw-social-tile-icon"
+                    style={{
+                      backgroundColor: socialLogoColor,
+                      maskImage: `url(${socialIconUrl})`,
+                      WebkitMaskImage: `url(${socialIconUrl})`
+                    }}
+                  />
+                </a>
+              );
+            })}
           </div>
         </div>
       </section>

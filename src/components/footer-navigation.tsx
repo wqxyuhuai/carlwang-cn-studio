@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import Image from "next/image";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
 
@@ -33,6 +33,7 @@ export async function FooterNavigation() {
   const footerLinks = content.socials.filter((link) => link.footerVisible && link.status !== "Archived" && link.url);
   const workTypeLinks = content.workTypes.filter((type) => type.filterVisible && type.status !== "Archived").slice(0, 6);
   const socialIcons = footerLinks.filter((link) => link.iconUrl).slice(0, 4);
+  const footerBrandTagline = "A designer working across visual, digital and spatial systems.";
   const footerGroups = [
     {
       title: "Home",
@@ -60,9 +61,7 @@ export async function FooterNavigation() {
             <span>Carl Wang</span>
             <span>Studio</span>
           </div>
-          <p className="caption-copy text-muted footer-copy">
-            {footerMain?.bodyEn || content.settings.seoDescription || "A designer working across visual, digital and spatial systems."}
-          </p>
+          <p className="caption-copy text-muted footer-copy">A designer working across visual, digital and spatial systems.</p>
           {socialIcons.length > 0 ? (
             <div className="pw-footer-socials" aria-label="Social links">
               {socialIcons.map((link) => (
@@ -94,8 +93,9 @@ export async function FooterNavigation() {
             </div>
           ) : null)}
         </nav>
-        <p className="caption-copy pw-footer-copy">{content.settings.footerCopyright || "© Carl Wang. All rights reserved."}</p>
+        <p className="caption-copy pw-footer-copy">{"\u00A9 Carl Wang. All rights reserved."}</p>
       </div>
     </footer>
   );
 }
+
