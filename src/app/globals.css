@@ -10,6 +10,7 @@ html {
   color: var(--color-black);
   color-scheme: light;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 html[data-theme="dark"] {
@@ -28,6 +29,7 @@ body {
   letter-spacing: var(--type-body-r-tracking);
   text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
+  scrollbar-gutter: stable;
 }
 
 .glass-filter {
@@ -839,6 +841,27 @@ html:not([data-theme="dark"]) .cw-glass-header {
 
 .cw-glass-header .cw-theme-toggle {
   background: transparent;
+}
+
+.cw-glass-header,
+.cw-glass-header.is-scrolled {
+  z-index: 9100 !important;
+}
+
+.cw-glass-header .cw-glass-wrapper,
+.cw-glass-header .cw-glass-effect,
+.cw-glass-header .cw-glass-content {
+  transition:
+    opacity var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out),
+    background var(--motion-base) var(--ease-out),
+    backdrop-filter var(--motion-base) var(--ease-out),
+    -webkit-backdrop-filter var(--motion-base) var(--ease-out);
+}
+
+.cw-glass-header.is-scrolled .cw-glass-wrapper,
+.cw-glass-header.is-scrolled .cw-glass-content {
+  box-shadow: none !important;
 }
 
 .text-muted {
