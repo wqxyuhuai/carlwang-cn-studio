@@ -611,8 +611,7 @@ video {
   text-decoration: none;
   white-space: nowrap;
   transition:
-    background var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out);
+    color var(--motion-slow) var(--ease-out);
 }
 
 .cw-nav-link.is-active {
@@ -636,7 +635,7 @@ video {
 .cw-nav-link.is-active:hover,
 .cw-nav-link.is-active:focus-visible {
   background: transparent;
-  color: var(--cw-nav-active-text);
+  color: var(--cw-nav-text-strong);
 }
 
 .cw-nav-tools {
@@ -652,16 +651,21 @@ video {
   align-items: center;
   background: transparent;
   border-radius: 0;
-  color: var(--cw-nav-icon);
+  color: var(--cw-nav-text);
   display: inline-flex;
   block-size: 2rem;
   flex: 0 0 2rem;
   inline-size: 2rem;
   justify-content: center;
   transition:
-    background var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out),
-    transform var(--motion-fast) var(--ease-out);
+    color var(--motion-slow) var(--ease-out),
+    transform var(--motion-slow) var(--ease-out);
+}
+
+.cw-nav-link,
+.cw-theme-toggle,
+.cw-nav-action {
+  color: var(--cw-nav-text);
 }
 
 .cw-theme-toggle:hover,
@@ -676,6 +680,7 @@ video {
 }
 
 .cw-theme-mode-icon {
+  transition: transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
   background: currentColor;
   block-size: 1.25rem;
   display: block;

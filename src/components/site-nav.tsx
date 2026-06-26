@@ -17,6 +17,7 @@ export function SiteNav() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [isScrolled, setIsScrolled] = useState(false);
   const [navOnDark, setNavOnDark] = useState(isHome);
+  const [themeRotation, setThemeRotation] = useState(0);
   const headerRef = useRef<HTMLElement | null>(null);
   const isScrolledRef = useRef(false);
 
@@ -173,6 +174,7 @@ export function SiteNav() {
   const nextTheme = activeTheme === "dark" ? "light" : "dark";
   const switchTheme = () => {
     setTheme(nextTheme);
+    setThemeRotation((current) => current + 180);
     document.documentElement.dataset.theme = nextTheme;
     window.localStorage.setItem("theme", nextTheme);
   };
@@ -207,7 +209,11 @@ export function SiteNav() {
               onClick={switchTheme}
               type="button"
             >
-              <span className="cw-theme-mode-icon" aria-hidden="true" />
+              <span
+                className="cw-theme-mode-icon"
+                aria-hidden="true"
+                style={{ transform: `rotate(${themeRotation}deg)` }}
+              />
             </button>
           </div>
         </div>
