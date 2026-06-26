@@ -1742,62 +1742,6 @@ html:not([data-theme="dark"]) .cw-glass-header {
 
 @media (max-width: 760px) {
   .cw-glass-header {
-    inline-size: min(calc(100% - 20px), 520px);
-    inset-block-start: 10px;
-  }
-
-  .cw-glass-content {
-    border-radius: 30px;
-    grid-template-columns: 1fr auto;
-    min-block-size: auto;
-    padding: 8px;
-    row-gap: 8px;
-  }
-
-  .cw-brand {
-    font-size: 0.8125rem;
-    padding-inline-start: 8px;
-  }
-
-  .cw-nav-links {
-    font-size: 0.8125rem;
-    gap: 0;
-    grid-column: 1 / -1;
-    justify-content: space-between;
-    order: 3;
-    inline-size: 100%;
-  }
-
-  .cw-nav-link {
-    flex: 1 1 0;
-    inline-size: auto;
-    min-block-size: 34px;
-    padding-inline: 8px;
-  }
-
-  .cw-nav-link.is-active {
-    min-inline-size: 62px;
-  }
-
-  .cw-nav-tools {
-    gap: 8px;
-  }
-
-  .cw-theme-toggle {
-    block-size: 36px;
-    inline-size: 36px;
-  }
-
-  .cw-nav-action {
-    font-size: 0.8125rem;
-    min-block-size: 36px;
-    min-inline-size: auto;
-    padding-inline: 14px;
-  }
-}
-
-@media (max-width: 760px) {
-  .cw-glass-header {
     inline-size: min(calc(100vw - 20px), 382px);
     inset-block-start: 10px;
   }
