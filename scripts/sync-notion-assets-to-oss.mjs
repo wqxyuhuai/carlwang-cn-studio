@@ -169,6 +169,19 @@ function extensionFromMime(mime) {
   return map[mime] || "";
 }
 
+function mimeFromBuffer(buffer) {
+  if (buffer.length >= 12 && buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
+    return "image/webp";
+  }
+  if (buffer.length >= 8 && buffer.toString("ascii", 1, 4) === "PNG") return "image/png";
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
+  if (buffer.length >= 6 && ["GIF87a", "GIF89a"].includes(buffer.toString("ascii", 0, 6))) return "image/gif";
+  if (buffer.length >= 12 && buffer.toString("ascii", 4, 8) === "ftyp") return "video/mp4";
+  if (buffer.length >= 4 && buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) return "video/webm";
+  if (buffer.length >= 5 && buffer.toString("ascii", 0, 5) === "%PDF-") return "application/pdf";
+  return "";
+}
+
 function objectKeyFromOssUrl(url) {
   const base = getOssConfig().publicBaseUrl.replace(/\/+$/g, "");
   if (!base || typeof url !== "string" || !url.startsWith(`${base}/`)) return "";
@@ -218,7 +231,7 @@ async function downloadAsset(url) {
   }
   return {
     buffer,
-    contentType: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream"
+    contentType: mimeFromBuffer(buffer) || response.headers.get("content-type")?.split(";")[0] || "application/octet-stream"
   };
 }
 
@@ -233,7 +246,7 @@ async function uploadUrlToOss(client, url, objectBasePath, originalName) {
   }
 
   const { buffer, contentType } = await downloadAsset(url);
-  const extension = extensionFromName(originalName) || extensionFromMime(contentType) || "bin";
+  const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
   const nameBase = slugify(String(originalName || "asset").replace(/\.[^.]+$/, ""), "asset");
   const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
   await withTimeout(client.put(objectKey, buffer, {

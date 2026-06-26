@@ -127,11 +127,23 @@ function isLikelyNotionId(value: string) {
   return /^[0-9a-f-]{32,36}$/i.test(value);
 }
 
+function proxiedOssUrl(src: string) {
+  try {
+    const url = new URL(src);
+    if (/^[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(url.hostname)) {
+      return `/api/media/oss?url=${encodeURIComponent(src)}`;
+    }
+  } catch {
+    return src;
+  }
+  return src;
+}
+
 function media(src: string, alt: string, fallback = placeholderImage): MediaItem {
   const safeSrc = src || fallback;
   return {
     type: /\.(mp4|webm)(\?|$)/i.test(safeSrc) ? "video" : "image",
-    src: safeSrc,
+    src: proxiedOssUrl(safeSrc),
     alt: alt || "Studio media"
   };
 }

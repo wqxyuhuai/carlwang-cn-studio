@@ -250,10 +250,22 @@ type OssProjectData = {
   capabilities?: unknown[];
 };
 
+function proxiedOssUrl(src: string) {
+  try {
+    const url = new URL(src);
+    if (/^[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(url.hostname)) {
+      return `/api/media/oss?url=${encodeURIComponent(src)}`;
+    }
+  } catch {
+    return src;
+  }
+  return src;
+}
+
 function mediaFromUrl(src: string, alt: string, caption?: string): MediaItem {
   return {
     type: /\.(mp4|webm)(\?|$)/i.test(src) ? "video" : "image",
-    src,
+    src: proxiedOssUrl(src),
     alt,
     caption
   };
