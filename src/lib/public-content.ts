@@ -422,9 +422,29 @@ async function buildPublicContent(): Promise<PublicContent> {
   for (const result of loaded) records.set(result.key, result.items);
 
   const sections = records.get("page-sections")?.map(sectionFromRecord).filter((section) => section.key) || fallbackSections();
-  const workTypes = workTypesFromRecords(records.get("work-types") || []);
+  const baseHasOssWorks = base.sync.source === "oss" && base.works.length > 0;
+  const workTypesFromBase = Array.from(new Map(base.works.map((work) => {
+    const name = work.primaryType || work.category || "Selected Work";
+    const slug = work.primaryTypeSlug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return [slug, {
+      id: slug,
+      nameEn: name,
+      nameCn: "",
+      slug,
+      shortLabel: name,
+      descriptionEn: "",
+      descriptionCn: "",
+      iconUrl: "",
+      homeVisible: true,
+      filterVisible: true,
+      order: 999,
+      status: "Published" as const,
+      workCount: 0
+    }];
+  })).values());
+  const workTypes = baseHasOssWorks ? workTypesFromBase : workTypesFromRecords(records.get("work-types") || []);
   const tools = toolsFromRecords(records.get("tools") || []);
-  const works = worksFromRecords(records.get("works") || [], workTypes, tools, base.works);
+  const works = baseHasOssWorks ? base.works : worksFromRecords(records.get("works") || [], workTypes, tools, base.works);
 
   return {
     settings: base.settings,

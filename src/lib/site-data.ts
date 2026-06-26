@@ -220,6 +220,111 @@ type LooseWork = Partial<Work> & {
   coverImage?: MediaItem;
 };
 
+type OssRichContentBlock = {
+  type?: string;
+  value?: string;
+  caption?: string;
+  columns?: OssRichContentBlock[][];
+};
+
+type OssProject = {
+  id?: string;
+  slug?: string;
+  title?: string;
+  category?: string;
+  year?: number | string;
+  content?: string;
+  richContent?: OssRichContentBlock[];
+  coverImage?: string;
+  galleryImages?: string[];
+  videoUrl?: string;
+  status?: string;
+  featured?: boolean;
+  sortOrder?: number | string;
+};
+
+type OssProjectData = {
+  projects?: OssProject[];
+  settings?: Partial<Record<string, string>>;
+  socials?: unknown[];
+  capabilities?: unknown[];
+};
+
+function mediaFromUrl(src: string, alt: string, caption?: string): MediaItem {
+  return {
+    type: /\.(mp4|webm)(\?|$)/i.test(src) ? "video" : "image",
+    src,
+    alt,
+    caption
+  };
+}
+
+function richContentToBlocks(blocks: OssRichContentBlock[] | undefined, title: string): NotionBlock[] {
+  if (!Array.isArray(blocks)) return [];
+
+  return blocks.flatMap((block, index): NotionBlock[] => {
+    const value = typeof block.value === "string" ? block.value : "";
+    const caption = typeof block.caption === "string" ? block.caption : undefined;
+
+    if ((block.type === "image" || block.type === "video") && value) {
+      return [{ type: block.type, media: mediaFromUrl(value, `${title} media ${index + 1}`, caption) }];
+    }
+
+    if (block.type === "columns" && Array.isArray(block.columns)) {
+      return [
+        {
+          type: "column_list",
+          columns: block.columns.map((column) => richContentToBlocks(column, title))
+        }
+      ];
+    }
+
+    if (block.type === "paragraph" && value) {
+      return [{ type: "paragraph", text: [{ text: value }] }];
+    }
+
+    return [];
+  });
+}
+
+function normalizeStatus(value: string | undefined): Work["status"] {
+  if (value === "Published" || value === "Archived" || value === "Draft") return value;
+  return "Published";
+}
+
+function normalizeProject(value: OssProject): Work | null {
+  if (!value || !value.title || !value.slug || !value.coverImage) return null;
+
+  const title = value.title;
+  const cover = mediaFromUrl(value.coverImage, `${title} cover`);
+  const gallery = [
+    ...(value.videoUrl ? [mediaFromUrl(value.videoUrl, `${title} video`)] : []),
+    ...(Array.isArray(value.galleryImages) ? value.galleryImages.map((url, index) => mediaFromUrl(url, `${title} gallery image ${index + 1}`)) : [])
+  ];
+
+  return {
+    id: value.id || value.slug,
+    title,
+    slug: value.slug,
+    status: normalizeStatus(value.status),
+    year: Number(value.year || new Date().getFullYear()),
+    viewCount: 0,
+    likeCount: 0,
+    category: value.category || "Selected Work",
+    primaryType: value.category || "Selected Work",
+    primaryTypeSlug: (value.category || "selected-work").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
+    featured: Boolean(value.featured),
+    order: Number(value.sortOrder || 999),
+    cover,
+    intro: value.content || value.category || "",
+    role: "",
+    tools: [],
+    gallery: gallery.length > 0 ? gallery : [cover],
+    content: richContentToBlocks(value.richContent, title),
+    notionPageId: value.id
+  };
+}
+
 function normalizeWork(value: unknown): Work | null {
   if (!value || typeof value !== "object") return null;
   const work = value as LooseWork;
@@ -254,6 +359,33 @@ function isStudioData(value: unknown): value is StudioData {
   return Array.isArray(candidate.works) && Boolean(candidate.settings);
 }
 
+function normalizeProjectData(value: unknown): StudioData | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as OssProjectData;
+  if (!Array.isArray(candidate.projects)) return null;
+
+  const works = candidate.projects.map(normalizeProject).filter((work): work is Work => Boolean(work));
+  if (works.length === 0) return null;
+
+  const settings = candidate.settings || {};
+
+  return {
+    ...fallbackData,
+    settings: {
+      ...fallbackData.settings,
+      homeHeroTitle: settings.slogan || fallbackData.settings.homeHeroTitle,
+      homeHeroDescription: settings.role || fallbackData.settings.homeHeroDescription,
+      seoTitle: settings.name ? `${settings.name} Studio` : fallbackData.settings.seoTitle,
+      seoDescription: settings.bio || fallbackData.settings.seoDescription,
+      contactEmail: settings.email || fallbackData.settings.contactEmail,
+      footerCopyright: settings.footer || fallbackData.settings.footerCopyright,
+      contentUrl: CONTENT_URL
+    },
+    works: works.sort((a, b) => a.order - b.order),
+    sync: { source: "oss" }
+  };
+}
+
 export async function getStudioData(): Promise<StudioData> {
   try {
     const response = await fetch(CONTENT_URL, { cache: "force-cache" });
@@ -273,6 +405,9 @@ export async function getStudioData(): Promise<StudioData> {
         sync: { source: "oss" }
       };
     }
+
+    const projectData = normalizeProjectData(json);
+    if (projectData) return projectData;
 
     throw new Error("OSS JSON shape does not match PW2 StudioData.");
   } catch (error) {
