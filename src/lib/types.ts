@@ -78,6 +78,22 @@ export type Tool = {
   order: number;
 };
 
+export type WorkType = {
+  id?: string;
+  nameEn: string;
+  nameCn?: string;
+  slug: string;
+  shortLabel?: string;
+  descriptionEn?: string;
+  descriptionCn?: string;
+  iconUrl?: string;
+  homeVisible?: boolean;
+  filterVisible?: boolean;
+  order: number;
+  status?: "Published" | "Archived";
+  workCount?: number;
+};
+
 export type SocialLink = {
   id?: string;
   platform: string;
@@ -96,6 +112,23 @@ export type SocialLink = {
   status?: "Published" | "Archived";
   active: boolean;
   order: number;
+};
+
+export type Experience = {
+  id: string;
+  title: string;
+  organization: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  dateLabel?: string;
+  isCurrent?: boolean;
+  descriptionEn?: string;
+  descriptionCn?: string;
+  tags?: string[];
+  imageUrl?: string;
+  order: number;
+  visible: boolean;
 };
 
 export type SiteSettings = {
@@ -118,8 +151,10 @@ export type SiteSettings = {
 export type StudioData = {
   settings: SiteSettings;
   works: Work[];
+  workTypes?: WorkType[];
   tools: Tool[];
   socials: SocialLink[];
+  experiences?: Experience[];
   sync: {
     source: "oss" | "fallback";
     error?: string;

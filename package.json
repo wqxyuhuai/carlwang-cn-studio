@@ -14,11 +14,14 @@
     "format": "eslint --fix",
     "typecheck": "tsc --noEmit",
     "screenshots": "node scripts/capture-screenshots.mjs",
+    "content:publish": "node scripts/publish-oss-content.mjs",
+    "content:sync-assets": "node scripts/sync-notion-assets-to-oss.mjs",
     "admin:hash": "node scripts/generate-admin-password-hash.mjs",
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@notionhq/client": "^5.22.0",
+    "ali-oss": "^6.23.0",
     "bcryptjs": "^3.0.3",
     "gsap": "^3.15.0",
     "next": "16.2.9",

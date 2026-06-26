@@ -24,7 +24,11 @@ function renderBaseParts(parts: string[]) {
 
     return (
       <span className="cascade-text-word" key={`base-word-${part}-${partIndex}`}>
-        {part}
+        {Array.from(part).map((char, charIndex) => (
+          <span className="cascade-text-base-char" key={`${char}-${charIndex}`}>
+            {char}
+          </span>
+        ))}
       </span>
     );
   });

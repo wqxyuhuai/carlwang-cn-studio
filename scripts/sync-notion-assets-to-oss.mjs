@@ -1,5 +1,6 @@
 ﻿import { randomBytes } from "node:crypto";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import OSS from "ali-oss";
@@ -10,6 +11,7 @@ const SYNC_STATUS_NAME = String.fromCharCode(0x540c, 0x6b65, 0x72b6, 0x6001);
 const SYNCED_STATUS = String.fromCharCode(0x5df2, 0x540c, 0x6b65);
 const WAITING_SYNC_STATUS = String.fromCharCode(0x5f85, 0x540c, 0x6b65);
 const WAITING_UPDATE_STATUS = String.fromCharCode(0x5f85, 0x66f4, 0x65b0);
+const EDITING_STATUS = String.fromCharCode(0x7f16, 0x8f91, 0x4e2d);
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
 const ASSET_TIMEOUT_MS = Number(process.env.ASSET_TIMEOUT_MS || 20000);
 const MAX_FAILED_MEDIA_PER_ITEM = Number(process.env.MAX_FAILED_MEDIA_PER_ITEM || 3);
@@ -44,6 +46,13 @@ const tables = {
     tableFolder: "studio-social-links",
     titleProperty: "Platform",
     fileProperties: ["Black Logo", "Color Logo"]
+  },
+  experience: {
+    label: "Studio Experience",
+    dataSourceEnv: "NOTION_ABOUT_EXPERIENCE_DATABASE_ID",
+    tableFolder: "studio-experience",
+    titleProperty: "Title",
+    fileProperties: ["Company Logo"]
   }
 };
 
@@ -78,7 +87,8 @@ function getOssConfig() {
     endpoint: envValue("ALIYUN_OSS_ENDPOINT"),
     bucket: envValue("ALIYUN_OSS_BUCKET"),
     publicBaseUrl: envValue("ALIYUN_OSS_PUBLIC_BASE_URL"),
-    uploadPrefix: envValue("ALIYUN_OSS_UPLOAD_PREFIX", "ALIYUN_OSS_DIR") || "uploads/admin"
+    uploadPrefix: envValue("ALIYUN_OSS_UPLOAD_PREFIX", "ALIYUN_OSS_DIR") || "uploads/admin",
+    assetManifestKey: envValue("ALIYUN_OSS_ASSET_MANIFEST_KEY") || `${envValue("ALIYUN_OSS_UPLOAD_PREFIX", "ALIYUN_OSS_DIR") || "uploads/admin"}/notion-sync/.asset-manifest.json`
   };
 }
 
@@ -192,6 +202,36 @@ function isOssUrl(url) {
   return Boolean(objectKeyFromOssUrl(url));
 }
 
+function sha256Buffer(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+async function loadAssetManifest(client) {
+  try {
+    const result = await client.get(getOssConfig().assetManifestKey);
+    const source = Buffer.isBuffer(result.content) ? result.content.toString("utf8") : String(result.content || "{}");
+    const parsed = JSON.parse(source);
+    return {
+      bySha256: parsed && typeof parsed.bySha256 === "object" && parsed.bySha256 ? parsed.bySha256 : {}
+    };
+  } catch {
+    return { bySha256: {} };
+  }
+}
+
+async function saveAssetManifest(client, manifest) {
+  const body = Buffer.from(`${JSON.stringify({
+    bySha256: manifest.bySha256,
+    updatedAt: new Date().toISOString()
+  }, null, 2)}\n`, "utf8");
+  await withTimeout(client.put(getOssConfig().assetManifestKey, body, {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-cache"
+    }
+  }), "asset manifest upload");
+}
+
 async function withTimeout(promise, label) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
@@ -204,9 +244,19 @@ async function withTimeout(promise, label) {
   }
 }
 
-function isDesiredOssUrl(url, objectBasePath) {
-  const objectKey = objectKeyFromOssUrl(url);
-  return Boolean(objectKey && objectKey.startsWith(`${objectBasePath}/`));
+async function retryAsync(fn, label, attempts = 4) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+      }
+    }
+  }
+  throw new Error(`${label} failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
 async function downloadAsset(url) {
@@ -239,13 +289,19 @@ function publicUrlForObject(objectKey) {
   return `${getOssConfig().publicBaseUrl.replace(/\/+$/g, "")}/${objectKey}`;
 }
 
-async function uploadUrlToOss(client, url, objectBasePath, originalName) {
+async function uploadUrlToOss(client, manifest, url, objectBasePath, originalName) {
   const existingObjectKey = objectKeyFromOssUrl(url);
-  if (existingObjectKey && existingObjectKey.startsWith(`${objectBasePath}/`)) {
+  if (existingObjectKey) {
     return { url, skipped: true, objectKey: existingObjectKey };
   }
 
   const { buffer, contentType } = await downloadAsset(url);
+  const sha256 = sha256Buffer(buffer);
+  const existing = manifest.bySha256[sha256];
+  if (existing?.url && isOssUrl(existing.url)) {
+    return { url: existing.url, skipped: false, reused: true, objectKey: existing.objectKey || objectKeyFromOssUrl(existing.url), sha256 };
+  }
+
   const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
   const nameBase = slugify(String(originalName || "asset").replace(/\.[^.]+$/, ""), "asset");
   const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
@@ -255,19 +311,27 @@ async function uploadUrlToOss(client, url, objectBasePath, originalName) {
       "Cache-Control": "public, max-age=31536000, immutable"
     }
   }), "oss upload");
-  return { url: publicUrlForObject(objectKey), skipped: false, objectKey };
+  const publicUrl = publicUrlForObject(objectKey);
+  manifest.bySha256[sha256] = {
+    url: publicUrl,
+    objectKey,
+    contentType,
+    byteLength: buffer.length,
+    updatedAt: new Date().toISOString()
+  };
+  return { url: publicUrl, skipped: false, reused: false, objectKey, sha256 };
 }
 
 async function listAllPages(notion, dataSourceId) {
   const pages = [];
   let startCursor;
   do {
-    const response = await notion.dataSources.query({
+    const response = await retryAsync(() => notion.dataSources.query({
       data_source_id: dataSourceId,
       page_size: 100,
       result_type: "page",
       start_cursor: startCursor
-    });
+    }), "notion data source query");
     pages.push(...response.results);
     startCursor = response.has_more ? response.next_cursor : undefined;
   } while (startCursor);
@@ -278,18 +342,18 @@ async function listChildren(notion, blockId) {
   const blocks = [];
   let startCursor;
   do {
-    const response = await notion.blocks.children.list({
+    const response = await retryAsync(() => notion.blocks.children.list({
       block_id: blockId,
       page_size: 100,
       start_cursor: startCursor
-    });
+    }), "notion block children query");
     blocks.push(...response.results);
     startCursor = response.has_more ? response.next_cursor : undefined;
   } while (startCursor);
   return blocks;
 }
 
-async function processBlockTree(notion, client, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun) {
+async function processBlockTree(notion, client, manifest, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun) {
   const stack = await listChildren(notion, pageId);
   while (stack.length) {
     if (stats.failedMedia >= MAX_FAILED_MEDIA_PER_ITEM) {
@@ -304,13 +368,13 @@ async function processBlockTree(notion, client, pageId, tableFolder, itemFolder,
       const originalName = `${media.blockType}-${block.id}`;
       const objectBasePath = ossPath(tableFolder, itemFolder, "notion-page-body");
       console.log(`[body] ${itemLabel} media #${stats.seen} ${media.blockType}`);
-      if (isDesiredOssUrl(media.url, objectBasePath)) {
+      if (isOssUrl(media.url)) {
         stats.skipped += 1;
         console.log(`[body] ${itemLabel} media #${stats.seen} skipped`);
       } else {
         try {
           if (!dryRun) {
-            const uploaded = await uploadUrlToOss(client, media.url, objectBasePath, originalName);
+            const uploaded = await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName);
             const nextPayload = {
               external: { url: uploaded.url },
               caption: media.caption
@@ -319,8 +383,13 @@ async function processBlockTree(notion, client, pageId, tableFolder, itemFolder,
               block_id: block.id,
               [media.blockType]: nextPayload
             });
-            stats.uploaded += 1;
-            console.log(`[body] ${itemLabel} media #${stats.seen} uploaded`);
+            if (uploaded.reused) {
+              stats.reused += 1;
+              console.log(`[body] ${itemLabel} media #${stats.seen} reused`);
+            } else {
+              stats.uploaded += 1;
+              console.log(`[body] ${itemLabel} media #${stats.seen} uploaded`);
+            }
           } else {
             stats.uploaded += 1;
             console.log(`[body] ${itemLabel} media #${stats.seen} would-upload`);
@@ -343,7 +412,7 @@ function ossPath(tableFolder, itemFolder, segment) {
   return [prefix, "notion-sync", itemFolder, segment].filter(Boolean).join("/");
 }
 
-async function processFilesProperty(client, page, tableConfig, itemFolder, propertyName, stats, dryRun) {
+async function processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, dryRun) {
   const property = page.properties?.[propertyName];
   const files = fileArrayFromProperty(property);
   if (!files.length) return null;
@@ -361,21 +430,16 @@ async function processFilesProperty(client, page, tableConfig, itemFolder, prope
 
     const objectBasePath = ossPath(tableConfig.tableFolder, itemFolder, slugify(propertyName, "files"));
     console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length}`);
-    const alreadyTargetOss = isDesiredOssUrl(sourceUrl, objectBasePath);
-    if (stats.updateOnly && !alreadyTargetOss) {
-      stats.failedMedia += 1;
-      console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} update-only skipped: source is not target OSS URL`);
-      nextFiles.push(file);
-      continue;
-    }
+    const alreadyOss = isOssUrl(sourceUrl);
 
     const upload = dryRun
       ? {
         url: sourceUrl,
-        skipped: alreadyTargetOss
+        skipped: alreadyOss
       }
       : await uploadUrlToOss(
         client,
+        manifest,
         sourceUrl,
         objectBasePath,
         fileName
@@ -384,6 +448,10 @@ async function processFilesProperty(client, page, tableConfig, itemFolder, prope
     if (upload.skipped) {
       stats.skipped += 1;
       console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} skipped`);
+    } else if (upload.reused) {
+      stats.reused += 1;
+      changed = true;
+      console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} reused`);
     } else {
       stats.uploaded += 1;
       changed = true;
@@ -422,8 +490,11 @@ function shouldProcessPending(page) {
   return status === WAITING_SYNC_STATUS || status === WAITING_UPDATE_STATUS;
 }
 
-function isWaitingUpdate(page) {
-  return syncStatusValue(page) === WAITING_UPDATE_STATUS;
+function shouldProcessPage(page, options = {}) {
+  const status = syncStatusValue(page);
+  if (status === EDITING_STATUS) return false;
+  if (options.includeSynced) return true;
+  return shouldProcessPending(page);
 }
 
 async function runTable(tableKey, options = {}) {
@@ -435,13 +506,22 @@ async function runTable(tableKey, options = {}) {
 
   const notion = new Client({ auth: process.env.NOTION_TOKEN });
   const client = createOssClient();
+  const manifest = await loadAssetManifest(client);
+  let manifestChanged = false;
   const allPages = await listAllPages(notion, dataSourceId);
-  const eligiblePages = options.onlyPending ? allPages.filter(shouldProcessPending) : allPages;
-  const pages = options.limit ? eligiblePages.slice(0, options.limit) : eligiblePages;
+  const eligiblePages = allPages.filter((page) => shouldProcessPage(page, options));
+  const titleContains = String(options.titleContains || "").toLowerCase();
+  const filteredPages = titleContains
+    ? eligiblePages.filter((page) => {
+      const title = titleFromProperty(page.properties?.[tableConfig.titleProperty]).toLowerCase();
+      return title.includes(titleContains);
+    })
+    : eligiblePages;
+  const pages = options.limit ? filteredPages.slice(0, options.limit) : filteredPages;
   const skippedByStatus = allPages.length - eligiblePages.length;
-  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, skipped: 0, updatedRows: 0, failedRows: 0 };
+  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, reused: 0, skipped: 0, updatedRows: 0, failedRows: 0 };
 
-  console.log(`[${tableConfig.label}] rows=${pages.length}${options.onlyPending ? ` skippedByStatus=${skippedByStatus}` : ""}${options.limit ? ` limit=${options.limit}` : ""}`);
+  console.log(`[${tableConfig.label}] rows=${pages.length} skippedByStatus=${skippedByStatus}${titleContains ? ` titleContains=${titleContains}` : ""}${options.limit ? ` limit=${options.limit}` : ""}`);
 
   let index = 0;
   for (const page of pages) {
@@ -449,22 +529,19 @@ async function runTable(tableKey, options = {}) {
     const title = titleFromProperty(page.properties?.[tableConfig.titleProperty]) || `row-${index}`;
     const slug = tableConfig.slugProperty ? richTextFromProperty(page.properties?.[tableConfig.slugProperty]) : "";
     const itemFolder = tableKey === "projects" ? slugify(slug || title || page.id, "project") : slugify(title || page.id, "item");
-    const updateOnly = isWaitingUpdate(page) && !options.forceUploadUpdates;
-    const stats = { uploaded: 0, skipped: 0, seen: 0, failedMedia: 0, updateOnly };
+    const stats = { uploaded: 0, reused: 0, skipped: 0, seen: 0, failedMedia: 0 };
     const fileProperties = {};
 
-    console.log(`[${tableConfig.label}] ${index}/${pages.length} ${title}${updateOnly ? " update-only" : ""}`);
+    console.log(`[${tableConfig.label}] ${index}/${pages.length} ${title} status=${syncStatusValue(page) || "empty"}`);
 
     try {
       for (const propertyName of tableConfig.fileProperties) {
-        const update = await processFilesProperty(client, page, tableConfig, itemFolder, propertyName, stats, options.dryRun);
+        const update = await processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, options.dryRun);
         if (update) Object.assign(fileProperties, update);
       }
 
-      if (tableConfig.includeBodyMedia && !options.skipBody && !updateOnly) {
-        await processBlockTree(notion, client, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun);
-      } else if (tableConfig.includeBodyMedia && !options.skipBody && updateOnly) {
-        console.log(`[body] ${title} update-only skipped body media upload`);
+      if (tableConfig.includeBodyMedia && !options.skipBody) {
+        await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun);
       }
 
       let rowUpdated = false;
@@ -481,14 +558,21 @@ async function runTable(tableKey, options = {}) {
       }
 
       if (rowUpdated) totals.updatedRows += 1;
+      if (stats.uploaded > 0 || stats.reused > 0) manifestChanged = true;
 
       totals.uploaded += stats.uploaded;
+      totals.reused += stats.reused;
       totals.skipped += stats.skipped;
-      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} skipped=${stats.skipped}`);
+      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} reused=${stats.reused} skipped=${stats.skipped}`);
     } catch (error) {
       totals.failedRows += 1;
       console.log(`[${tableConfig.label}] failed ${index}/${pages.length} ${title}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  if (!options.dryRun && manifestChanged) {
+    await saveAssetManifest(client, manifest);
+    console.log(`[${tableConfig.label}] asset manifest updated`);
   }
 
   console.log(`[${tableConfig.label}] summary ${JSON.stringify(totals)}`);
@@ -508,15 +592,15 @@ async function main() {
   const limit = limitArg ? Math.max(0, Number(limitArg)) : 0;
   const dryRun = process.argv.includes("--dry-run");
   const skipBody = process.argv.includes("--skip-body");
-  const onlyPending = process.argv.includes("--only-pending");
-  const forceUploadUpdates = process.argv.includes("--force-upload-updates");
+  const includeSynced = process.argv.includes("--include-synced");
+  const titleContains = process.argv.find((arg) => arg.startsWith("--title-contains="))?.split("=").slice(1).join("=") || "";
   const selected = tableArg === "all" ? Object.keys(tables) : [tableArg];
 
-  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${onlyPending ? " onlyPending=true" : ""}${forceUploadUpdates ? " forceUploadUpdates=true" : ""}`);
+  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${titleContains ? ` titleContains=${titleContains}` : ""}`);
 
   const summary = {};
   for (const tableKey of selected) {
-    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, onlyPending, forceUploadUpdates });
+    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, includeSynced, titleContains });
   }
 
   console.log(`sync complete ${JSON.stringify(summary)}`);

@@ -47,13 +47,13 @@ const fallbackDirectionItems: DirectionItem[] = [
 
 const defaultDirectionIndex = 2;
 
-export function DirectionShowcase({ heading = "Design Direction", items = fallbackDirectionItems }: { heading?: string; items?: DirectionItem[] }) {
+export function DirectionShowcase({ heading = "Design Direction", id, items = fallbackDirectionItems }: { heading?: string; id?: string; items?: DirectionItem[] }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const directionItems = items.length > 0 ? items : fallbackDirectionItems;
   const visibleIndex = Math.min(activeIndex ?? defaultDirectionIndex, directionItems.length - 1);
 
   return (
-    <section className="pw-about-direction" onMouseLeave={() => setActiveIndex(null)} style={{ marginTop: "100px" }}>
+    <section className="pw-about-direction" id={id} onMouseLeave={() => setActiveIndex(null)} style={{ marginTop: "100px" }}>
       <span className="pw-figma-image pw-direction-media" aria-live="polite">
         {directionItems.map((item, index) => (
           <span className="pw-direction-media-item" data-active={visibleIndex === index} key={item.label}>

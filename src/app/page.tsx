@@ -43,7 +43,7 @@ export default async function Home() {
   const [content, featuredWorks] = await Promise.all([getPublicContent(), getFeaturedWorks()]);
   const hero = sectionByKey(content, "home_hero");
   const featuredSection = sectionByKey(content, "home_featured_works");
-  const projectTypes = content.workTypes.filter((type) => type.homeVisible && type.status !== "Archived");
+  const projectTypes = content.workTypes.filter((type) => (type.homeVisible || type.filterVisible) && type.status !== "Archived");
   const sourceThumbs: HomeTrackItem[] = (featuredWorks.length > 0 ? featuredWorks : content.works.filter((work) => work.status === "Published")).slice(0, homeTrackMinItems);
   const fallbackThumbs: HomeTrackItem[] = fallbackMedia.map((src, index) => ({
     slug: "studio-web-system",
@@ -52,7 +52,7 @@ export default async function Home() {
   }));
   const baseTrackItems = sourceThumbs.length > 0 ? sourceThumbs : fallbackThumbs;
   const trackItems = Array.from({ length: Math.max(homeTrackMinItems, baseTrackItems.length) }, (_, index) => baseTrackItems[index % baseTrackItems.length]);
-  const fieldItems = projectTypes.slice(0, 6).map((type, index) => ({
+  const fieldItems = projectTypes.map((type, index) => ({
     label: type.shortLabel || type.nameEn,
     media: {
       alt: `${type.nameEn} visual`,
@@ -65,7 +65,7 @@ export default async function Home() {
     <main className="pw-page pw-home-motion-root">
       <HomeMotionLayer />
 
-      <section className="pw-home-hero" data-home-hero>
+      <section className="pw-home-hero" data-home-hero id="home">
         <div className="pw-home-hero-visual" data-home-hero-visual aria-hidden="true">
           <div className="pw-home-raster-grid">
             {heroSlices.map((index) => (
@@ -75,10 +75,10 @@ export default async function Home() {
         </div>
         <div className="pw-home-hero-inner">
           <h1 className="pw-home-title" data-home-title>
-            {hero?.titleEn || content.settings.homeHeroTitle}
-            <br />
-            <br />
-            {hero?.subtitleEn || content.settings.homeHeroDescription}
+            <span className="pw-home-title-group">
+              <span>{hero?.titleEn || content.settings.homeHeroTitle}</span>
+              <span>{hero?.subtitleEn || content.settings.homeHeroDescription}</span>
+            </span>
           </h1>
           <div className="pw-meta-row caption-copy" data-home-meta>
             <span>Build with love @2026</span>
@@ -87,7 +87,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="pw-home-strip" data-home-second data-home-work-strip aria-label="Featured works">
+      <section className="pw-home-strip" data-home-second data-home-work-strip id="featured-works" aria-label="Featured works">
         <div className="pw-home-strip-stage" data-home-work-stage>
           <div className="pw-thumb-track" data-home-thumb-track>
             {trackItems.map((work, index) => (

@@ -1,8 +1,8 @@
-import type { MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work } from "./types";
+import type { Experience, MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 
 export const CONTENT_URL =
   process.env.NEXT_PUBLIC_CONTENT_URL ||
-  "https://carlwang-cn.oss-cn-shanghai.aliyuncs.com/uploads/site-content.json";
+  "https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json";
 
 const image = (src: string, alt: string, caption?: string): MediaItem => ({
   type: "image",
@@ -190,6 +190,34 @@ const fallbackTools: Tool[] = [
   { name: "Blender", category: "3D", active: true, order: 7 }
 ];
 
+function slugFromLabel(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+const fallbackWorkTypes: WorkType[] = Array.from(
+  new Map(
+    fallbackWorks.map((work, index) => {
+      const name = work.primaryType || work.category || "Selected Work";
+      const slug = work.primaryTypeSlug || slugFromLabel(name);
+      return [slug, {
+        id: slug,
+        nameEn: name,
+        nameCn: "",
+        slug,
+        shortLabel: name,
+        descriptionEn: "",
+        descriptionCn: "",
+        iconUrl: "",
+        homeVisible: true,
+        filterVisible: true,
+        order: index + 1,
+        status: "Published" as const,
+        workCount: 0
+      }];
+    })
+  ).values()
+);
+
 export const fallbackSocials: SocialLink[] = [
   { platform: "Email", label: "Email", url: "mailto:hello@carlwang.cn", handle: "hello@carlwang.cn", group: "Contact", active: true, order: 1 },
   { platform: "Behance", label: "Behance", url: "https://www.behance.net/", group: "Portfolio", active: true, order: 2 },
@@ -208,8 +236,10 @@ export const fallbackData: StudioData = {
     seoDescription: "A designer working across visual, digital and spatial systems."
   },
   works: fallbackWorks,
+  workTypes: fallbackWorkTypes,
   tools: fallbackTools,
   socials: fallbackSocials,
+  experiences: [],
   sync: {
     source: "fallback",
     error: "Using fallback content until OSS JSON is normalized for PW2."
@@ -268,6 +298,22 @@ function mediaFromUrl(src: string, alt: string, caption?: string): MediaItem {
     src: proxiedOssUrl(src),
     alt,
     caption
+  };
+}
+
+function normalizeMedia(value: unknown, alt: string): MediaItem | null {
+  if (typeof value === "string" && value) return mediaFromUrl(value, alt);
+  if (!value || typeof value !== "object") return null;
+  const media = value as Partial<MediaItem>;
+  if (!media.src) return null;
+  return {
+    type: media.type === "video" || /\.(mp4|webm)(\?|$)/i.test(media.src) ? "video" : "image",
+    src: proxiedOssUrl(media.src),
+    alt: media.alt || alt,
+    caption: media.caption,
+    poster: media.poster ? proxiedOssUrl(media.poster) : undefined,
+    width: media.width,
+    height: media.height
   };
 }
 
@@ -340,13 +386,14 @@ function normalizeProject(value: OssProject): Work | null {
 function normalizeWork(value: unknown): Work | null {
   if (!value || typeof value !== "object") return null;
   const work = value as LooseWork;
-  const cover = work.cover || work.coverImage;
+  const title = work.title || "";
+  const cover = normalizeMedia(work.cover || work.coverImage, `${title} cover`);
 
-  if (!work.title || !work.slug || !work.status || !work.year || !work.category || !cover) return null;
+  if (!title || !work.slug || !work.status || !work.year || !work.category || !cover) return null;
 
   return {
     id: work.id || work.slug,
-    title: work.title,
+    title,
     slug: work.slug,
     status: work.status,
     year: Number(work.year),
@@ -354,14 +401,131 @@ function normalizeWork(value: unknown): Work | null {
     viewCount: Number(work.viewCount || 0),
     likeCount: Number(work.likeCount || 0),
     category: work.category,
+    primaryType: work.primaryType || work.category,
+    primaryTypeSlug: work.primaryTypeSlug || slugFromLabel(work.primaryType || work.category),
+    tags: Array.isArray(work.tags) ? work.tags : [],
     featured: Boolean(work.featured),
+    featuredOrder: Number(work.featuredOrder || work.order || 999),
     order: Number(work.order || 999),
     cover,
     intro: work.intro || "",
+    introCn: work.introCn,
+    overview: work.overview,
+    overviewCn: work.overviewCn,
     role: work.role || "",
+    roleCn: work.roleCn,
+    clientBrand: work.clientBrand,
     tools: work.tools || [],
-    gallery: work.gallery || [cover],
-    content: work.content || []
+    gallery: (work.gallery || [cover]).map((item, index) => normalizeMedia(item, `${title} gallery image ${index + 1}`)).filter((item): item is MediaItem => Boolean(item)),
+    content: work.content || [],
+    externalUrl: work.externalUrl,
+    notionUrl: work.notionUrl,
+    notionPageId: work.notionPageId
+  };
+}
+
+function stringFromUnknown(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function booleanFromUnknown(value: unknown, fallback: boolean) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeWorkType(value: unknown): WorkType | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Partial<WorkType> & {
+    name?: string;
+    title?: string;
+    label?: string;
+    cover?: string;
+  };
+  const name = stringFromUnknown(record.nameEn) || stringFromUnknown(record.name) || stringFromUnknown(record.title) || stringFromUnknown(record.label);
+  if (!name) return null;
+  const slug = stringFromUnknown(record.slug) || slugFromLabel(name);
+
+  return {
+    id: stringFromUnknown(record.id) || slug,
+    nameEn: name,
+    nameCn: stringFromUnknown(record.nameCn),
+    slug,
+    shortLabel: stringFromUnknown(record.shortLabel) || name,
+    descriptionEn: stringFromUnknown(record.descriptionEn),
+    descriptionCn: stringFromUnknown(record.descriptionCn),
+    iconUrl: proxiedOssUrl(stringFromUnknown(record.iconUrl) || stringFromUnknown(record.cover)),
+    homeVisible: booleanFromUnknown(record.homeVisible, true),
+    filterVisible: booleanFromUnknown(record.filterVisible, true),
+    order: Number(record.order || 999),
+    status: record.status === "Archived" ? "Archived" : "Published",
+    workCount: Number(record.workCount || 0)
+  };
+}
+
+function normalizeTool(value: unknown): Tool | null {
+  if (!value || typeof value !== "object") return null;
+  const tool = value as Partial<Tool>;
+  if (!tool.name) return null;
+  const active = tool.active !== false && tool.status !== "Archived";
+  return {
+    id: tool.id,
+    name: tool.name,
+    category: tool.category || "Design",
+    iconUrl: tool.iconUrl ? proxiedOssUrl(tool.iconUrl) : "",
+    description: tool.description || "",
+    descriptionCn: tool.descriptionCn || "",
+    homeVisible: tool.homeVisible !== false,
+    status: active ? "Published" : "Archived",
+    active,
+    order: Number(tool.order || 999)
+  };
+}
+
+function normalizeSocial(value: unknown): SocialLink | null {
+  if (!value || typeof value !== "object") return null;
+  const social = value as Partial<SocialLink>;
+  if (!social.platform || !social.url) return null;
+  const group = social.group || social.type || "Social";
+  const active = social.active !== false && social.status !== "Archived";
+  return {
+    id: social.id,
+    platform: social.platform,
+    label: social.label || social.platform,
+    labelCn: social.labelCn,
+    url: social.url,
+    handle: social.handle,
+    group,
+    type: social.type || group,
+    iconUrl: social.iconUrl ? proxiedOssUrl(social.iconUrl) : "",
+    colorIconUrl: social.colorIconUrl ? proxiedOssUrl(social.colorIconUrl) : "",
+    cardBackgroundColor: social.cardBackgroundColor,
+    cardLogoColor: social.cardLogoColor,
+    footerVisible: social.footerVisible ?? (group === "Footer" || group === "Portfolio" || group === "Social"),
+    contactVisible: social.contactVisible ?? (group === "Contact" || group === "Portfolio" || group === "Social" || group === "Form"),
+    status: active ? "Published" : "Archived",
+    active,
+    order: Number(social.order || 999)
+  };
+}
+
+function normalizeExperience(value: unknown): Experience | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Partial<Experience>;
+  if (!item.title) return null;
+  return {
+    id: item.id || slugFromLabel(item.title),
+    title: item.title,
+    organization: item.organization || "",
+    location: item.location || "",
+    startDate: item.startDate || "",
+    endDate: item.endDate || "",
+    dateLabel: item.dateLabel || "",
+    isCurrent: Boolean(item.isCurrent),
+    descriptionEn: item.descriptionEn || "",
+    descriptionCn: item.descriptionCn || "",
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    imageUrl: item.imageUrl ? proxiedOssUrl(item.imageUrl) : "",
+    order: Number(item.order || 999),
+    visible: item.visible !== false
   };
 }
 
@@ -400,20 +564,34 @@ function normalizeProjectData(value: unknown): StudioData | null {
 
 export async function getStudioData(): Promise<StudioData> {
   try {
-    const response = await fetch(CONTENT_URL, { cache: "force-cache" });
+    const response = await fetch(CONTENT_URL, { cache: "no-store" });
     if (!response.ok) throw new Error(`OSS responded ${response.status}`);
     const json = (await response.json()) as unknown;
 
     if (isStudioData(json)) {
       const normalizedWorks = json.works.map(normalizeWork).filter((work): work is Work => Boolean(work));
-      if (normalizedWorks.length === 0) throw new Error("OSS JSON contains no usable works.");
+      const works = normalizedWorks.length > 0 ? normalizedWorks : fallbackData.works;
+      const normalizedWorkTypes = (json.workTypes || fallbackData.workTypes || [])
+        .map(normalizeWorkType)
+        .filter((workType): workType is WorkType => Boolean(workType));
+      const normalizedTools = (json.tools || fallbackData.tools)
+        .map(normalizeTool)
+        .filter((tool): tool is Tool => Boolean(tool));
+      const normalizedSocials = (json.socials || fallbackData.socials)
+        .map(normalizeSocial)
+        .filter((social): social is SocialLink => Boolean(social));
+      const normalizedExperiences = (json.experiences || fallbackData.experiences || [])
+        .map(normalizeExperience)
+        .filter((experience): experience is Experience => Boolean(experience));
 
       return {
         ...fallbackData,
         ...json,
-        works: normalizedWorks.sort((a, b) => a.order - b.order),
-        tools: [...(json.tools || fallbackData.tools)].sort((a, b) => a.order - b.order),
-        socials: [...(json.socials || fallbackData.socials)].sort((a, b) => a.order - b.order),
+        works: works.sort((a, b) => a.order - b.order),
+        workTypes: normalizedWorkTypes.sort((a, b) => a.order - b.order),
+        tools: normalizedTools.sort((a, b) => a.order - b.order),
+        socials: normalizedSocials.sort((a, b) => a.order - b.order),
+        experiences: normalizedExperiences.sort((a, b) => a.order - b.order),
         sync: { source: "oss" }
       };
     }

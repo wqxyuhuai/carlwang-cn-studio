@@ -1,8 +1,5 @@
 ﻿import Link from "next/link";
-import Image from "next/image";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
-
-const fallbackIcon = "/figma/footer-social-x.svg";
 
 function ExternalOrInternalLink({ className, href, label }: { className?: string; href: string; label: string }) {
   if (!href) return null;
@@ -29,27 +26,32 @@ function ExternalOrInternalLink({ className, href, label }: { className?: string
 export async function FooterNavigation() {
   const content = await getPublicContent();
   const footerMain = sectionByKey(content, "footer_main");
-  const footerContact = sectionByKey(content, "footer_contact");
   const footerLinks = content.socials.filter((link) => link.footerVisible && link.status !== "Archived" && link.url);
-  const workTypeLinks = content.workTypes.filter((type) => type.filterVisible && type.status !== "Archived").slice(0, 6);
-  const socialIcons = footerLinks.filter((link) => link.iconUrl).slice(0, 4);
-  const footerBrandTagline = "A designer working across visual, digital and spatial systems.";
+  const workTypeLinks = content.workTypes.filter((type) => type.filterVisible && type.status !== "Archived");
+  const socialIcons = footerLinks.filter((link) => link.iconUrl);
   const footerGroups = [
     {
       title: "Home",
       links: [
-        { label: "Home", href: "/" },
-        { label: "Works", href: "/works" },
-        { label: "About", href: "/about" }
+        { label: "Hero", href: "/#home" },
+        { label: "Featured Works", href: "/#featured-works" },
+        { label: "About", href: "/#about" },
+        { label: "Design Fields", href: "/#design-fields" }
       ]
     },
     {
-      title: "Work Types",
+      title: "Works",
       links: workTypeLinks.map((type) => ({ label: type.shortLabel || type.nameEn, href: `/works?type=${type.slug}` }))
     },
     {
-      title: footerContact?.titleEn || "Contact",
-      links: footerLinks.map((link) => ({ label: link.label, href: link.url }))
+      title: "About",
+      links: [
+        { label: "Intro", href: "/about#intro" },
+        { label: "Direction", href: "/about#direction" },
+        { label: "Experience", href: "/about#experience" },
+        { label: "Contact", href: "/about#contact" },
+        { label: "Social Links", href: "/about#social-links" }
+      ]
     }
   ];
 
@@ -73,7 +75,18 @@ export async function FooterNavigation() {
                   rel="noreferrer"
                   target="_blank"
                 >
-                  <Image alt="" height={24} loading="eager" src={link.iconUrl || fallbackIcon} width={24} />
+                  <span
+                    aria-hidden="true"
+                    className="pw-social-icon-image pw-social-icon-black"
+                    style={{ backgroundImage: `url(${link.iconUrl})` }}
+                  />
+                  {link.colorIconUrl ? (
+                    <span
+                      aria-hidden="true"
+                      className="pw-social-icon-image pw-social-icon-color"
+                      style={{ backgroundImage: `url(${link.colorIconUrl})` }}
+                    />
+                  ) : null}
                 </a>
               ))}
             </div>

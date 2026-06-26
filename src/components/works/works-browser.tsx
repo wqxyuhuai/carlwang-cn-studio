@@ -15,8 +15,8 @@ type Filter = {
   value: string;
 };
 
-const gridIcon = "/figma/pw2-icon-grid.svg";
-const listIcon = "/figma/pw2-icon-list.svg";
+const gridIcon = "/figma/pw2-icon-grid.svg?v=2";
+const listIcon = "/figma/pw2-icon-list.svg?v=2";
 const eyeIcon = "/figma/pw2-icon-eye.svg";
 const likeIcon = "/figma/pw2-icon-like.svg";
 
@@ -96,6 +96,10 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
               {filteredWorks.map((work, index) => (
                 <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} title={work.intro}>
                   <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
+                  <span className="pw-works-grid-meta">
+                    <strong>{work.title}</strong>
+                    <span>{work.primaryType || work.category}</span>
+                  </span>
                 </Link>
               ))}
             </div>
@@ -110,14 +114,14 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
                     <strong className="pw-list-title">{work.title}</strong>
                     <span className="pw-list-meta caption-copy">
                       <span>{workPublishedLabel(work)}</span>
-                      <span aria-hidden="true">·</span>
+                      <span className="pw-list-separator" aria-hidden="true">·</span>
                       <span className="pw-list-stat">
-                        <Image alt="" height={12} src={eyeIcon} width={12} />
+                        <Image alt="" height={16} src={eyeIcon} width={16} />
                         {metricLabel(work.viewCount)}
                       </span>
-                      <span aria-hidden="true">·</span>
+                      <span className="pw-list-separator" aria-hidden="true">·</span>
                       <span className="pw-list-stat">
-                        <Image alt="" height={12} src={likeIcon} width={12} />
+                        <Image alt="" height={16} src={likeIcon} width={16} />
                         {metricLabel(work.likeCount)}
                       </span>
                     </span>

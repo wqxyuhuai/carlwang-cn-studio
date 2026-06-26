@@ -217,7 +217,7 @@ export const collectionConfigs: Record<AdminCollectionKey, AdminCollectionConfig
     navLabel: "About",
     description: "Local fallback experience rows used by the About page timeline/list.",
     apiPath: "about-experience",
-    databaseEnv: [],
+    databaseEnv: ["NOTION_ABOUT_EXPERIENCE_DATABASE_ID", "NOTION_STUDIO_ABOUT_EXPERIENCE_DATABASE_ID"],
     notionTableName: "Studio About Experience",
     titleField: "title",
     allowCreate: true,

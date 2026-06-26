@@ -75,7 +75,7 @@ export function FieldHoverShowcase({ items = fallbackFieldItems }: { items?: Fie
   const visibleIndex = Math.min(activeIndex ?? defaultMediaIndex, fieldItems.length - 1);
 
   return (
-    <section className="pw-fields-band" aria-label="Design fields" onMouseLeave={() => setActiveIndex(null)}>
+    <section className="pw-fields-band" id="design-fields" aria-label="Design fields" onMouseLeave={() => setActiveIndex(null)}>
       <span className="pw-figma-image pw-field-media" aria-live="polite">
         {fieldItems.map((item, index) => {
           const isVisible = visibleIndex === index;

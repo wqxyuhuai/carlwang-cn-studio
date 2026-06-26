@@ -44,7 +44,7 @@ export default async function AboutPage() {
   const experienceSection = sectionByKey(content, "about_experience");
   const contactSection = sectionByKey(content, "about_contact");
   const directionTypes = content.workTypes.filter((type) => type.status !== "Archived" && type.filterVisible);
-  const directionItems = (directionTypes.length > 0 ? directionTypes : []).slice(0, 4).map((type, index) => ({
+  const directionItems = (directionTypes.length > 0 ? directionTypes : []).map((type, index) => ({
     label: type.shortLabel || type.nameEn,
     media: {
       alt: `${type.shortLabel || type.nameEn} direction visual`,
@@ -52,10 +52,18 @@ export default async function AboutPage() {
     }
   }));
   const socialLinks = content.socials.filter((link) => link.contactVisible && link.status !== "Archived");
+  const dynamicExperienceRows = content.experiences.map((experience) => ({
+    id: experience.id,
+    role: experience.title,
+    company: experience.organization,
+    period: experience.dateLabel || [experience.startDate, experience.isCurrent ? "Present" : experience.endDate].filter(Boolean).join("-"),
+    image: experience.imageUrl || experienceThumb
+  }));
+  const visibleExperienceRows = dynamicExperienceRows.length > 0 ? dynamicExperienceRows : experienceRows;
 
   return (
     <main className="pw-about-page">
-      <section className="pw-about-hero">
+      <section className="pw-about-hero" id="intro">
         <div className="pw-about-hero-left">
           <div className="pw-about-quote">
             <span className="pw-about-quote-art" aria-hidden="true">
@@ -82,15 +90,15 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <DirectionShowcase heading={direction?.titleEn || "Design Direction"} items={directionItems} />
+      <DirectionShowcase heading={direction?.titleEn || "Design Direction"} id="direction" items={directionItems} />
 
-      <section className="pw-about-experience">
+      <section className="pw-about-experience" id="experience">
         <div className="pw-experience-heading">
           <span aria-hidden="true" />
           <h2 className="pw-kicker-line">{experienceSection?.titleEn || "Experience"}</h2>
         </div>
         <div className="pw-experience-rows">
-          {experienceRows.map((row) => (
+          {visibleExperienceRows.map((row) => (
             <div className="pw-experience-item" key={row.id} tabIndex={0}>
               <span className="pw-experience-role">
                 <CascadeText text={row.role} underline={false} wrap />
@@ -123,7 +131,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="pw-about-social">
+      <section className="pw-about-social" id="social-links">
         <div className="pw-section-heading-grid">
           <span aria-hidden="true" />
           <h2 className="pw-kicker-line">Social Links</h2>

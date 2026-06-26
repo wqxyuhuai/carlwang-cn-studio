@@ -1,10 +1,8 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { fallbackData, getStudioData } from "./site-data";
-import type { AdminCollectionKey, AdminRecord, AdminValue } from "./admin/schema";
-import { listRecords } from "./admin/content-store";
-import { getNotionPageBlocks, hasNotionToken } from "./admin/notion-store";
-import type { MediaItem, NotionBlock, SiteSettings, SocialLink, StudioData, Tool, Work, WorkStatus } from "./types";
+import type { AdminRecord, AdminValue } from "./admin/schema";
+import type { MediaItem, NotionBlock, SiteSettings, SocialLink, StudioData, Tool, Work, WorkStatus, WorkType } from "./types";
 
 export const PUBLIC_CONTENT_CACHE_TAG = "public-content";
 
@@ -53,10 +51,12 @@ export type PublicExperience = {
   location: string;
   startDate: string;
   endDate: string;
+  dateLabel: string;
   isCurrent: boolean;
   descriptionEn: string;
   descriptionCn: string;
   tags: string[];
+  imageUrl: string;
   order: number;
   visible: boolean;
 };
@@ -148,20 +148,6 @@ function media(src: string, alt: string, fallback = placeholderImage): MediaItem
   };
 }
 
-async function loadCollectionSafe(key: AdminCollectionKey) {
-  try {
-    const result = await listRecords(key);
-    return { key, source: result.source, items: result.items, error: "" };
-  } catch (error) {
-    return {
-      key,
-      source: "fallback" as const,
-      items: [] as AdminRecord[],
-      error: error instanceof Error ? error.message : `Unable to load ${key}.`
-    };
-  }
-}
-
 function sectionFromRecord(record: AdminRecord): PublicSection {
   return {
     id: record.id,
@@ -181,30 +167,6 @@ function sectionFromRecord(record: AdminRecord): PublicSection {
     order: numberValue(record, "order", 999),
     visible: booleanValue(record, "visible", true)
   };
-}
-
-function workTypesFromRecords(records: AdminRecord[]) {
-  return records
-    .map((record) => {
-      const name = text(record, "nameEn", text(record, "titleEn", "Work Type"));
-      const syncStatus = text(record, "syncStatus");
-      return {
-        id: record.id,
-        nameEn: name,
-        nameCn: text(record, "nameCn", text(record, "titleCn")),
-        slug: text(record, "slug", name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")),
-        shortLabel: text(record, "shortLabel", name),
-        descriptionEn: text(record, "descriptionEn", text(record, "description")),
-        descriptionCn: text(record, "descriptionCn"),
-        iconUrl: proxiedOssUrl(text(record, "iconUrl", text(record, "icon"))),
-        homeVisible: syncStatus !== "编辑中",
-        filterVisible: syncStatus !== "编辑中",
-        order: numberValue(record, "order", 999),
-        status: syncStatus === "编辑中" ? "Archived" as const : "Published" as const,
-        workCount: 0
-      };
-    })
-    .sort((left, right) => left.order - right.order);
 }
 
 function toolsFromRecords(records: AdminRecord[]) {
@@ -419,26 +381,8 @@ function withWorkTypeCounts(workTypes: PublicWorkType[], works: Work[]) {
   }));
 }
 
-async function buildPublicContent(): Promise<PublicContent> {
-  const base = await getStudioData();
-  const keys: AdminCollectionKey[] = [
-    "page-sections",
-    "works",
-    "work-types",
-    "tools",
-    "about-experience",
-    "about-skills",
-    "social-links",
-    "media-assets"
-  ];
-  const loaded = await Promise.all(keys.map(loadCollectionSafe));
-  const records = new Map<AdminCollectionKey, AdminRecord[]>();
-  const errors = loaded.map((item) => item.error).filter(Boolean);
-  for (const result of loaded) records.set(result.key, result.items);
-
-  const sections = records.get("page-sections")?.map(sectionFromRecord).filter((section) => section.key) || fallbackSections();
-  const baseHasOssWorks = base.sync.source === "oss" && base.works.length > 0;
-  const workTypesFromBase = Array.from(new Map(base.works.map((work) => {
+function workTypesFromWorks(works: Work[]) {
+  return Array.from(new Map(works.map((work) => {
     const name = work.primaryType || work.category || "Selected Work";
     const slug = work.primaryTypeSlug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     return [slug, {
@@ -457,42 +401,75 @@ async function buildPublicContent(): Promise<PublicContent> {
       workCount: 0
     }];
   })).values());
-  const workTypes = baseHasOssWorks ? workTypesFromBase : workTypesFromRecords(records.get("work-types") || []);
-  const tools = toolsFromRecords(records.get("tools") || []);
-  const works = baseHasOssWorks ? base.works : worksFromRecords(records.get("works") || [], workTypes, tools, base.works);
+}
+
+function workTypesFromOssData(workTypes: WorkType[] | undefined) {
+  return (workTypes || [])
+    .map((type) => {
+      const name = type.nameEn || type.shortLabel || "Work Type";
+      const slug = type.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return {
+        id: type.id || slug,
+        nameEn: name,
+        nameCn: type.nameCn || "",
+        slug,
+        shortLabel: type.shortLabel || name,
+        descriptionEn: type.descriptionEn || "",
+        descriptionCn: type.descriptionCn || "",
+        iconUrl: proxiedOssUrl(type.iconUrl || ""),
+        homeVisible: type.homeVisible !== false,
+        filterVisible: type.filterVisible !== false,
+        order: Number(type.order || 999),
+        status: type.status === "Archived" ? "Archived" as const : "Published" as const,
+        workCount: Number(type.workCount || 0)
+      };
+    })
+    .sort((left, right) => left.order - right.order);
+}
+
+async function buildPublicContent(): Promise<PublicContent> {
+  const base = await getStudioData();
+  const baseHasOssWorks = base.sync.source === "oss" && base.works.length > 0;
+  const workTypesFromOss = workTypesFromOssData(base.workTypes);
+  const workTypes = workTypesFromOss.length > 0 ? workTypesFromOss : workTypesFromWorks(base.works);
+  const works = baseHasOssWorks ? base.works : fallbackData.works;
 
   return {
     settings: base.settings,
-    sections: sections.length > 0 ? sections.sort((left, right) => left.order - right.order) : fallbackSections(),
+    sections: fallbackSections(),
     works,
     workTypes: withWorkTypeCounts(workTypes, works),
-    tools,
-    experiences: experiencesFromRecords(records.get("about-experience") || []),
-    skillGroups: skillGroupsFromRecords(records.get("about-skills") || []),
-    socials: socialsFromRecords(records.get("social-links") || []),
-    media: records.get("media-assets") || [],
+    tools: base.tools,
+    experiences: (base.experiences || []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      organization: item.organization,
+      location: item.location || "",
+      startDate: item.startDate || "",
+      endDate: item.endDate || "",
+      dateLabel: item.dateLabel || "",
+      isCurrent: Boolean(item.isCurrent),
+      descriptionEn: item.descriptionEn || "",
+      descriptionCn: item.descriptionCn || "",
+      tags: item.tags || [],
+      imageUrl: item.imageUrl || "",
+      order: item.order,
+      visible: item.visible
+    })).filter((item) => item.visible).sort((left, right) => left.order - right.order),
+    skillGroups: [],
+    socials: base.socials.filter((link) => link.active && link.url),
+    media: [],
     sync: {
-      ...base.sync,
-      adminSource: loaded.find((item) => item.source !== "fallback")?.source,
-      errors
+      ...base.sync
     }
   };
 }
 
-const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v1"], {
+const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v5"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 
 export const getPublicContent = cache(getPublicContentFromCache);
-
-async function getNotionPageBlocksSafe(pageId: string) {
-  return getNotionPageBlocks(pageId).catch(() => []);
-}
-
-const getNotionPageBlocksFromCache = unstable_cache(getNotionPageBlocksSafe, ["public-notion-blocks-v1"], {
-  tags: [PUBLIC_CONTENT_CACHE_TAG],
-  revalidate: 3600
-});
 
 export async function getPublishedWorks() {
   const content = await getPublicContent();
@@ -511,14 +488,10 @@ async function resolveWorkBySlug(slug: string) {
   const work = index >= 0 ? works[index] : undefined;
   if (!work) return null;
 
-  const shouldReadPageBody = hasNotionToken() && work.notionPageId && isLikelyNotionId(work.notionPageId);
-  const notionContent = shouldReadPageBody ? await getNotionPageBlocksFromCache(work.notionPageId as string) : [];
-  const contentBlocks = notionContent.length > 0 ? notionContent : work.content;
-
   return {
     work: {
       ...work,
-      content: contentBlocks
+      content: work.content
     },
     previous: works[(index - 1 + works.length) % works.length],
     next: works[(index + 1) % works.length],
