@@ -592,6 +592,7 @@ video {
   inline-size: max-content;
   justify-content: flex-end;
   justify-self: end;
+  padding-inline-end: var(--space-8);
   letter-spacing: var(--type-body-m-tracking);
   line-height: var(--type-body-m-line);
 }
@@ -640,7 +641,6 @@ video {
 
 .cw-nav-tools {
   align-items: center;
-  margin-inline-start: var(--space-8);
   display: flex;
   gap: 0;
   justify-content: flex-end;
