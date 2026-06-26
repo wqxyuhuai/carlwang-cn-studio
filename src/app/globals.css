@@ -395,7 +395,7 @@ video {
   position: fixed;
   transform: none;
   will-change: transform;
-  z-index: 100;
+  z-index: 9100;
 }
 
 .cw-glass-header[data-tone="dark"] {
@@ -475,7 +475,7 @@ video {
 }
 
 .cw-glass-header.is-scrolled .cw-glass-wrapper {
-  box-shadow: 0 0 0 1px var(--cw-nav-scroll-stroke);
+  box-shadow: none;
 }
 
 .cw-glass-header.is-scrolled .cw-glass-wrapper::before {
@@ -771,9 +771,7 @@ html:not([data-theme="dark"]) .cw-glass-header {
 }
 
 .cw-glass-header.is-scrolled .cw-glass-wrapper {
-  box-shadow:
-    0 0 1px rgb(255 255 255 / 8%),
-    0 10px 30px rgb(0 0 0 / 6%);
+  box-shadow: none;
 }
 
 .cw-glass-header .cw-glass-wrapper::before {
@@ -791,7 +789,10 @@ html:not([data-theme="dark"]) .cw-glass-header {
   opacity: 0;
   -webkit-backdrop-filter: blur(var(--cw-nav-backdrop-blur)) brightness(1.02) saturate(1.3);
   backdrop-filter: blur(var(--cw-nav-backdrop-blur)) brightness(1.02) saturate(1.3);
-  transition: opacity var(--motion-base) var(--ease-out);
+  transition:
+    opacity var(--motion-base) var(--ease-out),
+    backdrop-filter var(--motion-base) var(--ease-out),
+    -webkit-backdrop-filter var(--motion-base) var(--ease-out);
 }
 
 .cw-glass-header.is-scrolled .cw-glass-effect {
@@ -810,9 +811,7 @@ html:not([data-theme="dark"]) .cw-glass-header {
 
 .cw-glass-header.is-scrolled .cw-glass-content {
   background: var(--cw-nav-glass-bg);
-  box-shadow:
-    inset 0 0.5px 0 rgb(255 255 255 / 12%),
-    inset 0 -0.5px 0 rgb(255 255 255 / 4%);
+  box-shadow: none;
 }
 
 .cw-glass-header .cw-glass-content::before {
