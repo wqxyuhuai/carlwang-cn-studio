@@ -640,6 +640,7 @@ video {
 
 .cw-nav-tools {
   align-items: center;
+  margin-inline-start: var(--space-8);
   display: flex;
   gap: 0;
   justify-content: flex-end;
