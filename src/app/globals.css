@@ -510,6 +510,8 @@ video {
   color: var(--cw-nav-text);
   display: grid;
   block-size: var(--cw-nav-current-h);
+  margin-inline: auto;
+  max-inline-size: min(100%, 1920px);
   gap: 0;
   grid-template-columns: auto minmax(0, 1fr) auto;
   justify-content: space-between;
