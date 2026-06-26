@@ -1,8 +1,4 @@
-import { randomBytes } from "crypto";
-
-type OssClient = {
-  put: (name: string, file: Buffer, options?: { headers?: Record<string, string> }) => Promise<{ name?: string; url?: string }>;
-};
+import { createHmac, randomBytes } from "crypto";
 
 const usagePathMap: Record<string, string> = {
   "Work Cover": "works/covers",
@@ -57,22 +53,49 @@ export function hasOssConfig() {
   return Boolean(config.accessKeyId && config.accessKeySecret && config.bucket && config.publicBaseUrl && (config.region || config.endpoint));
 }
 
-async function createOssClient(): Promise<OssClient> {
+function ossEndpointHost() {
   const config = getOssConfig();
+  const rawEndpoint = config.endpoint || `${config.region}.aliyuncs.com`;
+  return rawEndpoint.replace(/^https?:\/\//, "").replace(/\/+$/g, "");
+}
 
+function ossObjectUrl(objectKey: string) {
+  const config = getOssConfig();
+  const host = ossEndpointHost();
+  const encodedKey = objectKey.split("/").map(encodeURIComponent).join("/");
+  return `https://${config.bucket}.${host}/${encodedKey}`;
+}
+
+function ossAuthorization(method: string, objectKey: string, contentType: string, date: string) {
+  const config = getOssConfig();
+  const canonicalResource = `/${config.bucket}/${objectKey}`;
+  const stringToSign = `${method}\n\n${contentType}\n${date}\n${canonicalResource}`;
+  const signature = createHmac("sha1", config.accessKeySecret).update(stringToSign).digest("base64");
+  return `OSS ${config.accessKeyId}:${signature}`;
+}
+
+async function putObjectToOss(objectKey: string, body: Buffer, contentType: string) {
   if (!hasOssConfig()) {
     throw new Error("Aliyun OSS is not fully configured.");
   }
 
-  const ossModule = await import("ali-oss");
-  const OSS = ossModule.default;
-  return new OSS({
-    accessKeyId: config.accessKeyId,
-    accessKeySecret: config.accessKeySecret,
-    bucket: config.bucket,
-    endpoint: config.endpoint || undefined,
-    region: config.region || undefined
-  }) as OssClient;
+  const date = new Date().toUTCString();
+  const response = await fetch(ossObjectUrl(objectKey), {
+    method: "PUT",
+    headers: {
+      Authorization: ossAuthorization("PUT", objectKey, contentType, date),
+      Date: date,
+      "Content-Type": contentType
+    },
+    body: body as unknown as BodyInit
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Aliyun OSS upload failed (${response.status}).${detail ? ` ${detail.slice(0, 300)}` : ""}`);
+  }
+
+  return { name: objectKey };
 }
 
 function extensionFromFile(file: File) {
@@ -179,18 +202,13 @@ export async function uploadFileToOss(file: File, usage: string) {
   const usagePath = usagePathMap[usage] || "general";
   const normalizedUsage = usageLabelMap[usage] || "General";
   const prefix = `${config.uploadPrefix.replace(/^\/+|\/+$/g, "")}/${usagePath}`;
-  const client = await createOssClient();
   const buffer = Buffer.from(await file.arrayBuffer());
   const safeName = `${Date.now()}-${randomBytes(4).toString("hex")}-${sanitizeSegment(file.name.replace(/\.[^.]+$/, ""))}.${extensionFromFile(file)}`;
   const objectKey = `${prefix}/${safeName}`;
-  const result = await client.put(objectKey, buffer, {
-    headers: {
-      "Content-Type": file.type
-    }
-  });
+  const result = await putObjectToOss(objectKey, buffer, file.type);
 
   const publicBase = config.publicBaseUrl.replace(/\/+$/g, "");
-  const url = publicBase ? `${publicBase}/${objectKey}` : result.url || "";
+  const url = publicBase ? `${publicBase}/${objectKey}` : ossObjectUrl(objectKey);
 
   return {
     title: file.name,
@@ -210,14 +228,9 @@ export async function testOssConnection() {
   }
 
   try {
-    const client = await createOssClient();
     const content = Buffer.from("ok");
     const objectKey = `${getOssConfig().uploadPrefix.replace(/^\/+|\/+$/g, "")}/healthcheck-${Date.now()}.txt`;
-    const result = await client.put(objectKey, content, {
-      headers: {
-        "Content-Type": "text/plain"
-      }
-    });
+    const result = await putObjectToOss(objectKey, content, "text/plain");
     return { status: "connected", objectKey: result.name || objectKey };
   } catch (error) {
     return {

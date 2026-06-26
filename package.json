@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
@@ -19,18 +19,15 @@
   },
   "dependencies": {
     "@notionhq/client": "^5.22.0",
-    "ali-oss": "^6.23.0",
     "bcryptjs": "^3.0.3",
     "gsap": "^3.15.0",
     "next": "16.2.9",
-    "proxy-agent": "^5.0.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.0",
     "@tailwindcss/postcss": "^4",
-    "@types/ali-oss": "^6.23.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
