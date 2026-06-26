@@ -25,7 +25,7 @@ export function GlassDistortionFilter() {
         <feDisplacementMap
           in="SourceGraphic"
           in2="softMap"
-          scale={92}
+          scale={120}
           xChannelSelector="R"
           yChannelSelector="G"
           result="displacedRough"
@@ -39,7 +39,7 @@ export function GlassDistortionFilter() {
         <feDisplacementMap
           in="SourceGraphic"
           in2="softMap"
-          scale={86}
+          scale={112}
           xChannelSelector="R"
           yChannelSelector="G"
           result="displacedMid"
@@ -53,7 +53,7 @@ export function GlassDistortionFilter() {
         <feDisplacementMap
           in="SourceGraphic"
           in2="softMap"
-          scale={80}
+          scale={104}
           xChannelSelector="R"
           yChannelSelector="G"
           result="displacedSoft"
