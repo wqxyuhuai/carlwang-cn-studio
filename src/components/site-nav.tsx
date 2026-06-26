@@ -7,7 +7,8 @@ import { useEffect, useRef, useState } from "react";
 const navItems = [
   { href: "/", label: "Home" },
   { href: "/works", label: "Works" },
-  { href: "/about", label: "About" }
+  { href: "/about", label: "About" },
+  { href: "/about#contact", label: "Contact" }
 ];
 
 export function SiteNav() {
@@ -175,6 +176,7 @@ export function SiteNav() {
     document.documentElement.dataset.theme = nextTheme;
     window.localStorage.setItem("theme", nextTheme);
   };
+
   return (
     <header
       className={`cw-glass-header ${isScrolled ? "is-scrolled" : ""} ${navOnDark ? "is-on-dark" : "is-on-light"}`}
@@ -184,19 +186,18 @@ export function SiteNav() {
         <span className="cw-glass-effect" aria-hidden="true" />
         <div className="cw-glass-content">
           <Link className="cw-brand" href="/" aria-label="Carl Wang Studio home">
-            <span>Carl Wang</span>
-            <span className="cw-brand-muted">- studio</span>
+            <span className="cw-brand-mark" aria-hidden="true" />
           </Link>
           <div className="cw-nav-links">
-          {navItems.map((item) => {
-            const active = item.href.includes("#") ? false : item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            {navItems.map((item) => {
+              const active = item.href.includes("#") ? false : item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
 
-            return (
-              <Link aria-current={active ? "page" : undefined} className={`cw-nav-link ${active ? "is-active" : ""}`} href={item.href} key={item.href}>
-                {item.label}
-              </Link>
-            );
-          })}
+              return (
+                <Link aria-current={active ? "page" : undefined} className={`cw-nav-link ${active ? "is-active" : ""}`} href={item.href} key={item.href}>
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
           <div className="cw-nav-tools">
             <button
@@ -206,20 +207,8 @@ export function SiteNav() {
               onClick={switchTheme}
               type="button"
             >
-              {activeTheme === "dark" ? (
-                <svg aria-hidden="true" className="theme-icon" fill="none" viewBox="0 0 24 24">
-                  <path d="M20 15.6A8.5 8.5 0 0 1 8.4 4 7 7 0 1 0 20 15.6Z" />
-                </svg>
-              ) : (
-                <svg aria-hidden="true" className="theme-icon" fill="none" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
-                </svg>
-              )}
+              <span className="cw-theme-mode-icon" aria-hidden="true" />
             </button>
-            <Link className="cw-nav-action" href="/about#contact">
-              Contact <span aria-hidden="true">↗</span>
-            </Link>
           </div>
         </div>
       </nav>

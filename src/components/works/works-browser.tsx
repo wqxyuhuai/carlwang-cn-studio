@@ -15,8 +15,8 @@ type Filter = {
   value: string;
 };
 
-const gridIcon = "/figma/works-grid-icon.png";
-const listIcon = "/figma/works-list-icon.png";
+const gridIcon = "/figma/pw2-icon-grid.svg";
+const listIcon = "/figma/pw2-icon-list.svg";
 const eyeIcon = "/figma/pw2-icon-eye.svg";
 const likeIcon = "/figma/pw2-icon-like.svg";
 

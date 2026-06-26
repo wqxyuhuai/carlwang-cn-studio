@@ -376,24 +376,25 @@ video {
     rgb(255 255 255 / 4%) 30%,
     rgb(255 255 255 / 0%) 68%
   );
-  --cw-nav-text: rgb(32 32 29 / 76%);
-  --cw-nav-text-strong: rgb(10 10 10 / 94%);
-  --cw-nav-muted: rgb(32 32 29 / 55%);
-  --cw-nav-icon: rgb(32 32 29 / 72%);
-  --cw-nav-hover: rgb(255 255 255 / 20%);
+  --cw-nav-text: var(--color-black-40);
+  --cw-nav-text-strong: var(--color-black);
+  --cw-nav-muted: var(--color-black-40);
+  --cw-nav-icon: var(--color-black);
+  --cw-nav-hover: transparent;
   --cw-nav-active-bg: rgb(8 8 8 / 92%);
-  --cw-nav-active-text: #fff;
+  --cw-nav-active-text: var(--cw-nav-text-strong);
   --cw-nav-contact-bg: rgb(204 214 142 / 82%);
   --cw-nav-contact-text: rgb(31 33 28 / 92%);
   --cw-nav-contact-border: rgb(255 255 255 / 28%);
   --cw-nav-scroll-stroke: rgb(255 255 255 / 24%);
 
-  inline-size: min(calc(100% - 96px), 1220px);
-  inset-block-start: 28px;
-  inset-inline-start: 50%;
+  --cw-nav-current-h: var(--nav-h);
+  inline-size: 100%;
+  inset: 0 0 auto 0;
   pointer-events: none;
   position: fixed;
-  transform: translateX(-50%);
+  transform: none;
+  will-change: transform;
   z-index: 100;
 }
 
@@ -437,7 +438,7 @@ video {
   --cw-nav-icon: rgb(244 244 239 / 72%);
   --cw-nav-hover: rgb(255 255 255 / 9%);
   --cw-nav-active-bg: rgb(28 28 28 / 92%);
-  --cw-nav-active-text: #fff;
+  --cw-nav-active-text: var(--cw-nav-text-strong);
   --cw-nav-contact-bg: rgb(137 151 83 / 84%);
   --cw-nav-contact-text: rgb(15 16 12 / 92%);
   --cw-nav-contact-border: rgb(255 255 255 / 12%);
@@ -445,11 +446,12 @@ video {
 }
 
 .cw-glass-wrapper {
-  border-radius: 9999px;
+  border-radius: 0;
   isolation: isolate;
   overflow: hidden;
   pointer-events: none;
   position: relative;
+  block-size: var(--cw-nav-current-h);
   transition: box-shadow var(--motion-base) var(--ease-out);
 }
 
@@ -505,12 +507,13 @@ video {
   box-shadow: inset 0 0.5px 0 rgb(255 255 255 / 20%);
   color: var(--cw-nav-text);
   display: grid;
+  block-size: var(--cw-nav-current-h);
   gap: 0;
-  grid-template-columns: 290px minmax(260px, 1fr) 290px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   justify-content: space-between;
-  min-block-size: 64px;
+  min-block-size: var(--cw-nav-current-h);
   overflow: hidden;
-  padding: 10px;
+  padding: 0 var(--figma-pad-desktop);
   position: relative;
   transition:
     background var(--motion-base) var(--ease-out),
@@ -552,14 +555,20 @@ video {
   background: transparent;
   color: var(--cw-nav-text-strong);
   display: inline-flex;
-  font-size: 0.875rem;
-  font-weight: 560;
-  gap: 13px;
-  inline-size: fit-content;
+  gap: 0;
+  inline-size: 2.125rem;
   line-height: 1.25rem;
-  min-inline-size: max-content;
-  padding-inline-start: 21px;
+  min-inline-size: 2.125rem;
+  min-block-size: 2.125rem;
+  padding-inline-start: 0;
   text-decoration: none;
+}
+
+.cw-brand-mark {
+  background: var(--color-green);
+  block-size: 2.125rem;
+  display: block;
+  inline-size: 2.125rem;
 }
 
 .cw-brand-muted {
@@ -571,91 +580,78 @@ video {
   align-items: center;
   color: var(--cw-nav-text);
   display: flex;
-  font-size: 0.875rem;
-  font-weight: 560;
-  gap: 24px;
-  justify-content: center;
-  line-height: 1.25rem;
+  flex: 0 0 auto;
+  font-family: var(--type-body-m-family);
+  font-size: var(--type-body-m-size);
+  font-weight: var(--type-body-m-weight);
+  gap: var(--space-8);
+  inline-size: max-content;
+  justify-content: flex-end;
+  justify-self: end;
+  letter-spacing: var(--type-body-m-tracking);
+  line-height: var(--type-body-m-line);
 }
 
 .cw-nav-link {
   align-items: center;
   background: transparent;
-  border-radius: 999px;
+  border-radius: 0;
   color: inherit;
   display: inline-flex;
-  inline-size: 74px;
+  inline-size: auto;
   justify-content: center;
-  min-block-size: 40px;
-  padding-inline: 12px;
+  min-block-size: 2.5rem;
+  padding-inline: 0;
   position: relative;
   text-decoration: none;
+  white-space: nowrap;
   transition:
     background var(--motion-fast) var(--ease-out),
-    color var(--motion-fast) var(--ease-out),
-    box-shadow var(--motion-fast) var(--ease-out);
+    color var(--motion-fast) var(--ease-out);
 }
 
 .cw-nav-link.is-active {
-  background: var(--cw-nav-active-bg);
-  box-shadow:
-    inset 0 0.5px 0 rgb(255 255 255 / 18%),
-    0 6px 16px rgb(0 0 0 / 12%);
+  background: transparent;
+  box-shadow: none;
   color: var(--cw-nav-active-text);
 }
 
 .cw-nav-link.is-active::before,
 .cw-nav-action::before {
-  background: linear-gradient(
-    145deg,
-    rgb(255 255 255 / 70%) 0%,
-    rgb(255 255 255 / 22%) 24%,
-    rgb(255 255 255 / 7%) 50%,
-    rgb(255 255 255 / 18%) 78%,
-    rgb(255 255 255 / 56%) 100%
-  );
-  border-radius: inherit;
-  content: "";
-  inset: 0;
-  padding: 0.5px;
-  pointer-events: none;
-  position: absolute;
-  -webkit-mask-clip: content-box, padding-box;
-  mask-clip: content-box, padding-box;
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  -webkit-mask-image: linear-gradient(#fff 0 0), linear-gradient(#fff 0 0);
-  mask-image: linear-gradient(#fff 0 0), linear-gradient(#fff 0 0);
+  display: none;
 }
 
 .cw-nav-link:hover,
 .cw-nav-link:focus-visible {
-  background: var(--cw-nav-hover);
+  background: transparent;
   color: var(--cw-nav-text-strong);
   outline: none;
 }
 
 .cw-nav-link.is-active:hover,
 .cw-nav-link.is-active:focus-visible {
-  background: var(--cw-nav-active-bg);
+  background: transparent;
   color: var(--cw-nav-active-text);
 }
 
 .cw-nav-tools {
   align-items: center;
   display: flex;
-  gap: 24px;
+  gap: 0;
   justify-content: flex-end;
+  flex: 0 0 2rem;
+  inline-size: 2rem;
 }
 
 .cw-theme-toggle {
   align-items: center;
-  background: rgb(255 255 255 / 8%);
-  border-radius: 999px;
+  background: transparent;
+  border-radius: 0;
   color: var(--cw-nav-icon);
   display: inline-flex;
-  block-size: 40px;
-  inline-size: 40px;
+  block-size: 2rem;
+  flex: 0 0 2rem;
+  inline-size: 2rem;
   justify-content: center;
   transition:
     background var(--motion-fast) var(--ease-out),
@@ -665,13 +661,22 @@ video {
 
 .cw-theme-toggle:hover,
 .cw-theme-toggle:focus-visible {
-  background: var(--cw-nav-hover);
+  background: transparent;
   color: var(--cw-nav-text-strong);
   outline: none;
 }
 
 .cw-theme-toggle:active {
   transform: translateY(1px);
+}
+
+.cw-theme-mode-icon {
+  background: currentColor;
+  block-size: 1.25rem;
+  display: block;
+  inline-size: 1.25rem;
+  -webkit-mask: url("/figma/pw2-theme-mode.svg") center / contain no-repeat;
+  mask: url("/figma/pw2-theme-mode.svg") center / contain no-repeat;
 }
 
 .cw-nav-action {
@@ -711,67 +716,7 @@ video {
 }
 
 .cw-glass-header {
-  --cw-nav-backdrop-blur: 18px;
-  --cw-nav-glass-bg: rgb(255 255 255 / 4%);
-  --cw-nav-text: rgb(31 31 31 / 88%);
-  --cw-nav-text-strong: rgb(12 12 12 / 94%);
-  --cw-nav-muted: rgb(31 31 31 / 62%);
-  --cw-nav-icon: rgb(31 31 31 / 68%);
-  --cw-nav-hover: rgb(0 0 0 / 8%);
-  --cw-nav-active-bg: rgb(8 8 8 / 58%);
-  --cw-nav-active-text: #fff;
-  --cw-nav-contact-bg: rgb(204 214 142 / 80%);
-  --cw-nav-contact-text: rgb(31 33 28 / 92%);
-  --cw-nav-contact-border: rgb(255 255 255 / 26%);
-  --cw-nav-rim: radial-gradient(
-      46% 190% at 1.8% 0%,
-      rgb(255 255 255 / 100%) 0%,
-      rgb(255 255 255 / 88%) 4%,
-      rgb(255 255 255 / 68%) 10%,
-      rgb(255 255 255 / 42%) 22%,
-      rgb(255 255 255 / 20%) 38%,
-      rgb(255 255 255 / 7%) 58%,
-      rgb(255 255 255 / 0%) 82%
-    ),
-    radial-gradient(
-      62% 240% at 99.4% 100%,
-      rgb(255 255 255 / 96%) 0%,
-      rgb(255 255 255 / 78%) 4%,
-      rgb(255 255 255 / 54%) 11%,
-      rgb(255 255 255 / 30%) 24%,
-      rgb(255 255 255 / 14%) 42%,
-      rgb(255 255 255 / 5%) 62%,
-      rgb(255 255 255 / 0%) 84%
-    ),
-    linear-gradient(
-      165deg,
-      rgb(255 255 255 / 62%) 0%,
-      rgb(255 255 255 / 42%) 5%,
-      rgb(255 255 255 / 22%) 14%,
-      rgb(255 255 255 / 8%) 28%,
-      rgb(255 255 255 / 0%) 46%,
-      rgb(255 255 255 / 0%) 64%,
-      rgb(255 255 255 / 8%) 78%,
-      rgb(255 255 255 / 28%) 91%,
-      rgb(255 255 255 / 58%) 100%
-    );
-  --cw-nav-inner-shine: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 9%) 0%,
-    rgb(255 255 255 / 2%) 28%,
-    rgb(255 255 255 / 0%) 62%
-  );
-  --cw-nav-bottom-shine: linear-gradient(
-    180deg,
-    transparent 0%,
-    transparent 84%,
-    rgb(255 255 255 / 2%) 94%,
-    rgb(255 255 255 / 5%) 100%
-  );
-
-  inline-size: min(calc(100% - 96px), 1220px);
-  inset-block-start: 34px;
-  pointer-events: none;
+  --cw-nav-current-h: var(--nav-h);
 }
 
 html[data-theme="dark"] .cw-glass-header {
@@ -800,13 +745,13 @@ html:not([data-theme="dark"]) .cw-glass-header {
 }
 
 .cw-glass-header.is-on-light {
-  --cw-nav-text: rgb(31 31 31 / 88%);
-  --cw-nav-text-strong: rgb(12 12 12 / 94%);
-  --cw-nav-muted: rgb(31 31 31 / 62%);
-  --cw-nav-icon: rgb(31 31 31 / 68%);
+  --cw-nav-text: var(--color-black-40);
+  --cw-nav-text-strong: var(--color-black);
+  --cw-nav-muted: var(--color-black-40);
+  --cw-nav-icon: var(--color-black);
   --cw-nav-hover: rgb(0 0 0 / 8%);
   --cw-nav-active-bg: rgb(8 8 8 / 58%);
-  --cw-nav-active-text: #fff;
+  --cw-nav-active-text: var(--cw-nav-text-strong);
 }
 
 .cw-glass-header.is-on-dark {
@@ -816,7 +761,7 @@ html:not([data-theme="dark"]) .cw-glass-header {
   --cw-nav-icon: rgb(244 244 239 / 72%);
   --cw-nav-hover: rgb(255 255 255 / 10%);
   --cw-nav-active-bg: rgb(8 8 8 / 56%);
-  --cw-nav-active-text: #fff;
+  --cw-nav-active-text: var(--cw-nav-text-strong);
 }
 
 .cw-glass-header .cw-glass-wrapper {
@@ -857,8 +802,10 @@ html:not([data-theme="dark"]) .cw-glass-header {
   background: transparent;
   box-shadow: none;
   color: var(--cw-nav-text);
-  grid-template-columns: 320px minmax(220px, 1fr) 320px;
-  min-block-size: 60px;
+  block-size: var(--cw-nav-current-h);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-block-size: var(--cw-nav-current-h);
+  padding: 0 var(--figma-pad-desktop);
 }
 
 .cw-glass-header.is-scrolled .cw-glass-content {
@@ -1742,68 +1689,57 @@ html:not([data-theme="dark"]) .cw-glass-header {
 
 @media (max-width: 760px) {
   .cw-glass-header {
-    inline-size: min(calc(100vw - 20px), 382px);
-    inset-block-start: 10px;
+    --cw-nav-current-h: var(--nav-mobile-h);
+    inline-size: 100%;
+    inset-block-start: 0;
   }
 
   .cw-glass-header .cw-glass-wrapper {
-    border-radius: 30px;
+    block-size: var(--cw-nav-current-h);
+    border-radius: 0;
   }
 
   .cw-glass-header .cw-glass-content {
-    border-radius: 30px;
-    grid-template-columns: minmax(0, 1fr) auto;
-    min-block-size: auto;
-    padding: 8px;
-    row-gap: 8px;
+    block-size: var(--cw-nav-current-h);
+    border-radius: 0;
+    column-gap: var(--space-4);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-block-size: var(--cw-nav-current-h);
+    padding: 0 var(--figma-pad-mobile);
+    row-gap: 0;
   }
 
-  .cw-glass-header .cw-brand {
-    font-size: 0.8125rem;
-    min-block-size: 38px;
-    padding-inline-start: 8px;
-  }
-
-  .cw-glass-header .cw-brand-muted {
-    font-size: 0.8125rem;
+  .cw-glass-header .cw-brand,
+  .cw-glass-header .cw-brand-mark {
+    block-size: 2rem;
+    inline-size: 2rem;
+    min-inline-size: 2rem;
   }
 
   .cw-glass-header .cw-nav-tools {
-    gap: 8px;
+    inline-size: 2rem;
     justify-content: flex-end;
+    order: 2;
   }
 
   .cw-glass-header .cw-theme-toggle {
-    block-size: 36px;
-    inline-size: 36px;
-  }
-
-  .cw-glass-header .cw-nav-action {
-    font-size: 0.8125rem;
-    min-block-size: 36px;
-    min-inline-size: auto;
-    padding-inline: 12px;
+    block-size: 2rem;
+    inline-size: 2rem;
   }
 
   .cw-glass-header .cw-nav-links {
-    border-top: 1px solid rgb(255 255 255 / 10%);
-    gap: 0;
-    grid-column: 1 / -1;
-    inline-size: 100%;
-    justify-content: space-between;
-    order: 3;
-    padding-top: 8px;
-  }
-
-  .cw-glass-header:not(.is-scrolled) .cw-nav-links {
-    border-top-color: transparent;
+    border-top: 0;
+    gap: var(--space-4);
+    grid-column: auto;
+    inline-size: auto;
+    justify-content: flex-end;
+    order: 2;
+    padding-top: 0;
   }
 
   .cw-glass-header .cw-nav-link {
-    flex: 1 1 0;
-    inline-size: auto;
-    min-block-size: 34px;
-    padding-inline: 8px;
+    min-block-size: 2rem;
+    padding-inline: 0;
   }
 }
 
