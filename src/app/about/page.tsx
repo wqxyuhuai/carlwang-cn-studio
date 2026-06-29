@@ -7,7 +7,6 @@ import { FooterNavigation } from "@/components/footer-navigation";
 import { aboutPlaceholderImage, getPublicContent, sectionByKey } from "@/lib/public-content";
 
 const quoteMark = "/figma/about-quote.svg";
-const quoteLine = "/figma/about-quote-line.svg";
 const experienceThumb = "/figma/about-experience-thumb.png";
 const fallbackDirectionMedia = ["/field-media/a1-2.webp", "/field-media/a2-1.webp", "/figma/about-direction.png", "/field-media/b1-1.webp"];
 const fallbackSocialIcon = "/figma/social-email.svg";
@@ -67,8 +66,14 @@ export default async function AboutPage() {
         <div className="pw-about-hero-left">
           <div className="pw-about-quote">
             <span className="pw-about-quote-art" aria-hidden="true">
-              <Image alt="" className="pw-about-quote-mark" height={20} src={quoteMark} width={28} />
-              <Image alt="" className="pw-about-quote-line" height={84} src={quoteLine} width={1} />
+              <span
+                className="pw-about-quote-mark"
+                style={{
+                  maskImage: `url(${quoteMark})`,
+                  WebkitMaskImage: `url(${quoteMark})`
+                }}
+              />
+              <span className="pw-about-quote-line" />
             </span>
             <span className="pw-about-quote-copy">
               <span>{aboutIntro?.subtitleEn || "A designer working across digital interfaces, brand visuals, motion content and spatial experiences."}</span>
@@ -141,7 +146,7 @@ export default async function AboutPage() {
           <div className="pw-social-grid" aria-label="Social links">
             {socialLinks.map((link) => {
               const socialLogoColor = link.cardLogoColor || defaultSocialLogoColor;
-              const socialIconUrl = link.colorIconUrl || link.iconUrl || fallbackSocialIcon;
+              const socialIconUrl = link.footerIconUrl || link.colorIconUrl || link.iconUrl || fallbackSocialIcon;
               return (
                 <a
                   aria-label={link.label}

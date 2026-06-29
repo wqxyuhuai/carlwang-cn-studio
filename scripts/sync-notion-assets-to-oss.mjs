@@ -14,6 +14,7 @@ const WAITING_UPDATE_STATUS = String.fromCharCode(0x5f85, 0x66f4, 0x65b0);
 const EDITING_STATUS = String.fromCharCode(0x7f16, 0x8f91, 0x4e2d);
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
 const ASSET_TIMEOUT_MS = Number(process.env.ASSET_TIMEOUT_MS || 20000);
+const ASSET_PROGRESS_MS = Number(process.env.ASSET_PROGRESS_MS || 5000);
 const MAX_FAILED_MEDIA_PER_ITEM = Number(process.env.MAX_FAILED_MEDIA_PER_ITEM || 3);
 
 const tables = {
@@ -259,26 +260,87 @@ async function retryAsync(fn, label, attempts = 4) {
   throw new Error(`${label} failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
-async function downloadAsset(url) {
+function formatBytes(value) {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
+  }
+  return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`;
+}
+
+function shortUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}${parsed.pathname.slice(0, 80)}${parsed.pathname.length > 80 ? "..." : ""}`;
+  } catch {
+    return String(url || "").slice(0, 100);
+  }
+}
+
+async function downloadAsset(url, label = "asset") {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ASSET_TIMEOUT_MS);
   let response;
   try {
     response = await withTimeout(fetch(url, { signal: controller.signal }), "download headers");
-  } finally {
+  } catch (error) {
     clearTimeout(timeout);
+    throw error;
   }
   if (!response.ok) {
+    clearTimeout(timeout);
     throw new Error(`download failed ${response.status}`);
   }
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > MAX_FILE_SIZE) {
+    clearTimeout(timeout);
     throw new Error(`file too large: ${Math.round(contentLength / 1024 / 1024)} MB`);
   }
-  const buffer = Buffer.from(await withTimeout(response.arrayBuffer(), "download body"));
-  if (buffer.length > MAX_FILE_SIZE) {
-    throw new Error(`file too large: ${Math.round(buffer.length / 1024 / 1024)} MB`);
+  console.log(`[download] ${label} start ${contentLength ? formatBytes(contentLength) : "unknown size"} from ${shortUrl(url)}`);
+
+  const chunks = [];
+  let downloaded = 0;
+  let lastProgressAt = Date.now();
+  const startedAt = lastProgressAt;
+  try {
+    if (!response.body?.getReader) {
+      const buffer = Buffer.from(await withTimeout(response.arrayBuffer(), "download body"));
+      downloaded = buffer.length;
+      chunks.push(buffer);
+    } else {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = Buffer.from(value);
+        chunks.push(chunk);
+        downloaded += chunk.length;
+        if (downloaded > MAX_FILE_SIZE) {
+          throw new Error(`file too large: ${Math.round(downloaded / 1024 / 1024)} MB`);
+        }
+
+        const now = Date.now();
+        if (now - lastProgressAt >= ASSET_PROGRESS_MS) {
+          const percent = contentLength ? ` ${Math.round(downloaded / contentLength * 100)}%` : "";
+          const elapsed = Math.round((now - startedAt) / 1000);
+          console.log(`[download] ${label} ${formatBytes(downloaded)}${contentLength ? `/${formatBytes(contentLength)}` : ""}${percent} elapsed=${elapsed}s`);
+          lastProgressAt = now;
+        }
+      }
+    }
+  } catch (error) {
+    throw new Error(`download body failed after ${formatBytes(downloaded)}: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    clearTimeout(timeout);
   }
+
+  const elapsed = Math.round((Date.now() - startedAt) / 1000);
+  const buffer = Buffer.concat(chunks);
+  console.log(`[download] ${label} done ${formatBytes(buffer.length)} elapsed=${elapsed}s`);
   return {
     buffer,
     contentType: mimeFromBuffer(buffer) || response.headers.get("content-type")?.split(";")[0] || "application/octet-stream"
@@ -289,28 +351,48 @@ function publicUrlForObject(objectKey) {
   return `${getOssConfig().publicBaseUrl.replace(/\/+$/g, "")}/${objectKey}`;
 }
 
-async function uploadUrlToOss(client, manifest, url, objectBasePath, originalName) {
+async function uploadUrlToOss(client, manifest, url, objectBasePath, originalName, options = {}) {
   const existingObjectKey = objectKeyFromOssUrl(url);
   if (existingObjectKey) {
-    return { url, skipped: true, objectKey: existingObjectKey };
+    if (!options.rehomeOss || existingObjectKey.startsWith(`${objectBasePath}/`)) {
+      return { url, skipped: true, objectKey: existingObjectKey };
+    }
+    console.log(`[rehome] ${existingObjectKey} -> ${objectBasePath}/`);
+    const extension = extensionFromName(existingObjectKey) || extensionFromName(originalName) || "bin";
+    const nameBase = slugify(String(originalName || path.basename(existingObjectKey) || "asset").replace(/\.[^.]+$/, ""), "asset");
+    const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
+    console.log(`[oss-copy] start ${existingObjectKey} -> ${objectKey}`);
+    await withTimeout(client.copy(objectKey, existingObjectKey), "oss copy");
+    console.log(`[oss-copy] done ${objectKey}`);
+    return {
+      url: publicUrlForObject(objectKey),
+      skipped: false,
+      reused: false,
+      copied: true,
+      objectKey,
+      oldObjectKey: existingObjectKey
+    };
   }
 
-  const { buffer, contentType } = await downloadAsset(url);
+  const { buffer, contentType } = await downloadAsset(url, `${path.basename(objectBasePath)}/${originalName || "asset"}`);
   const sha256 = sha256Buffer(buffer);
   const existing = manifest.bySha256[sha256];
-  if (existing?.url && isOssUrl(existing.url)) {
+  const existingManifestObjectKey = existing?.url ? objectKeyFromOssUrl(existing.url) : "";
+  if (existing?.url && isOssUrl(existing.url) && (!options.rehomeOss || existingManifestObjectKey.startsWith(`${objectBasePath}/`))) {
     return { url: existing.url, skipped: false, reused: true, objectKey: existing.objectKey || objectKeyFromOssUrl(existing.url), sha256 };
   }
 
   const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
   const nameBase = slugify(String(originalName || "asset").replace(/\.[^.]+$/, ""), "asset");
   const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
+  console.log(`[oss-upload] start ${objectKey} ${formatBytes(buffer.length)}`);
   await withTimeout(client.put(objectKey, buffer, {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "public, max-age=31536000, immutable"
     }
   }), "oss upload");
+  console.log(`[oss-upload] done ${objectKey}`);
   const publicUrl = publicUrlForObject(objectKey);
   manifest.bySha256[sha256] = {
     url: publicUrl,
@@ -319,7 +401,23 @@ async function uploadUrlToOss(client, manifest, url, objectBasePath, originalNam
     byteLength: buffer.length,
     updatedAt: new Date().toISOString()
   };
-  return { url: publicUrl, skipped: false, reused: false, objectKey, sha256 };
+  return { url: publicUrl, skipped: false, reused: false, objectKey, oldObjectKey: existingObjectKey || "", sha256 };
+}
+
+async function deleteOldObjectKeys(client, objectKeys) {
+  const uniqueKeys = Array.from(new Set(objectKeys.filter(Boolean)));
+  if (!uniqueKeys.length) return 0;
+  let deleted = 0;
+  for (const objectKey of uniqueKeys) {
+    try {
+      await withTimeout(client.delete(objectKey), `delete ${objectKey}`);
+      deleted += 1;
+      console.log(`[delete] ${objectKey}`);
+    } catch (error) {
+      console.log(`[delete] failed ${objectKey}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  return deleted;
 }
 
 async function listAllPages(notion, dataSourceId) {
@@ -353,7 +451,7 @@ async function listChildren(notion, blockId) {
   return blocks;
 }
 
-async function processBlockTree(notion, client, manifest, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun) {
+async function processBlockTree(notion, client, manifest, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun, options = {}) {
   const stack = await listChildren(notion, pageId);
   while (stack.length) {
     if (stats.failedMedia >= MAX_FAILED_MEDIA_PER_ITEM) {
@@ -368,13 +466,13 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
       const originalName = `${media.blockType}-${block.id}`;
       const objectBasePath = ossPath(tableFolder, itemFolder, "notion-page-body");
       console.log(`[body] ${itemLabel} media #${stats.seen} ${media.blockType}`);
-      if (isOssUrl(media.url)) {
+      if (isOssUrl(media.url) && (!options.rehomeOss || objectKeyFromOssUrl(media.url).startsWith(`${objectBasePath}/`))) {
         stats.skipped += 1;
         console.log(`[body] ${itemLabel} media #${stats.seen} skipped`);
       } else {
         try {
           if (!dryRun) {
-            const uploaded = await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName);
+            const uploaded = await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
             const nextPayload = {
               external: { url: uploaded.url },
               caption: media.caption
@@ -386,10 +484,14 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
             if (uploaded.reused) {
               stats.reused += 1;
               console.log(`[body] ${itemLabel} media #${stats.seen} reused`);
+            } else if (uploaded.copied) {
+              stats.uploaded += 1;
+              console.log(`[body] ${itemLabel} media #${stats.seen} copied`);
             } else {
               stats.uploaded += 1;
               console.log(`[body] ${itemLabel} media #${stats.seen} uploaded`);
             }
+            if (uploaded.oldObjectKey) stats.oldObjectKeys.push(uploaded.oldObjectKey);
           } else {
             stats.uploaded += 1;
             console.log(`[body] ${itemLabel} media #${stats.seen} would-upload`);
@@ -409,10 +511,10 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
 
 function ossPath(tableFolder, itemFolder, segment) {
   const prefix = getOssConfig().uploadPrefix.replace(/^\/+|\/+$/g, "");
-  return [prefix, "notion-sync", itemFolder, segment].filter(Boolean).join("/");
+  return [prefix, "notion-sync", tableFolder, itemFolder].filter(Boolean).join("/");
 }
 
-async function processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, dryRun) {
+async function processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, dryRun, options = {}) {
   const property = page.properties?.[propertyName];
   const files = fileArrayFromProperty(property);
   if (!files.length) return null;
@@ -430,7 +532,7 @@ async function processFilesProperty(client, manifest, page, tableConfig, itemFol
 
     const objectBasePath = ossPath(tableConfig.tableFolder, itemFolder, slugify(propertyName, "files"));
     console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length}`);
-    const alreadyOss = isOssUrl(sourceUrl);
+    const alreadyOss = isOssUrl(sourceUrl) && (!options.rehomeOss || objectKeyFromOssUrl(sourceUrl).startsWith(`${objectBasePath}/`));
 
     const upload = dryRun
       ? {
@@ -442,21 +544,30 @@ async function processFilesProperty(client, manifest, page, tableConfig, itemFol
         manifest,
         sourceUrl,
         objectBasePath,
-        fileName
+        fileName,
+        options
       );
 
     if (upload.skipped) {
       stats.skipped += 1;
       console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} skipped`);
+    } else if (dryRun) {
+      stats.uploaded += 1;
+      console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} would-upload`);
     } else if (upload.reused) {
       stats.reused += 1;
       changed = true;
       console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} reused`);
+    } else if (upload.copied) {
+      stats.uploaded += 1;
+      changed = true;
+      console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} copied`);
     } else {
       stats.uploaded += 1;
       changed = true;
       console.log(`[files] ${tableConfig.label} ${itemFolder} ${propertyName} ${fileIndex}/${files.length} uploaded`);
     }
+    if (upload.oldObjectKey) stats.oldObjectKeys.push(upload.oldObjectKey);
 
     nextFiles.push({
       name: fileName,
@@ -519,7 +630,7 @@ async function runTable(tableKey, options = {}) {
     : eligiblePages;
   const pages = options.limit ? filteredPages.slice(0, options.limit) : filteredPages;
   const skippedByStatus = allPages.length - eligiblePages.length;
-  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, reused: 0, skipped: 0, updatedRows: 0, failedRows: 0 };
+  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, reused: 0, skipped: 0, deletedOld: 0, updatedRows: 0, failedRows: 0 };
 
   console.log(`[${tableConfig.label}] rows=${pages.length} skippedByStatus=${skippedByStatus}${titleContains ? ` titleContains=${titleContains}` : ""}${options.limit ? ` limit=${options.limit}` : ""}`);
 
@@ -529,19 +640,19 @@ async function runTable(tableKey, options = {}) {
     const title = titleFromProperty(page.properties?.[tableConfig.titleProperty]) || `row-${index}`;
     const slug = tableConfig.slugProperty ? richTextFromProperty(page.properties?.[tableConfig.slugProperty]) : "";
     const itemFolder = tableKey === "projects" ? slugify(slug || title || page.id, "project") : slugify(title || page.id, "item");
-    const stats = { uploaded: 0, reused: 0, skipped: 0, seen: 0, failedMedia: 0 };
+    const stats = { uploaded: 0, reused: 0, skipped: 0, deletedOld: 0, seen: 0, failedMedia: 0, oldObjectKeys: [] };
     const fileProperties = {};
 
     console.log(`[${tableConfig.label}] ${index}/${pages.length} ${title} status=${syncStatusValue(page) || "empty"}`);
 
     try {
       for (const propertyName of tableConfig.fileProperties) {
-        const update = await processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, options.dryRun);
+        const update = await processFilesProperty(client, manifest, page, tableConfig, itemFolder, propertyName, stats, options.dryRun, options);
         if (update) Object.assign(fileProperties, update);
       }
 
       if (tableConfig.includeBodyMedia && !options.skipBody) {
-        await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun);
+        await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun, options);
       }
 
       let rowUpdated = false;
@@ -559,11 +670,15 @@ async function runTable(tableKey, options = {}) {
 
       if (rowUpdated) totals.updatedRows += 1;
       if (stats.uploaded > 0 || stats.reused > 0) manifestChanged = true;
+      if (!options.dryRun && options.deleteOldOss && stats.failedMedia === 0) {
+        stats.deletedOld = await deleteOldObjectKeys(client, stats.oldObjectKeys);
+      }
 
       totals.uploaded += stats.uploaded;
       totals.reused += stats.reused;
       totals.skipped += stats.skipped;
-      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} reused=${stats.reused} skipped=${stats.skipped}`);
+      totals.deletedOld += stats.deletedOld;
+      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} reused=${stats.reused} skipped=${stats.skipped} deletedOld=${stats.deletedOld}`);
     } catch (error) {
       totals.failedRows += 1;
       console.log(`[${tableConfig.label}] failed ${index}/${pages.length} ${title}: ${error instanceof Error ? error.message : String(error)}`);
@@ -593,14 +708,16 @@ async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const skipBody = process.argv.includes("--skip-body");
   const includeSynced = process.argv.includes("--include-synced");
+  const rehomeOss = process.argv.includes("--rehome-oss");
+  const deleteOldOss = process.argv.includes("--delete-old-oss");
   const titleContains = process.argv.find((arg) => arg.startsWith("--title-contains="))?.split("=").slice(1).join("=") || "";
   const selected = tableArg === "all" ? Object.keys(tables) : [tableArg];
 
-  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${titleContains ? ` titleContains=${titleContains}` : ""}`);
+  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${rehomeOss ? " rehomeOss=true" : ""}${deleteOldOss ? " deleteOldOss=true" : ""}${titleContains ? ` titleContains=${titleContains}` : ""}`);
 
   const summary = {};
   for (const tableKey of selected) {
-    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, includeSynced, titleContains });
+    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, includeSynced, rehomeOss, deleteOldOss, titleContains });
   }
 
   console.log(`sync complete ${JSON.stringify(summary)}`);

@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+import type { CSSProperties } from "react";
+import Link from "next/link";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
 
 function ExternalOrInternalLink({ className, href, label }: { className?: string; href: string; label: string }) {
@@ -23,12 +24,23 @@ function ExternalOrInternalLink({ className, href, label }: { className?: string
   );
 }
 
+function socialHref(url: string) {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("mailto:") || url.startsWith("/")) return url;
+  if (url.includes("@")) return `mailto:${url}`;
+  return url;
+}
+
+function socialPlatformKey(link: { platform?: string; label?: string }) {
+  return (link.platform || link.label || "link").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 export async function FooterNavigation() {
   const content = await getPublicContent();
   const footerMain = sectionByKey(content, "footer_main");
-  const footerLinks = content.socials.filter((link) => link.footerVisible && link.status !== "Archived" && link.url);
+  const footerLinks = content.socials.filter((link) => (link.footerVisible || link.group === "Contact") && link.status !== "Archived" && link.url);
   const workTypeLinks = content.workTypes.filter((type) => type.filterVisible && type.status !== "Archived");
-  const socialIcons = footerLinks.filter((link) => link.iconUrl);
+  const socialIcons = footerLinks.filter((link) => link.footerIconUrl || link.iconUrl || link.colorIconUrl);
   const footerGroups = [
     {
       title: "Home",
@@ -67,27 +79,52 @@ export async function FooterNavigation() {
           {socialIcons.length > 0 ? (
             <div className="pw-footer-socials" aria-label="Social links">
               {socialIcons.map((link) => (
-                <a
-                  aria-label={`${link.label} (opens in a new tab)`}
-                  className="pw-social-icon"
-                  href={link.url}
-                  key={link.id || link.url}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="pw-social-icon-image pw-social-icon-black"
-                    style={{ backgroundImage: `url(${link.iconUrl})` }}
-                  />
-                  {link.colorIconUrl ? (
-                    <span
-                      aria-hidden="true"
-                      className="pw-social-icon-image pw-social-icon-color"
-                      style={{ backgroundImage: `url(${link.colorIconUrl})` }}
-                    />
-                  ) : null}
-                </a>
+                (() => {
+                  const footerIcon = link.footerIconUrl || link.iconUrl || link.colorIconUrl;
+                  const platformKey = socialPlatformKey(link);
+                  const specialHover = Boolean(link.lightColorIconUrl) || platformKey === "github" || platformKey === "email";
+                  const href = socialHref(link.url);
+                  return (
+                    <a
+                      aria-label={`${link.label} (opens in a new tab)`}
+                      className="pw-social-icon"
+                      data-platform={platformKey}
+                      href={href}
+                      key={link.id || link.url}
+                      rel={href.startsWith("http") ? "noreferrer" : undefined}
+                      target={href.startsWith("http") ? "_blank" : undefined}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="pw-social-icon-image pw-social-icon-base"
+                        style={{
+                          maskImage: `url(${footerIcon})`,
+                          WebkitMaskImage: `url(${footerIcon})`
+                        }}
+                      />
+                      {link.colorIconUrl ? (
+                        <span
+                          aria-hidden="true"
+                          className={["pw-social-icon-image pw-social-icon-color", specialHover ? "pw-social-icon-color-special" : ""].filter(Boolean).join(" ")}
+                          style={specialHover ? {
+                            backgroundColor: "var(--color-black)",
+                            backgroundImage: "none",
+                            maskImage: `url(${footerIcon})`,
+                            maskPosition: "center",
+                            maskRepeat: "no-repeat",
+                            maskSize: "contain",
+                            WebkitMaskImage: `url(${footerIcon})`,
+                            WebkitMaskPosition: "center",
+                            WebkitMaskRepeat: "no-repeat",
+                            WebkitMaskSize: "contain"
+                          } as CSSProperties : {
+                            backgroundImage: `url(${link.colorIconUrl})`
+                          }}
+                        />
+                      ) : null}
+                    </a>
+                  );
+                })()
               ))}
             </div>
           ) : null}
@@ -111,4 +148,3 @@ export async function FooterNavigation() {
     </footer>
   );
 }
-

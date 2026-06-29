@@ -17,13 +17,16 @@ type Filter = {
 
 const gridIcon = "/figma/pw2-icon-grid.svg?v=2";
 const listIcon = "/figma/pw2-icon-list.svg?v=2";
-const eyeIcon = "/figma/pw2-icon-eye.svg";
-const likeIcon = "/figma/pw2-icon-like.svg";
 
 function filterWorks(works: Work[], filter: Filter) {
   if (filter.kind === "all") return works;
-  if (filter.kind === "type") return works.filter((work) => work.primaryTypeSlug === filter.value || work.primaryType === filter.value || work.category === filter.value);
+  if (filter.kind === "type")
+    return works.filter((work) => work.primaryTypeSlug === filter.value || work.primaryType === filter.value || work.category === filter.value);
   return works;
+}
+
+function matchesType(work: Work, typeSlug: string) {
+  return work.primaryTypeSlug === typeSlug || work.primaryType === typeSlug || work.category === typeSlug;
 }
 
 function initialFilterFromLocation(): Filter {
@@ -39,7 +42,8 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
   const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
   const years = useMemo(() => Array.from(new Set(works.map((work) => work.year))).sort((left, right) => right - left), [works]);
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
-  const visibleTypes = workTypes.filter((type) => type.filterVisible && type.status !== "Archived");
+  const visibleTypes = useMemo(() => workTypes.filter((type) => type.filterVisible && type.status !== "Archived"), [workTypes]);
+  const visibleTypedTypes = useMemo(() => visibleTypes.map((type) => ({ type, count: works.filter((work) => matchesType(work, type.slug)).length })).filter((entry) => entry.count > 0), [visibleTypes, works]);
 
   function setActiveFilter(nextFilter: Filter) {
     setFilter(nextFilter);
@@ -60,12 +64,12 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
               </span>
               <span>/ {works.length}</span>
             </button>
-            {visibleTypes.map((type) => (
+            {visibleTypedTypes.map(({ count, type }) => (
               <button className={`pw-category-row${filter.kind === "type" && filter.value === type.slug ? " is-active" : ""}`} key={type.id} onClick={() => setActiveFilter({ kind: "type", value: type.slug })} type="button">
                 <span>
                   <CascadeText text={type.shortLabel || type.nameEn} underline={false} />
                 </span>
-                <span>/ {type.workCount}</span>
+                <span>/ {count}</span>
               </button>
             ))}
           </div>
@@ -78,7 +82,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
         </aside>
 
         <div className="pw-works-right">
-          <div className="pw-view-toggle" aria-label="Works view">
+            <div className="pw-view-toggle" aria-label="Works view">
             <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setMode("grid")} type="button">
               <Image alt="" height={20} src={gridIcon} width={20} />
               Grid
@@ -89,21 +93,39 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
             </button>
           </div>
 
-          {filteredWorks.length === 0 ? (
-            <p className="pw-works-empty">No published works match this filter.</p>
-          ) : mode === "grid" ? (
-            <div className="pw-works-grid">
-              {filteredWorks.map((work, index) => (
-                <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} title={work.intro}>
-                  <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
-                  <span className="pw-works-grid-meta">
-                    <strong>{work.title}</strong>
-                    <span>{work.primaryType || work.category}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : (
+              {filteredWorks.length === 0 ? (
+                <p className="pw-works-empty">No published works match this filter.</p>
+              ) : mode === "grid" ? (
+                <div className="pw-works-grid">
+                  {filteredWorks.map((work, index) => (
+                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} title={work.intro}>
+                      <span className="pw-works-grid-card-inner">
+                        <span className="pw-works-grid-card-face pw-works-grid-card-front">
+                          <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
+                        </span>
+                        <span className="pw-works-grid-card-face pw-works-grid-card-back">
+                        <span
+                          aria-hidden="true"
+                          className="pw-works-grid-card-back-layer"
+                        >
+                            <Image
+                              alt=""
+                              className="pw-works-grid-card-back-image"
+                              src={work.cover.src}
+                              height={400}
+                              width={400}
+                            />
+                          </span>
+                          <span className="pw-works-grid-card-back-content">
+                            <strong>{work.title}</strong>
+                            <span className="pw-works-grid-card-back-meta">{work.primaryType || work.category}</span>
+                          </span>
+                        </span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
                 <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id}>
@@ -114,15 +136,10 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
                     <strong className="pw-list-title">{work.title}</strong>
                     <span className="pw-list-meta caption-copy">
                       <span>{workPublishedLabel(work)}</span>
-                      <span className="pw-list-separator" aria-hidden="true">·</span>
+                      <span className="pw-list-separator" aria-hidden="true">&middot;</span>
                       <span className="pw-list-stat">
-                        <Image alt="" height={16} src={eyeIcon} width={16} />
+                        <span className="pw-stat-icon pw-stat-icon-eye" aria-hidden="true" />
                         {metricLabel(work.viewCount)}
-                      </span>
-                      <span className="pw-list-separator" aria-hidden="true">·</span>
-                      <span className="pw-list-stat">
-                        <Image alt="" height={16} src={likeIcon} width={16} />
-                        {metricLabel(work.likeCount)}
                       </span>
                     </span>
                   </span>

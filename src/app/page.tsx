@@ -13,7 +13,6 @@ const homeAboutCopy = [
   "My work often starts with structure: understanding what needs to be communicated, how people will see it, and what kind of feeling the design should leave behind. From there, I focus on layout, rhythm, details and interaction, trying to make the final result feel clear, refined and purposeful.",
   "I'm interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
 ];
-const heroSlices = Array.from({ length: 14 }, (_, index) => index);
 const fallbackMedia = ["/field-media/a1-2.webp", figmaImage, "/field-media/a2-1.webp", "/field-media/a1-1.webp", "/field-media/b1-1.webp", "/field-media/c1-5.webp"];
 const homeTrackMinItems = 18;
 
@@ -66,13 +65,7 @@ export default async function Home() {
       <HomeMotionLayer />
 
       <section className="pw-home-hero" data-home-hero id="home">
-        <div className="pw-home-hero-visual" data-home-hero-visual aria-hidden="true">
-          <div className="pw-home-raster-grid">
-            {heroSlices.map((index) => (
-              <span className="pw-home-raster-slice" key={index} style={{ "--slice-index": index } as CSSProperties} />
-            ))}
-          </div>
-        </div>
+        <div className="pw-home-hero-visual" data-home-hero-visual aria-hidden="true" />
         <div className="pw-home-hero-inner">
           <h1 className="pw-home-title" data-home-title>
             <span className="pw-home-title-group">

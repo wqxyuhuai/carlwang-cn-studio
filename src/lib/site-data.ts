@@ -482,29 +482,116 @@ function normalizeTool(value: unknown): Tool | null {
 
 function normalizeSocial(value: unknown): SocialLink | null {
   if (!value || typeof value !== "object") return null;
-  const social = value as Partial<SocialLink>;
-  if (!social.platform || !social.url) return null;
+  const social = value as Partial<SocialLink> & { name?: string; href?: string; icon?: string };
+  const legacyPlatform = typeof social.name === "string" ? social.name.trim() : "";
+  const legacyHref = typeof social.href === "string" ? social.href.trim() : "";
+  const platform = social.platform || legacyPlatform;
+  const url = social.url || legacyHref;
+  if (!platform || !url) return null;
   const group = social.group || social.type || "Social";
   const active = social.active !== false && social.status !== "Archived";
+  const legacyKey = `${platform}|${social.icon || ""}`.toLowerCase();
+  const legacyAssets = legacySocialPresentation(legacyKey);
   return {
     id: social.id,
-    platform: social.platform,
-    label: social.label || social.platform,
+    platform,
+    label: social.label || platform,
     labelCn: social.labelCn,
-    url: social.url,
+    url,
     handle: social.handle,
     group,
     type: social.type || group,
-    iconUrl: social.iconUrl ? proxiedOssUrl(social.iconUrl) : "",
-    colorIconUrl: social.colorIconUrl ? proxiedOssUrl(social.colorIconUrl) : "",
-    cardBackgroundColor: social.cardBackgroundColor,
-    cardLogoColor: social.cardLogoColor,
+    cardImageUrl: social.cardImageUrl ? proxiedOssUrl(social.cardImageUrl) : legacyAssets.cardImageUrl,
+    iconUrl: social.iconUrl ? proxiedOssUrl(social.iconUrl) : legacyAssets.iconUrl,
+    colorIconUrl: social.colorIconUrl ? proxiedOssUrl(social.colorIconUrl) : legacyAssets.colorIconUrl,
+    lightColorIconUrl: social.lightColorIconUrl ? proxiedOssUrl(social.lightColorIconUrl) : legacyAssets.lightColorIconUrl,
+    footerIconUrl: social.footerIconUrl ? proxiedOssUrl(social.footerIconUrl) : legacyAssets.footerIconUrl,
+    cardBackgroundColor: social.cardBackgroundColor || legacyAssets.cardBackgroundColor,
+    cardLogoColor: social.cardLogoColor || legacyAssets.cardLogoColor,
     footerVisible: social.footerVisible ?? (group === "Footer" || group === "Portfolio" || group === "Social"),
     contactVisible: social.contactVisible ?? (group === "Contact" || group === "Portfolio" || group === "Social" || group === "Form"),
     status: active ? "Published" : "Archived",
     active,
-    order: Number(social.order || 999)
+    order: Number(social.order || legacyAssets.order || 999)
   };
+}
+
+function legacySocialPresentation(key: string) {
+  switch (key) {
+    case "behance|palette":
+      return {
+        cardImageUrl: "/figma/social-behance.svg",
+        iconUrl: "/figma/social-behance.svg",
+        colorIconUrl: "/figma/social-color-behance.svg",
+        footerIconUrl: "/figma/social-icon-behance.svg",
+        cardBackgroundColor: "#2952fb",
+        cardLogoColor: "#ffffff",
+        order: 1
+      };
+    case "zcool|brush":
+      return {
+        cardImageUrl: "/figma/social-zcool.svg",
+        iconUrl: "/figma/social-zcool.svg",
+        colorIconUrl: "/figma/social-color-zcool.svg",
+        footerIconUrl: "/figma/social-icon-zcool.svg",
+        cardBackgroundColor: "#f5ca1e",
+        cardLogoColor: "#040000",
+        order: 2
+      };
+    case "xiaohongshu|bookopen":
+      return {
+        cardImageUrl: "/figma/social-xiaohongshu.svg",
+        iconUrl: "/figma/social-xiaohongshu.svg",
+        colorIconUrl: "/figma/social-color-xiaohongshu.svg",
+        footerIconUrl: "/figma/social-icon-xiaohongshu.svg",
+        cardBackgroundColor: "#ff2e4d",
+        cardLogoColor: "#ffffff",
+        order: 3
+      };
+    case "github|github":
+      return {
+        cardImageUrl: "/figma/social-github.svg",
+        iconUrl: "/figma/social-github.svg",
+        colorIconUrl: "/figma/social-color-github.svg",
+        lightColorIconUrl: "/figma/social-color-github-light.svg",
+        footerIconUrl: "/figma/social-icon-github.svg",
+        cardBackgroundColor: "#202328",
+        cardLogoColor: "#ffffff",
+        order: 4
+      };
+    case "linkedin|linkedin":
+      return {
+        cardImageUrl: "/figma/social-linkedin.svg",
+        iconUrl: "/figma/social-linkedin.svg",
+        colorIconUrl: "/figma/social-color-linkedin.svg",
+        footerIconUrl: "/figma/social-icon-linkedin.svg",
+        cardBackgroundColor: "#156da0",
+        cardLogoColor: "#ffffff",
+        order: 5
+      };
+    case "email|mail":
+      return {
+        cardImageUrl: "/figma/social-email.svg",
+        iconUrl: "/figma/social-email.svg",
+        colorIconUrl: "/figma/social-color-email.svg",
+        lightColorIconUrl: "/figma/social-color-email-light.svg",
+        footerIconUrl: "/figma/social-icon-email.svg",
+        cardBackgroundColor: "#7c7979",
+        cardLogoColor: "#ffffff",
+        order: 6
+      };
+    default:
+      return {
+        cardImageUrl: "",
+        iconUrl: "",
+        colorIconUrl: "",
+        lightColorIconUrl: "",
+        footerIconUrl: "",
+        cardBackgroundColor: "",
+        cardLogoColor: "",
+        order: 999
+      };
+  }
 }
 
 function normalizeExperience(value: unknown): Experience | null {

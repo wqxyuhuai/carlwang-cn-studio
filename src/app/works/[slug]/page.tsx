@@ -61,18 +61,26 @@ function PagerItem({ direction, work }: { direction: "previous" | "next"; work: 
         <span className="pw-detail-pager-thumb">
           <Image alt={work.cover.alt || work.title} height={100} src={work.cover.src} width={100} />
         </span>
-          <span className="pw-detail-pager-copy">
-            <span className="pw-detail-pager-title">{work.title}</span>
-          <span className="pw-detail-pager-age">{workPublishedLabel(work)}</span>
-        </span>
       </span>
     </Link>
   );
 }
 
+const fallbackToolIcons: Record<string, string> = {
+  "after-effects": "/figma/pw2-tool-ae.svg",
+  blender: "/figma/pw2-tool-blender.svg",
+  figma: "/figma/pw2-icon-figma.svg",
+  illustrator: "/figma/pw2-tool-ai.svg",
+  photoshop: "/figma/pw2-tool-ps.svg"
+};
+
+function toolKey(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 function toolIconFor(name: string, tools: Tool[]) {
-  const normalized = name.trim().toLowerCase();
-  return tools.find((tool) => tool.name.trim().toLowerCase() === normalized && tool.iconUrl)?.iconUrl || "";
+  const normalized = toolKey(name);
+  return tools.find((tool) => toolKey(tool.name) === normalized && tool.iconUrl)?.iconUrl || fallbackToolIcons[normalized] || "";
 }
 
 export default async function WorkDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -86,6 +94,9 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
   const secondImage = imageMedia(gallery[1], firstImage);
   const thirdImage = imageMedia(gallery[2], firstImage);
   const remaining = gallery.slice(3);
+  const visibleTools = work.tools
+    .map((tool) => ({ icon: toolIconFor(tool, content.tools), name: tool }))
+    .filter((tool) => tool.icon);
 
   return (
     <main className="pw-detail-page">
@@ -99,24 +110,24 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
           <DetailImage className="is-cover" media={work.cover} priority />
 
           <WorkDetailHeading
-            likeCount={work.likeCount}
             publishedLabel={workPublishedLabel(work)}
+            slug={work.slug}
             title={work.title}
             viewCount={work.viewCount}
-            workId={work.id}
           />
 
-          <div className="pw-detail-tools" aria-label="Tools">
-            <div className="pw-detail-tools-title">Tools</div>
-            <ul className="pw-detail-tool-list">
-              {(work.tools.length > 0 ? work.tools : ["Design"]).map((tool) => (
-                <li className="pw-detail-tool" key={tool}>
-                  {toolIconFor(tool, content.tools) ? <IconImage alt="" src={toolIconFor(tool, content.tools)} size={24} /> : null}
-                  <span>{tool}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {visibleTools.length > 0 ? (
+            <div className="pw-detail-tools" aria-label="Tools">
+              <div className="pw-detail-tools-title">Tools</div>
+              <ul className="pw-detail-tool-list">
+                {visibleTools.map((tool) => (
+                  <li className="pw-detail-tool" key={tool.name} title={tool.name}>
+                    <IconImage alt={tool.name} src={tool.icon} size={24} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         <nav className="pw-detail-pager" aria-label="Adjacent works">

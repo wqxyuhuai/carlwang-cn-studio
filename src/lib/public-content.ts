@@ -465,7 +465,7 @@ async function buildPublicContent(): Promise<PublicContent> {
   };
 }
 
-const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v5"], {
+const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v10"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 

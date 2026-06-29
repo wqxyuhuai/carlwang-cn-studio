@@ -75,7 +75,7 @@ export function DirectionShowcase({ heading = "Design Direction", id, items = fa
               onMouseEnter={() => setActiveIndex(index)}
               type="button"
             >
-              <CascadeText text={item.label} underline={false} />
+              <CascadeText text={item.label} />
             </button>
           ))}
         </div>

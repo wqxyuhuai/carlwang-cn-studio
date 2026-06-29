@@ -103,8 +103,11 @@ export type SocialLink = {
   handle?: string;
   group: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
   type?: "Social" | "Portfolio" | "Contact" | "Footer" | "Form";
+  cardImageUrl?: string;
   iconUrl?: string;
   colorIconUrl?: string;
+  lightColorIconUrl?: string;
+  footerIconUrl?: string;
   cardBackgroundColor?: string;
   cardLogoColor?: string;
   footerVisible?: boolean;

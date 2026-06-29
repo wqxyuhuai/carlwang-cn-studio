@@ -1,35 +1,46 @@
 "use client";
 
-import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { metricLabel } from "@/lib/work-metrics";
 
-const eyeIcon = "/figma/pw2-icon-eye.svg";
-const likeIcon = "/figma/pw2-icon-like.svg";
-
 export function WorkDetailHeading({
-  likeCount,
   publishedLabel,
+  slug,
   title,
-  viewCount,
-  workId
+  viewCount
 }: {
-  likeCount: number;
   publishedLabel: string;
+  slug: string;
   title: string;
   viewCount: number;
-  workId: string;
 }) {
-  const storageKey = `work-like-count:${workId}`;
-  const [displayLikeCount, setDisplayLikeCount] = useState(likeCount);
+  const [displayViewCount, setDisplayViewCount] = useState(viewCount);
 
-  function likeWork() {
-    setDisplayLikeCount((current) => {
-      const next = current + 1;
-      window.localStorage.setItem(storageKey, String(next));
-      return next;
-    });
-  }
+  useEffect(() => {
+    let cancelled = false;
+
+    async function recordView() {
+      try {
+        const response = await fetch(`/api/works/${encodeURIComponent(slug)}/view`, {
+          method: "POST",
+          cache: "no-store"
+        });
+        if (!response.ok) return;
+        const result = await response.json() as { viewCount?: number };
+        if (!cancelled && typeof result.viewCount === "number") {
+          setDisplayViewCount(result.viewCount);
+        }
+      } catch {
+        // View count tracking is best-effort and should never block the detail page.
+      }
+    }
+
+    void recordView();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
 
   return (
     <div className="pw-detail-heading">
@@ -37,21 +48,13 @@ export function WorkDetailHeading({
         <h1>{title}</h1>
         <div className="pw-detail-stats" aria-label="Work metrics">
           <span>{publishedLabel}</span>
-          <span aria-hidden="true">·</span>
+          <span aria-hidden="true">&middot;</span>
           <span className="pw-detail-stat">
-            <Image alt="" height={18} src={eyeIcon} width={18} />
-            {metricLabel(viewCount)}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span className="pw-detail-stat">
-            <Image alt="" height={18} src={likeIcon} width={18} />
-            {metricLabel(displayLikeCount)}
+            <span className="pw-stat-icon pw-stat-icon-eye" aria-hidden="true" />
+            {metricLabel(displayViewCount)}
           </span>
         </div>
       </div>
-      <button aria-label={`Like ${title}`} className="pw-detail-like" onClick={likeWork} type="button">
-        <Image alt="" height={40} src={likeIcon} width={40} />
-      </button>
     </div>
   );
 }

@@ -180,12 +180,12 @@
 html[data-theme="dark"] {
   --color-white: #2a2d28;
   --color-black: #f4f5ef;
-  --color-black-60: rgb(244 245 239 / 68%);
-  --color-black-40: rgb(244 245 239 / 48%);
-  --color-black-20: rgb(244 245 239 / 28%);
+  --color-black-60: rgb(244 245 239 / 54%);
+  --color-black-40: rgb(244 245 239 / 36%);
+  --color-black-20: rgb(244 245 239 / 22%);
   --color-black-10: rgb(244 245 239 / 14%);
   --color-bg: #20231f;
-  --color-line: rgb(244 245 239 / 34%);
+  --color-line: rgb(244 245 239 / 26%);
   --color-error: #ff5a5a;
   --gradient-home-hero: linear-gradient(
       180deg,
