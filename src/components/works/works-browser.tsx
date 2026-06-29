@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useMemo, useState } from "react";
@@ -53,6 +54,15 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
     window.history.replaceState(null, "", query ? `/works?${query}` : "/works");
   }
 
+  function gridCardEntryStyle(index: number) {
+    const desktopColumnCount = 3;
+    const row = Math.floor(index / desktopColumnCount);
+    const column = index % desktopColumnCount;
+    const delay = 180 + (row + column) * 90 + row * 35;
+
+    return { "--works-card-entry-delay": `${delay}ms` } as CSSProperties;
+  }
+
   return (
     <section className="pw-works-page" aria-label="Works">
       <div className="pw-works-layout">
@@ -98,7 +108,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
-                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} title={work.intro}>
+                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} style={gridCardEntryStyle(index)} title={work.intro}>
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
