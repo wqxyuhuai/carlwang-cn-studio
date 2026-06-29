@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
+import { CascadeText } from "@/components/cascade-text";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
 
 function ExternalOrInternalLink({ className, href, label }: { className?: string; href: string; label: string }) {
@@ -12,14 +13,14 @@ function ExternalOrInternalLink({ className, href, label }: { className?: string
         rel={href.startsWith("mailto:") ? undefined : "noreferrer"}
         target={href.startsWith("mailto:") ? undefined : "_blank"}
       >
-        {label}
+        <CascadeText text={label} underline={false} />
       </a>
     );
   }
 
   return (
     <Link className={className} href={href}>
-      {label}
+      <CascadeText text={label} underline={false} />
     </Link>
   );
 }

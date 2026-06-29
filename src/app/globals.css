@@ -1690,6 +1690,8 @@ html:not([data-theme="dark"]) .cw-glass-header {
     .pw-category-row.is-active .cascade-text,
     .pw-category-row:hover .cascade-text,
     .pw-category-row:focus-visible .cascade-text,
+    .pw-footer-group a:hover .cascade-text,
+    .pw-footer-group a:focus-visible .cascade-text,
     .pw-experience-item:hover .cascade-text,
     .pw-experience-item:focus-visible .cascade-text
   )
@@ -1726,6 +1728,8 @@ html:not([data-theme="dark"]) .cw-glass-header {
     .pw-category-row.is-active .cascade-text,
     .pw-category-row:hover .cascade-text,
     .pw-category-row:focus-visible .cascade-text,
+    .pw-footer-group a:hover .cascade-text,
+    .pw-footer-group a:focus-visible .cascade-text,
     .pw-experience-item:hover .cascade-text,
     .pw-experience-item:focus-visible .cascade-text
   )
@@ -1750,6 +1754,8 @@ html:not([data-theme="dark"]) .cw-glass-header {
     .pw-category-row.is-active,
     .pw-category-row:hover,
     .pw-category-row:focus-visible,
+    .pw-footer-group a:hover,
+    .pw-footer-group a:focus-visible,
     .pw-experience-item:hover,
     .pw-experience-item:focus-visible
   )
@@ -2301,6 +2307,8 @@ html .custom-cursor {
       .cascade-text[data-active="true"],
       .pw-field-button[data-active="true"] .cascade-text,
       .pw-direction-button[data-active="true"] .cascade-text,
+      .pw-footer-group a:hover .cascade-text,
+      .pw-footer-group a:focus-visible .cascade-text,
       .pw-experience-item:hover .cascade-text,
       .pw-experience-item:focus-visible .cascade-text
     )
@@ -2479,9 +2487,17 @@ html .custom-cursor {
   margin-bottom: var(--space-3);
 }
 
-.pw-footer-group a,
-.pw-footer-group span {
+.pw-footer-group a {
   color: var(--color-black-40);
+}
+
+.pw-footer-group a .cascade-text {
+  --cascade-ink-active: var(--color-black);
+  --cascade-ink-rest: var(--color-black-40);
+}
+
+.pw-footer-group a:focus-visible {
+  outline: none;
 }
 
 .pw-footer-right > .pw-footer-copy {
@@ -2504,6 +2520,33 @@ html .custom-cursor {
   min-height: 40rem;
   overflow: hidden;
   padding: 0 var(--figma-pad-desktop);
+}
+
+@keyframes works-left-entry {
+  from {
+    clip-path: inset(0 0 100% 0);
+    opacity: 0;
+    transform: translateY(0.9rem);
+  }
+  to {
+    clip-path: inset(0);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes works-card-shutter-entry {
+  0% {
+    opacity: 0;
+    transform: perspective(900px) rotateY(-86deg);
+  }
+  46% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(900px) rotateY(0deg);
+  }
 }
 
 .pw-works-layout {
@@ -2535,6 +2578,42 @@ html .custom-cursor {
   padding-bottom: var(--space-4);
   scrollbar-width: thin;
   width: min(100%, 28.1875rem);
+}
+
+.pw-category-list .pw-category-row {
+  animation: works-left-entry 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pw-category-list .pw-category-row:nth-child(1) {
+  animation-delay: 90ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(2) {
+  animation-delay: 145ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(3) {
+  animation-delay: 200ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(4) {
+  animation-delay: 255ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(5) {
+  animation-delay: 310ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(6) {
+  animation-delay: 365ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(7) {
+  animation-delay: 420ms;
+}
+
+.pw-category-list .pw-category-row:nth-child(n + 8) {
+  animation-delay: 475ms;
 }
 
 .pw-category-row {
@@ -2572,6 +2651,7 @@ html .custom-cursor {
 
 .pw-works-title {
   align-self: end;
+  animation: works-left-entry 760ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
   font-family: var(--font-display);
   font-size: var(--text-display-works-year);
   font-weight: 700;
@@ -2598,6 +2678,7 @@ html .custom-cursor {
 
 .pw-view-toggle {
   align-items: center;
+  animation: works-left-entry 560ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
   display: flex;
   gap: 1.375rem;
   margin-bottom: 2.0625rem;
@@ -2673,6 +2754,8 @@ html .custom-cursor {
 }
 
 .pw-works-grid-card {
+  animation: works-card-shutter-entry 980ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--works-card-entry-delay, 180ms);
   aspect-ratio: 1;
   background: transparent;
   contain-intrinsic-size: 18rem;
@@ -2681,6 +2764,8 @@ html .custom-cursor {
   display: block;
   perspective: 1000px;
   position: relative;
+  transform-origin: left center;
+  will-change: transform, opacity;
 }
 
 .pw-works-grid-card-inner {
