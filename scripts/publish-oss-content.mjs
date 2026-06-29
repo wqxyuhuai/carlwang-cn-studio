@@ -79,6 +79,10 @@ function selectedTables() {
   return arg.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+function argValue(name) {
+  return process.argv.find((item) => item.startsWith(`--${name}=`))?.split("=").slice(1).join("=") || "";
+}
+
 function requiredEnv(tableKeys) {
   const oss = getOssConfig();
   const checks = [
@@ -253,9 +257,17 @@ function isCurrentOssUrl(url) {
   return typeof url === "string" && url.startsWith(`${base}/`);
 }
 
+function isAliyunOssUrl(url) {
+  try {
+    return /^[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 function assertOssUrls(urls, label, missingOss) {
   for (const url of urls.filter(Boolean)) {
-    if (!isCurrentOssUrl(url)) missingOss.push(label);
+    if (!isAliyunOssUrl(url)) missingOss.push(label);
   }
 }
 
@@ -423,6 +435,7 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
     const title = titleFromProperty(properties.Title);
     const slug = richTextFromProperty(properties.Slug) || slugify(title, page.id);
     if (!title || !slug) continue;
+    if (options.slug && slug !== options.slug) continue;
 
     const displayStatus = selectName(properties[DISPLAY_STATUS_NAME]);
     const status = displayStatus === SHOW_STATUS || displayStatus === "Published" || displayStatus === "Show" ? "Published" : "Draft";
@@ -432,7 +445,7 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
     const category = categoryById.get(categoryId);
     const categoryName = category?.nameEn || "";
     const coverUrl = firstFileUrl(properties.Cover);
-    if (!coverUrl || !isCurrentOssUrl(coverUrl)) {
+    if (!coverUrl || !isAliyunOssUrl(coverUrl)) {
       console.log(`[publish] skip project without synced OSS cover: ${title}`);
       continue;
     }
@@ -468,6 +481,28 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
   }
 
   return projects.sort((left, right) => left.order - right.order);
+}
+
+function mergeWorks(existingWorks, updatedWorks) {
+  const updatedById = new Map(updatedWorks.map((work) => [work.id, work]));
+  const updatedBySlug = new Map(updatedWorks.map((work) => [work.slug, work]));
+  const merged = [];
+  const seen = new Set();
+
+  for (const work of Array.isArray(existingWorks) ? existingWorks : []) {
+    const updated = updatedById.get(work.id) || updatedBySlug.get(work.slug);
+    const next = updated || work;
+    merged.push(next);
+    seen.add(next.id);
+    seen.add(next.slug);
+  }
+
+  for (const work of updatedWorks) {
+    if (seen.has(work.id) || seen.has(work.slug)) continue;
+    merged.push(work);
+  }
+
+  return merged.sort((left, right) => Number(left.order || 999) - Number(right.order || 999));
 }
 
 async function readTools(notion, missingOss) {
@@ -580,6 +615,7 @@ async function main() {
   loadEnv(ENV_PATH);
   const tableKeys = selectedTables();
   const skipBody = process.argv.includes("--skip-body");
+  const projectSlug = argValue("slug");
   for (const tableKey of tableKeys) {
     if (!tableConfigs[tableKey]) throw new Error(`Unknown table: ${tableKey}`);
   }
@@ -605,7 +641,11 @@ async function main() {
     categoryById = categoryResult.byId;
     if (tableKeys.includes("categories")) nextContent.workTypes = categoryResult.categories;
   }
-  if (tableKeys.includes("projects")) nextContent.works = await readProjects(notion, categoryById, missingOss, { skipBody });
+  if (tableKeys.includes("projects")) {
+    const updatedWorks = await readProjects(notion, categoryById, missingOss, { skipBody, slug: projectSlug });
+    if (projectSlug && updatedWorks.length === 0) throw new Error(`No project found for slug: ${projectSlug}`);
+    nextContent.works = projectSlug ? mergeWorks(nextContent.works, updatedWorks) : updatedWorks;
+  }
   if (tableKeys.includes("tools")) nextContent.tools = await readTools(notion, missingOss);
   if (tableKeys.includes("social")) nextContent.socials = await readSocials(notion, missingOss);
   if (tableKeys.includes("experience")) nextContent.experiences = await readExperiences(notion, missingOss);

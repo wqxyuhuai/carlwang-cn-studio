@@ -6,6 +6,12 @@ export type MediaItem = {
   alt: string;
   caption?: string;
   poster?: string;
+  spriteSrc?: string;
+  spriteFrameCount?: number;
+  spriteColumns?: number;
+  spriteRows?: number;
+  duration?: number;
+  mutedDefault?: boolean;
   width?: number;
   height?: number;
 };

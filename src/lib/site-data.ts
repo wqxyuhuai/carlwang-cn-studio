@@ -312,6 +312,12 @@ function normalizeMedia(value: unknown, alt: string): MediaItem | null {
     alt: media.alt || alt,
     caption: media.caption,
     poster: media.poster ? proxiedOssUrl(media.poster) : undefined,
+    spriteSrc: media.spriteSrc ? proxiedOssUrl(media.spriteSrc) : undefined,
+    spriteFrameCount: media.spriteFrameCount,
+    spriteColumns: media.spriteColumns,
+    spriteRows: media.spriteRows,
+    duration: media.duration,
+    mutedDefault: media.mutedDefault,
     width: media.width,
     height: media.height
   };
@@ -380,6 +386,24 @@ function normalizeProject(value: OssProject): Work | null {
     gallery: gallery.length > 0 ? gallery : [cover],
     content: richContentToBlocks(value.richContent, title),
     notionPageId: value.id
+  };
+}
+
+function lookupKey(value: string | undefined) {
+  return (value || "").normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function mergeAliyunProjectBody(work: Work, projectsBySlug: Map<string, Work>, projectsByTitle: Map<string, Work>): Work {
+  const project = projectsBySlug.get(work.slug) || projectsByTitle.get(lookupKey(work.title));
+  if (!project) return work;
+
+  const hasContent = work.content.length > 0;
+  const hasUsefulGallery = work.gallery.length > 1;
+
+  return {
+    ...work,
+    gallery: hasUsefulGallery || project.gallery.length === 0 ? work.gallery : project.gallery,
+    content: hasContent || project.content.length === 0 ? work.content : project.content
   };
 }
 
@@ -622,6 +646,10 @@ function isStudioData(value: unknown): value is StudioData {
   return Array.isArray(candidate.works) && Boolean(candidate.settings);
 }
 
+type StudioDataWithAliyunProjects = StudioData & {
+  projects?: OssProject[];
+};
+
 function normalizeProjectData(value: unknown): StudioData | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as OssProjectData;
@@ -656,8 +684,15 @@ export async function getStudioData(): Promise<StudioData> {
     const json = (await response.json()) as unknown;
 
     if (isStudioData(json)) {
+      const studioJson = json as StudioDataWithAliyunProjects;
+      const aliyunProjects = Array.isArray(studioJson.projects)
+        ? studioJson.projects.map(normalizeProject).filter((work): work is Work => Boolean(work))
+        : [];
+      const projectsBySlug = new Map(aliyunProjects.map((work) => [work.slug, work]));
+      const projectsByTitle = new Map(aliyunProjects.map((work) => [lookupKey(work.title), work]));
       const normalizedWorks = json.works.map(normalizeWork).filter((work): work is Work => Boolean(work));
-      const works = normalizedWorks.length > 0 ? normalizedWorks : fallbackData.works;
+      const mergedWorks = normalizedWorks.map((work) => mergeAliyunProjectBody(work, projectsBySlug, projectsByTitle));
+      const works = mergedWorks.length > 0 ? mergedWorks : fallbackData.works;
       const normalizedWorkTypes = (json.workTypes || fallbackData.workTypes || [])
         .map(normalizeWorkType)
         .filter((workType): workType is WorkType => Boolean(workType));

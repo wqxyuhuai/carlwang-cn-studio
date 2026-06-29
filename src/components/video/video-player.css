@@ -1,0 +1,475 @@
+.video-cursor-bubble {
+  --video-theme-green: var(--color-green);
+  --video-theme-ink: var(--figma-black);
+  --video-theme-paper: var(--color-bg);
+  --video-theme-line: var(--color-line);
+}
+
+.project-video-card {
+  --video-theme-green: var(--color-green);
+  --video-theme-ink: var(--figma-black);
+  --video-theme-paper: var(--color-bg);
+  --video-theme-line: var(--color-line);
+  appearance: none;
+  background: var(--color-black);
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: block;
+  inline-size: 100%;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+  text-align: inherit;
+}
+
+.project-video-card-media {
+  background: var(--figma-black);
+  display: block;
+  inline-size: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.project-video-card-media video {
+  block-size: auto;
+  display: block;
+  inline-size: 100%;
+  object-fit: cover;
+  transition:
+    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.project-video-card.is-hovering .project-video-card-media video,
+.project-video-card:focus-visible .project-video-card-media video {
+  filter: brightness(1.12);
+  transform: scale(1.03);
+}
+
+.project-video-card:focus-visible {
+  outline: 2px solid var(--video-theme-green);
+  outline-offset: 4px;
+}
+
+.video-demo-page {
+  min-height: 100dvh;
+  padding: calc(var(--nav-h) + var(--space-10)) var(--figma-pad-desktop) var(--space-20);
+}
+
+.video-demo-shell {
+  display: grid;
+  gap: var(--space-6);
+  margin-inline: auto;
+  max-inline-size: 72rem;
+}
+
+.video-demo-heading {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.video-demo-shell .project-video-card {
+  aspect-ratio: 16 / 9;
+}
+
+.video-demo-shell .project-video-card-media,
+.video-demo-shell .project-video-card-media video {
+  block-size: 100%;
+}
+
+.project-video-mobile-play,
+.video-cursor-bubble {
+  --video-cursor-glass-bg: rgb(244 245 239 / 0.16);
+  --video-cursor-glass-effect-bg: rgb(244 245 239 / 0.1);
+  align-items: center;
+  background: var(--video-cursor-glass-bg);
+  backdrop-filter: blur(18px) brightness(1.08) saturate(1.38) contrast(1.04);
+  -webkit-backdrop-filter: blur(18px) brightness(1.08) saturate(1.38) contrast(1.04);
+  border: 0;
+  border-radius: var(--radius-none);
+  color: var(--figma-white);
+  display: inline-flex;
+  font-family: var(--type-body-m-family);
+  font-size: var(--text-body-m);
+  font-weight: var(--type-body-m-weight);
+  justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  min-block-size: 2.125rem;
+  overflow: hidden;
+  padding: 0.5rem 0.75rem;
+  pointer-events: none;
+  position: relative;
+  white-space: nowrap;
+  z-index: 10002;
+}
+
+.video-cursor-glass-effect {
+  background: var(--video-cursor-glass-effect-bg);
+  backdrop-filter: blur(8px) brightness(1.2) saturate(1.55) contrast(1.05);
+  -webkit-backdrop-filter: blur(8px) brightness(1.2) saturate(1.55) contrast(1.05);
+  filter: url("#glass-distortion");
+  inset: -0.375rem;
+  opacity: 0.82;
+  position: absolute;
+  z-index: 0;
+}
+
+.video-cursor-bubble-text {
+  color: var(--figma-white);
+  mix-blend-mode: difference;
+  position: relative;
+  z-index: 1;
+}
+
+.video-cursor-bubble {
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  opacity: 0;
+  position: fixed;
+  transition: opacity 180ms ease;
+}
+
+.video-cursor-bubble.is-visible,
+.video-player-overlay:not(.is-idle) .video-cursor-bubble.is-close {
+  opacity: 1;
+}
+
+.project-video-mobile-play {
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  opacity: 0;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.video-player-overlay {
+  --video-theme-green: var(--color-green);
+  --video-theme-ink: var(--figma-black);
+  --video-theme-paper: var(--color-bg);
+  --video-theme-line: var(--color-line);
+  align-items: center;
+  animation: video-overlay-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  background: #05070c;
+  display: grid;
+  inset: 0;
+  isolation: isolate;
+  justify-items: center;
+  overflow: hidden;
+  position: fixed;
+  z-index: 10000;
+}
+
+.video-player-overlay.is-closing {
+  animation: video-overlay-out 420ms cubic-bezier(0.7, 0, 0.84, 0) both;
+}
+
+.video-player-backdrop {
+  background-position: center;
+  background-size: cover;
+  filter: blur(40px) saturate(1.14);
+  inset: 0;
+  opacity: 0.35;
+  position: fixed;
+  transform: scale(1.08);
+  z-index: -2;
+}
+
+.video-player-backdrop::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgb(5 7 12 / 0.12), rgb(5 7 12 / 0.8)),
+    #05070c;
+  content: "";
+  inset: -4rem;
+  position: absolute;
+}
+
+.video-player-cloud {
+  block-size: 15rem;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--video-theme-green) 36%, transparent),
+    color-mix(in srgb, var(--video-theme-paper) 16%, transparent),
+    transparent 65%
+  );
+  filter: blur(28px);
+  inline-size: 15rem;
+  mix-blend-mode: screen;
+  opacity: 0.26;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+.video-player-stage {
+  align-items: center;
+  animation: video-stage-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  position: fixed;
+}
+
+.video-player-video {
+  block-size: 100dvh;
+  display: block;
+  inline-size: 100vw;
+  max-block-size: 100dvh;
+  max-inline-size: 100vw;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
+}
+
+.video-controls {
+  align-items: center;
+  animation: video-controls-in 640ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgb(242 243 240 / 0.9);
+  background: color-mix(in srgb, var(--video-theme-paper) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--video-theme-green) 74%, transparent);
+  border-radius: var(--radius-none);
+  bottom: 2rem;
+  box-shadow: 0 0.875rem 2.5rem rgb(0 0 0 / 0.22);
+  display: flex;
+  gap: 0.5rem;
+  left: 50%;
+  padding: 0.5rem;
+  position: fixed;
+  transform: translateX(-50%);
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+  z-index: 10003;
+}
+
+.video-controls.is-dimmed {
+  opacity: 0.28;
+  transform: translateX(-50%) translateY(0.5rem);
+}
+
+.video-control-button {
+  align-items: center;
+  background: var(--color-black);
+  block-size: 2.75rem;
+  border: 2px solid color-mix(in srgb, var(--color-black) 82%, transparent);
+  border-radius: var(--radius-none);
+  color: var(--color-white);
+  display: inline-flex;
+  flex: 0 0 auto;
+  inline-size: 2.75rem;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.video-control-button:hover {
+  background: var(--video-theme-green);
+  border-color: color-mix(in srgb, var(--video-theme-green) 72%, var(--figma-white));
+  color: var(--video-theme-ink);
+  transform: translateY(-1px);
+}
+
+.video-control-button:active {
+  transform: scale(0.94);
+}
+
+.video-control-button svg {
+  block-size: 1.375rem;
+  fill: currentColor;
+  inline-size: 1.375rem;
+  stroke: none;
+}
+
+.video-scrub-timeline {
+  block-size: 2.75rem;
+  border: 1px solid rgb(0 0 0 / 28%);
+  border-radius: var(--radius-none);
+  cursor: ew-resize;
+  inline-size: clamp(18rem, 28vw, 26rem);
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+
+.video-scrub-strip,
+.video-scrub-sprite {
+  display: flex;
+  inset: 0;
+  position: absolute;
+}
+
+.video-scrub-sprite {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.video-scrub-thumb {
+  background-color: var(--figma-black);
+  background-position: center;
+  background-size: cover;
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+.video-scrub-thumb.is-loading {
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.08)),
+    var(--figma-black);
+}
+
+.video-scrub-progress {
+  background: color-mix(in srgb, var(--video-theme-green) 34%, transparent);
+  border: 2px solid var(--video-theme-green);
+  border-radius: var(--radius-none);
+  clip-path: inset(0 calc(100% - var(--video-progress, 0%)) 0 0);
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.video-scrub-progress::after {
+  background: var(--figma-white);
+  block-size: 100%;
+  box-shadow:
+    0 0 0 1px var(--video-theme-green),
+    0 0 1.25rem rgb(183 208 117 / 72%);
+  content: "";
+  inline-size: 4px;
+  inset-block-start: 0;
+  inset-inline-start: var(--video-progress, 0%);
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.video-scrub-time {
+  background: var(--video-theme-green);
+  border-radius: var(--radius-none);
+  color: var(--video-theme-ink);
+  font-size: 0.75rem;
+  inset-block-start: 50%;
+  inset-inline-start: var(--video-progress, 0%);
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes video-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes video-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes video-stage-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes video-controls-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .project-video-card {
+    cursor: pointer;
+  }
+
+  .project-video-mobile-play {
+    opacity: 1;
+  }
+
+  .video-cursor-bubble,
+  .video-player-cloud {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .video-demo-page {
+    padding: calc(var(--nav-mobile-h) + var(--space-6)) var(--figma-pad-mobile) var(--space-16);
+  }
+
+  .project-video-card {
+    cursor: pointer;
+  }
+
+  .project-video-mobile-play {
+    opacity: 1;
+  }
+
+  .video-cursor-bubble,
+  .video-player-cloud {
+    display: none;
+  }
+
+  .video-controls {
+    bottom: 1rem;
+    max-inline-size: calc(100vw - 1.5rem);
+  }
+
+  .video-scrub-timeline {
+    inline-size: min(14rem, 50vw);
+  }
+
+  .video-control-button {
+    block-size: 2.5rem;
+    inline-size: 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-video-card-media video,
+  .video-control-button,
+  .video-controls {
+    transition: none;
+  }
+
+  .video-player-overlay,
+  .video-player-overlay.is-closing,
+  .video-player-stage,
+  .video-controls {
+    animation: none;
+  }
+
+  .video-player-cloud,
+  .video-cursor-bubble {
+    display: none;
+  }
+}

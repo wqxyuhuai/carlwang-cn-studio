@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "@/components/video/video-player.css";
 import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
 import { SiteCursor } from "@/components/site-cursor";
 import { SiteNav } from "@/components/site-nav";

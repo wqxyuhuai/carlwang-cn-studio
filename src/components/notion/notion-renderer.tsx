@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
 import type { NotionBlock, RichTextSpan } from "@/lib/types";
 
 function spanColorClass(color: RichTextSpan["color"]) {
@@ -45,9 +46,9 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
   );
 }
 
-export function NotionRenderer({ blocks }: { blocks: NotionBlock[] }) {
+export function NotionRenderer({ blocks, className = "" }: { blocks: NotionBlock[]; className?: string }) {
   return (
-    <div className="notion-body">
+    <div className={["notion-body", className].filter(Boolean).join(" ")}>
       {blocks.map((block, index) => (
         <NotionBlockView block={block} key={`${block.type}-${index}`} />
       ))}
@@ -112,19 +113,37 @@ function NotionBlockView({ block }: { block: NotionBlock }) {
       return <hr className="notion-divider" />;
     case "image":
       return (
-        <figure>
-          <div className="detail-gallery-item">
-            <Image alt={block.media.alt} height={900} src={block.media.src} width={1440} />
+        <figure className="notion-media">
+          <div className="notion-media-frame">
+            <Image alt={block.media.alt} height={block.media.height || 1000} src={block.media.src} width={block.media.width || 1600} />
           </div>
-          {block.media.caption ? <figcaption className="caption-copy text-muted">{block.media.caption}</figcaption> : null}
+          {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
         </figure>
       );
     case "video":
-      return <video controls poster={block.media.poster} src={block.media.src} />;
+      return (
+        <figure className="notion-media">
+          <ProjectVideoCard
+            video={{
+              duration: block.media.duration,
+              mutedDefault: block.media.mutedDefault,
+              poster: block.media.poster,
+              spriteColumns: block.media.spriteColumns,
+              spriteFrameCount: block.media.spriteFrameCount,
+              spriteRows: block.media.spriteRows,
+              spriteSrc: block.media.spriteSrc,
+              src: block.media.src,
+              title: block.media.alt
+            }}
+          />
+          {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
+        </figure>
+      );
     case "bookmark":
       return (
-        <a className="link-line notion-rich-text" href={block.url} rel="noreferrer" target="_blank">
-          {block.title}
+        <a className="notion-bookmark" href={block.url} rel="noreferrer" target="_blank">
+          <span>{block.title}</span>
+          {block.description ? <small>{block.description}</small> : null}
         </a>
       );
     case "column_list":
@@ -145,6 +164,6 @@ function NotionBlockView({ block }: { block: NotionBlock }) {
         </details>
       );
     case "unsupported":
-      return <p className="caption-copy text-muted">Unsupported Notion block: {block.label}</p>;
+      return null;
   }
 }

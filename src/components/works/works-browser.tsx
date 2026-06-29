@@ -41,8 +41,11 @@ function initialFilterFromLocation(): Filter {
 export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workTypes: PublicWorkType[]; title: string }) {
   const [mode, setMode] = useState<ViewMode>("grid");
   const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
-  const years = useMemo(() => Array.from(new Set(works.map((work) => work.year))).sort((left, right) => right - left), [works]);
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
+  const visibleYears = useMemo(() => {
+    const yearSource = filteredWorks.length > 0 ? filteredWorks : works;
+    return Array.from(new Set(yearSource.map((work) => Number(work.year)).filter((year) => Number.isFinite(year)))).sort((left, right) => left - right);
+  }, [filteredWorks, works]);
   const visibleTypes = useMemo(() => workTypes.filter((type) => type.filterVisible && type.status !== "Archived"), [workTypes]);
   const visibleTypedTypes = useMemo(() => visibleTypes.map((type) => ({ type, count: works.filter((work) => matchesType(work, type.slug)).length })).filter((entry) => entry.count > 0), [visibleTypes, works]);
 
@@ -58,7 +61,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
     const desktopColumnCount = 3;
     const row = Math.floor(index / desktopColumnCount);
     const column = index % desktopColumnCount;
-    const delay = 180 + (row + column) * 90 + row * 35;
+    const delay = 120 + (row + column) * 64 + row * 18;
 
     return { "--works-card-entry-delay": `${delay}ms` } as CSSProperties;
   }
@@ -87,7 +90,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
           <h1 className="pw-works-title">
             {title}
             <br />
-            &copy; {years.length > 0 ? `${Math.min(...years)}-${Math.max(...years)}` : "2020-2026"}
+            &copy; {visibleYears.length > 0 ? `${visibleYears[0]}-${visibleYears[visibleYears.length - 1]}` : ""}
           </h1>
         </aside>
 

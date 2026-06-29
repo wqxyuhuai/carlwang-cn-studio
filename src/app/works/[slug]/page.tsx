@@ -30,15 +30,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-function IconImage({ alt = "", src, size }: { alt?: string; src: string; size: number }) {
-  return <Image alt={alt} height={size} src={src} width={size} />;
-}
-
-function imageMedia(media: MediaItem | undefined, fallback: MediaItem) {
-  if (!media || media.type === "video") return fallback;
-  return media;
-}
-
 function DetailImage({ media, className = "", priority = false }: { media: MediaItem; className?: string; priority?: boolean }) {
   return (
     <figure className={`pw-detail-image ${className}`}>
@@ -53,9 +44,9 @@ function PagerItem({ direction, work }: { direction: "previous" | "next"; work: 
   return (
     <Link className={`pw-detail-pager-item ${isNext ? "is-next" : ""}`} href={`/works/${work.slug}`}>
       <span className="pw-detail-pager-label">
-        {!isNext ? <IconImage src="/figma/pw2-icon-arrow-left.svg" size={18} /> : null}
+        {!isNext ? <span className="pw-detail-arrow is-left" aria-hidden="true" /> : null}
         <span>{isNext ? "Next" : "Previous"}</span>
-        {isNext ? <IconImage src="/figma/pw2-icon-arrow-right.svg" size={18} /> : null}
+        {isNext ? <span className="pw-detail-arrow is-right" aria-hidden="true" /> : null}
       </span>
       <span className="pw-detail-pager-card">
         <span className="pw-detail-pager-thumb">
@@ -90,10 +81,8 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
 
   const { work, previous, next, content } = result;
   const gallery = (work.gallery.length > 0 ? work.gallery : [work.cover]).filter((item) => item.type === "image");
-  const firstImage = imageMedia(gallery[0], work.cover);
-  const secondImage = imageMedia(gallery[1], firstImage);
-  const thirdImage = imageMedia(gallery[2], firstImage);
-  const remaining = gallery.slice(3);
+  const fallbackGallery = Array.from(new Map([work.cover, ...gallery].filter((item) => item.type === "image").map((item) => [item.src, item])).values());
+  const hasBodyContent = work.content.length > 0;
   const visibleTools = work.tools
     .map((tool) => ({ icon: toolIconFor(tool, content.tools), name: tool }))
     .filter((tool) => tool.icon);
@@ -103,7 +92,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
       <aside className="pw-detail-left" aria-label="Work summary">
         <div className="pw-detail-summary">
           <Link className="pw-detail-back" href="/works">
-            <IconImage src="/figma/pw2-icon-arrow-left.svg" size={18} />
+            <span className="pw-detail-arrow is-left" aria-hidden="true" />
             <span>Back</span>
           </Link>
 
@@ -122,7 +111,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
               <ul className="pw-detail-tool-list">
                 {visibleTools.map((tool) => (
                   <li className="pw-detail-tool" key={tool.name} title={tool.name}>
-                    <IconImage alt={tool.name} src={tool.icon} size={24} />
+                    <Image alt={tool.name} height={24} src={tool.icon} width={24} />
                   </li>
                 ))}
               </ul>
@@ -138,25 +127,21 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
 
       <section className="pw-detail-right" aria-label="Work body">
         <div className="pw-detail-body">
-          <DetailImage className="is-wide" media={firstImage} priority />
-          <div className="pw-detail-image-pair">
-            <DetailImage media={secondImage} />
-            <DetailImage media={thirdImage} />
-          </div>
-          <div className="pw-detail-copy">
-            {work.intro ? <p>{work.intro}</p> : null}
-            {work.overview ? <p>{work.overview}</p> : null}
-            {work.role ? <p>Role: {work.role}</p> : null}
-            {work.tags && work.tags.length > 0 ? <p>Tags: {work.tags.slice(0, 3).join(", ")}</p> : null}
-          </div>
-          {work.content.length > 0 ? <NotionRenderer blocks={work.content} /> : null}
-          {remaining.length > 0 ? (
-            <div className="pw-detail-image-pair">
-              {remaining.slice(0, 2).map((item) => (
-                <DetailImage key={item.src} media={item} />
+          {hasBodyContent ? (
+            <NotionRenderer blocks={work.content} />
+          ) : (
+            <div className="pw-detail-fallback-flow" aria-label="Fallback work body">
+              {fallbackGallery.map((item, index) => (
+                <DetailImage className="is-flow" key={item.src} media={item} priority={index === 0} />
               ))}
+              <div className="pw-detail-copy">
+                {work.intro ? <p>{work.intro}</p> : null}
+                {work.overview ? <p>{work.overview}</p> : null}
+                {work.role ? <p>Role: {work.role}</p> : null}
+                {work.tags && work.tags.length > 0 ? <p>Tags: {work.tags.slice(0, 3).join(", ")}</p> : null}
+              </div>
             </div>
-          ) : null}
+          )}
         </div>
       </section>
     </main>
