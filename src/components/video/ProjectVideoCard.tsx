@@ -2,14 +2,17 @@
 
 import type { MouseEvent, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
+import { RevealMedia } from "@/components/common/RevealMedia";
 import { VideoFullscreenPlayer } from "./VideoFullscreenPlayer";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
 
 export function ProjectVideoCard({
   className = "",
+  revealIndex = 0,
   video
 }: {
   className?: string;
+  revealIndex?: number;
   video: ProjectVideo;
 }) {
   const bubbleRef = useRef<HTMLSpanElement | null>(null);
@@ -54,32 +57,34 @@ export function ProjectVideoCard({
 
   return (
     <>
-      <button
-        aria-label={`Play ${video.title || "project video"}`}
-        className={["project-video-card", className, isHovering ? "is-hovering" : ""].filter(Boolean).join(" ")}
-        onClick={() => setIsOpen(true)}
-        onPointerEnter={(event) => {
-          setIsHovering(true);
-          handlePointerMove(event);
-        }}
-        onPointerLeave={() => setIsHovering(false)}
-        onPointerMove={handlePointerMove}
-        onMouseEnter={(event) => {
-          setIsHovering(true);
-          handleMouseMove(event);
-        }}
-        onMouseLeave={() => setIsHovering(false)}
-        onMouseMove={handleMouseMove}
-        type="button"
-      >
-        <span className="project-video-card-media">
-          <video aria-hidden="true" muted playsInline poster={video.poster} preload="metadata" src={video.src} />
-        </span>
-        <span className="project-video-mobile-play">
-          <span aria-hidden="true" className="video-cursor-glass-effect" />
-          <span className="video-cursor-bubble-text">Play</span>
-        </span>
-      </button>
+      <RevealMedia className="project-video-reveal" index={revealIndex}>
+        <button
+          aria-label={`Play ${video.title || "project video"}`}
+          className={["project-video-card", className, isHovering ? "is-hovering" : ""].filter(Boolean).join(" ")}
+          onClick={() => setIsOpen(true)}
+          onPointerEnter={(event) => {
+            setIsHovering(true);
+            handlePointerMove(event);
+          }}
+          onPointerLeave={() => setIsHovering(false)}
+          onPointerMove={handlePointerMove}
+          onMouseEnter={(event) => {
+            setIsHovering(true);
+            handleMouseMove(event);
+          }}
+          onMouseLeave={() => setIsHovering(false)}
+          onMouseMove={handleMouseMove}
+          type="button"
+        >
+          <span className="project-video-card-media">
+            <video aria-hidden="true" muted playsInline poster={video.poster} preload="metadata" src={video.src} />
+          </span>
+          <span className="project-video-mobile-play">
+            <span aria-hidden="true" className="video-cursor-glass-effect" />
+            <span className="video-cursor-bubble-text">Play</span>
+          </span>
+        </button>
+      </RevealMedia>
       <span className={["video-cursor-bubble is-play", isHovering ? "is-visible" : ""].filter(Boolean).join(" ")} ref={bubbleRef}>
         <span aria-hidden="true" className="video-cursor-glass-effect" />
         <span className="video-cursor-bubble-text">Play</span>

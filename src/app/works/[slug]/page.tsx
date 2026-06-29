@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { RevealMedia } from "@/components/common/RevealMedia";
 import { NotionRenderer } from "@/components/notion/notion-renderer";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/public-content";
@@ -30,15 +31,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-function DetailImage({ media, className = "", priority = false }: { media: MediaItem; className?: string; priority?: boolean }) {
+function DetailImage({ media, className = "", priority = false, revealIndex = 0 }: { media: MediaItem; className?: string; priority?: boolean; revealIndex?: number }) {
   return (
-    <figure className={`pw-detail-image ${className}`}>
+    <RevealMedia className={`pw-detail-image ${className}`} element="figure" index={revealIndex}>
       <Image alt={media.alt} height={868} priority={priority} src={media.src} width={868} />
-    </figure>
+    </RevealMedia>
   );
 }
 
-function PagerItem({ direction, work }: { direction: "previous" | "next"; work: Work }) {
+function PagerItem({ direction, revealIndex, work }: { direction: "previous" | "next"; revealIndex: number; work: Work }) {
   const isNext = direction === "next";
 
   return (
@@ -49,9 +50,9 @@ function PagerItem({ direction, work }: { direction: "previous" | "next"; work: 
         {isNext ? <span className="pw-detail-arrow is-right" aria-hidden="true" /> : null}
       </span>
       <span className="pw-detail-pager-card">
-        <span className="pw-detail-pager-thumb">
+        <RevealMedia className="pw-detail-pager-thumb" element="span" index={revealIndex}>
           <Image alt={work.cover.alt || work.title} height={100} src={work.cover.src} width={100} />
-        </span>
+        </RevealMedia>
       </span>
     </Link>
   );
@@ -96,7 +97,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
             <span>Back</span>
           </Link>
 
-          <DetailImage className="is-cover" media={work.cover} priority />
+          <DetailImage className="is-cover" media={work.cover} priority revealIndex={0} />
 
           <WorkDetailHeading
             publishedLabel={workPublishedLabel(work)}
@@ -120,8 +121,8 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
         </div>
 
         <nav className="pw-detail-pager" aria-label="Adjacent works">
-          {previous ? <PagerItem direction="previous" work={previous} /> : null}
-          {next ? <PagerItem direction="next" work={next} /> : null}
+          {previous ? <PagerItem direction="previous" revealIndex={1} work={previous} /> : null}
+          {next ? <PagerItem direction="next" revealIndex={2} work={next} /> : null}
         </nav>
       </aside>
 
@@ -132,7 +133,7 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
           ) : (
             <div className="pw-detail-fallback-flow" aria-label="Fallback work body">
               {fallbackGallery.map((item, index) => (
-                <DetailImage className="is-flow" key={item.src} media={item} priority={index === 0} />
+                <DetailImage className="is-flow" key={item.src} media={item} priority={index === 0} revealIndex={index} />
               ))}
               <div className="pw-detail-copy">
                 {work.intro ? <p>{work.intro}</p> : null}

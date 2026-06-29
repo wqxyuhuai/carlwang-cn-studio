@@ -24,6 +24,10 @@
   text-align: inherit;
 }
 
+.project-video-reveal {
+  inline-size: 100%;
+}
+
 .project-video-card-media {
   background: var(--figma-black);
   display: block;

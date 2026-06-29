@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { RevealMedia } from "@/components/common/RevealMedia";
 import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
 import type { NotionBlock, RichTextSpan } from "@/lib/types";
 
@@ -50,13 +51,13 @@ export function NotionRenderer({ blocks, className = "" }: { blocks: NotionBlock
   return (
     <div className={["notion-body", className].filter(Boolean).join(" ")}>
       {blocks.map((block, index) => (
-        <NotionBlockView block={block} key={`${block.type}-${index}`} />
+        <NotionBlockView block={block} index={index} key={`${block.type}-${index}`} />
       ))}
     </div>
   );
 }
 
-function NotionBlockView({ block }: { block: NotionBlock }) {
+function NotionBlockView({ block, index }: { block: NotionBlock; index: number }) {
   switch (block.type) {
     case "paragraph":
       return (
@@ -114,9 +115,9 @@ function NotionBlockView({ block }: { block: NotionBlock }) {
     case "image":
       return (
         <figure className="notion-media">
-          <div className="notion-media-frame">
+          <RevealMedia className="notion-media-frame" index={index}>
             <Image alt={block.media.alt} height={block.media.height || 1000} src={block.media.src} width={block.media.width || 1600} />
-          </div>
+          </RevealMedia>
           {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
         </figure>
       );
@@ -135,6 +136,7 @@ function NotionBlockView({ block }: { block: NotionBlock }) {
               src: block.media.src,
               title: block.media.alt
             }}
+            revealIndex={index}
           />
           {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
         </figure>

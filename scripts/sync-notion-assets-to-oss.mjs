@@ -608,6 +608,135 @@ function shouldProcessPage(page, options = {}) {
   return shouldProcessPending(page);
 }
 
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function extensionFromUrl(url, fallback = "bin") {
+  try {
+    const parsed = new URL(url);
+    return extensionFromName(parsed.pathname) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function manualFileName(prefix, mediaType, blockOrIndex, url) {
+  const extension = extensionFromUrl(url, mediaType === "video" ? "mp4" : mediaType === "image" ? "jpg" : "bin");
+  return `${slugify(prefix, "media")}-${blockOrIndex}.${extension}`;
+}
+
+function isExpectedOssUrl(url, objectBasePath, options = {}) {
+  if (!isOssUrl(url)) return false;
+  return !options.rehomeOss || objectKeyFromOssUrl(url).startsWith(`${objectBasePath}/`);
+}
+
+async function collectMissingBlockMedia(notion, pageId, tableConfig, itemFolder, title, rows, options = {}) {
+  const stack = await listChildren(notion, pageId);
+  let mediaIndex = 0;
+  while (stack.length) {
+    const block = stack.shift();
+    const media = mediaPayload(block);
+    if (media && ["image", "video", "file", "pdf"].includes(media.blockType)) {
+      mediaIndex += 1;
+      const objectBasePath = ossPath(tableConfig.tableFolder, itemFolder, "notion-page-body");
+      if (!isExpectedOssUrl(media.url, objectBasePath, options)) {
+        rows.push({
+          table: tableConfig.label,
+          title,
+          itemFolder,
+          source: "notion-page-body",
+          index: mediaIndex,
+          type: media.blockType,
+          blockId: block.id,
+          targetFolder: objectBasePath,
+          suggestedFileName: manualFileName(`${media.blockType}-${mediaIndex}`, media.blockType, block.id, media.url),
+          url: media.url
+        });
+      }
+    }
+    if (block.has_children) {
+      stack.push(...await listChildren(notion, block.id));
+    }
+  }
+}
+
+async function auditTable(tableKey, options = {}) {
+  const tableConfig = tables[tableKey];
+  if (!tableConfig) throw new Error(`Unknown table: ${tableKey}`);
+
+  const dataSourceId = process.env[tableConfig.dataSourceEnv];
+  if (!dataSourceId) throw new Error(`${tableConfig.dataSourceEnv} is missing`);
+
+  const notion = new Client({ auth: process.env.NOTION_TOKEN });
+  const allPages = await listAllPages(notion, dataSourceId);
+  const titleContains = String(options.titleContains || "").toLowerCase();
+  const pages = allPages
+    .filter((page) => syncStatusValue(page) !== EDITING_STATUS)
+    .filter((page) => {
+      if (!titleContains) return true;
+      return titleFromProperty(page.properties?.[tableConfig.titleProperty]).toLowerCase().includes(titleContains);
+    })
+    .slice(0, options.limit || undefined);
+
+  const rows = [];
+  let index = 0;
+  for (const page of pages) {
+    index += 1;
+    const title = titleFromProperty(page.properties?.[tableConfig.titleProperty]) || `row-${index}`;
+    const slug = tableConfig.slugProperty ? richTextFromProperty(page.properties?.[tableConfig.slugProperty]) : "";
+    const itemFolder = tableKey === "projects" ? slugify(slug || title || page.id, "project") : slugify(title || page.id, "item");
+    console.log(`[audit] ${tableConfig.label} ${index}/${pages.length} ${title}`);
+
+    for (const propertyName of tableConfig.fileProperties) {
+      const files = fileArrayFromProperty(page.properties?.[propertyName]);
+      let fileIndex = 0;
+      for (const file of files) {
+        fileIndex += 1;
+        const fileType = file.type;
+        const sourceUrl = file?.[fileType]?.url || "";
+        if (!sourceUrl) continue;
+        const objectBasePath = ossPath(tableConfig.tableFolder, itemFolder, slugify(propertyName, "files"));
+        if (!isExpectedOssUrl(sourceUrl, objectBasePath, options)) {
+          rows.push({
+            table: tableConfig.label,
+            title,
+            itemFolder,
+            source: propertyName,
+            index: fileIndex,
+            type: fileType || "file",
+            blockId: "",
+            targetFolder: objectBasePath,
+            suggestedFileName: manualFileName(`${slugify(propertyName, "file")}-${fileIndex}`, fileType || "file", fileIndex, sourceUrl),
+            url: sourceUrl
+          });
+        }
+      }
+    }
+
+    if (tableConfig.includeBodyMedia && !options.skipBody) {
+      await collectMissingBlockMedia(notion, page.id, tableConfig, itemFolder, title, rows, options);
+    }
+  }
+
+  return rows;
+}
+
+function writeMissingReport(rows) {
+  fs.mkdirSync(path.resolve("logs"), { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-");
+  const csvPath = path.resolve("logs", `missing-assets-${timestamp}.csv`);
+  const jsonPath = path.resolve("logs", `missing-assets-${timestamp}.json`);
+  const headers = ["table", "title", "itemFolder", "source", "index", "type", "blockId", "targetFolder", "suggestedFileName", "url"];
+  const csv = [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => headers.map((header) => csvCell(row[header])).join(","))
+  ].join("\n");
+  fs.writeFileSync(csvPath, `${csv}\n`, "utf8");
+  fs.writeFileSync(jsonPath, `${JSON.stringify(rows, null, 2)}\n`, "utf8");
+  return { csvPath, jsonPath };
+}
+
 async function runTable(tableKey, options = {}) {
   const tableConfig = tables[tableKey];
   if (!tableConfig) throw new Error(`Unknown table: ${tableKey}`);
@@ -710,8 +839,25 @@ async function main() {
   const includeSynced = process.argv.includes("--include-synced");
   const rehomeOss = process.argv.includes("--rehome-oss");
   const deleteOldOss = process.argv.includes("--delete-old-oss");
+  const auditMissing = process.argv.includes("--audit-missing");
   const titleContains = process.argv.find((arg) => arg.startsWith("--title-contains="))?.split("=").slice(1).join("=") || "";
   const selected = tableArg === "all" ? Object.keys(tables) : [tableArg];
+
+  if (auditMissing) {
+    console.log(`audit missing start tables=${selected.join(", ")}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${rehomeOss ? " rehomeOss=true" : ""}${titleContains ? ` titleContains=${titleContains}` : ""}`);
+    const rows = [];
+    for (const tableKey of selected) {
+      rows.push(...await auditTable(tableKey, { limit, skipBody, rehomeOss, titleContains }));
+    }
+    for (const row of rows) {
+      console.log(`[missing] ${row.table} | ${row.title} | ${row.source} #${row.index} ${row.type} -> ${row.targetFolder}/${row.suggestedFileName}`);
+    }
+    const report = writeMissingReport(rows);
+    console.log(`audit missing complete count=${rows.length}`);
+    console.log(`csv=${report.csvPath}`);
+    console.log(`json=${report.jsonPath}`);
+    return;
+  }
 
   console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${rehomeOss ? " rehomeOss=true" : ""}${deleteOldOss ? " deleteOldOss=true" : ""}${titleContains ? ` titleContains=${titleContains}` : ""}`);
 
