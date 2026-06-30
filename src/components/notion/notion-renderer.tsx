@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { RevealMedia } from "@/components/common/RevealMedia";
 import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
 import type { NotionBlock, RichTextSpan } from "@/lib/types";
@@ -149,8 +150,12 @@ function NotionBlockView({ block, index }: { block: NotionBlock; index: number }
         </a>
       );
     case "column_list":
+      const columnStyle = {
+        "--notion-column-count": String(Math.max(1, block.columns.length))
+      } as CSSProperties;
+
       return (
-        <div className="notion-columns">
+        <div className="notion-columns" style={columnStyle}>
           {block.columns.map((column, index) => (
             <NotionRenderer blocks={column} key={index} />
           ))}
