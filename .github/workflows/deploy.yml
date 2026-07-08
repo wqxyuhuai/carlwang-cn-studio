@@ -32,14 +32,6 @@ jobs:
             exit 1
           fi
 
-          token_length=${#CLOUDFLARE_API_TOKEN}
-          echo "CLOUDFLARE_API_TOKEN length: $token_length"
-
-          if [ "$token_length" -lt 30 ]; then
-            echo "::error::CLOUDFLARE_API_TOKEN looks too short. If your secret is a token name (not the full token string), Cloudflare will reject it."
-            exit 1
-          fi
-
           echo "Cloudflare token is present. Wrangler will use account_id from wrangler.jsonc."
       - name: Deploy to Cloudflare Workers via OpenNext
         run: npm run deploy
