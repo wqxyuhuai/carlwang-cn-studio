@@ -401,7 +401,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
         camera={{ position: [0, 0, INFINITE_INITIAL_CAMERA_Z], fov: 46, near: 1, far: 230 }}
         dpr={[1, 1.5]}
         flat
-        gl={{ antialias: false, powerPreference: "high-performance" }}
+        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true }}
       >
         <color attach="background" args={["#10130f"]} />
         <fog attach="fog" args={["#10130f", 76, 178]} />

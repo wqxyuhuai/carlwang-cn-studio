@@ -7,6 +7,19 @@ import { GradualBlur } from "@/components/home/gradual-blur";
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
 
+function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
+  if (typeof window === "undefined") return { mainTab: "works", workTab: "featured" };
+
+  switch (window.location.hash) {
+    case "#about":
+      return { mainTab: "about", workTab: "featured" };
+    case "#works-list":
+      return { mainTab: "works", workTab: "list" };
+    default:
+      return { mainTab: "works", workTab: "featured" };
+  }
+}
+
 function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
   const reactId = useId();
   const stableId = useMemo(() => reactId.replace(/[^a-zA-Z0-9_-]/g, ""), [reactId]);
@@ -120,12 +133,20 @@ export function StudioTabbedShell({
   featured: ReactNode;
   list: ReactNode;
 }) {
-  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>({ mainTab: "works", workTab: "featured" });
+  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>(() => tabsFromHash());
   const { mainTab, workTab } = tabs;
-  const workTabsRef = useRef<HTMLDivElement>(null);
   const bottomNavRef = useRef<HTMLElement>(null);
-  const workTabsGlass = useBottomNavGlassSurface(workTabsRef);
   const bottomNavGlass = useBottomNavGlassSurface(bottomNavRef);
+
+  useEffect(() => {
+    function syncTabsFromHash() {
+      setTabs(tabsFromHash());
+    }
+
+    syncTabsFromHash();
+    window.addEventListener("hashchange", syncTabsFromHash);
+    return () => window.removeEventListener("hashchange", syncTabsFromHash);
+  }, []);
 
   function selectMainTab(nextTab: MainTab) {
     setTabs((current) => ({ mainTab: nextTab, workTab: current.workTab }));
@@ -140,88 +161,16 @@ export function StudioTabbedShell({
   return (
     <main className="cw-studio-shell">
       {mainTab === "works" ? (
+        <div className="cw-work-top-mask" aria-hidden="true" />
+      ) : null}
+
+      {mainTab === "works" ? (
         <div
-          className={`cw-work-tabs ${workTabsGlass.supportsSvgFilter ? "cw-work-tabs--svg" : "cw-work-tabs--fallback"}`}
+          className="cw-work-tabs cw-work-tabs--fallback"
           role="tablist"
           aria-label="Works view"
           data-work-tab={workTab}
-          ref={workTabsRef}
-          style={workTabsGlass.style}
         >
-          <svg
-            className="cw-glass-filter"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            style={{ blockSize: "100%", height: "100%", inset: 0, inlineSize: "100%", opacity: 0, pointerEvents: "none", position: "absolute", width: "100%", zIndex: -1 }}
-          >
-            <defs>
-              <filter id={workTabsGlass.filterId} colorInterpolationFilters="sRGB" x="0%" y="0%" width="100%" height="100%">
-                <feImage
-                  href={workTabsGlass.displacementMap || undefined}
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  preserveAspectRatio="none"
-                  result="map"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispRed"
-                  scale="-180"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispRed"
-                  type="matrix"
-                  values="1 0 0 0 0
-                          0 0 0 0 0
-                          0 0 0 0 0
-                          0 0 0 1 0"
-                  result="red"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispGreen"
-                  scale="-170"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispGreen"
-                  type="matrix"
-                  values="0 0 0 0 0
-                          0 1 0 0 0
-                          0 0 0 0 0
-                          0 0 0 1 0"
-                  result="green"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispBlue"
-                  scale="-160"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispBlue"
-                  type="matrix"
-                  values="0 0 0 0 0
-                          0 0 0 0 0
-                          0 0 1 0 0
-                          0 0 0 1 0"
-                  result="blue"
-                />
-                <feBlend in="red" in2="green" mode="screen" result="rg" />
-                <feBlend in="rg" in2="blue" mode="screen" result="output" />
-                <feGaussianBlur in="output" stdDeviation="0" />
-              </filter>
-            </defs>
-          </svg>
           <button
             aria-controls="cw-featured-panel"
             aria-selected={workTab === "featured"}
@@ -231,7 +180,12 @@ export function StudioTabbedShell({
             role="tab"
             type="button"
           >
-            Featured
+            <span className="cw-nav-text-mask">
+              <span className="cw-nav-text-track">
+                <span className="cw-nav-text-line">Featured</span>
+                <span className="cw-nav-text-line" aria-hidden="true">Featured</span>
+              </span>
+            </span>
           </button>
           <button
             aria-controls="cw-list-panel"
@@ -242,7 +196,12 @@ export function StudioTabbedShell({
             role="tab"
             type="button"
           >
-            List
+            <span className="cw-nav-text-mask">
+              <span className="cw-nav-text-track">
+                <span className="cw-nav-text-line">List</span>
+                <span className="cw-nav-text-line" aria-hidden="true">List</span>
+              </span>
+            </span>
           </button>
         </div>
       ) : null}
