@@ -38,8 +38,22 @@ function initialFilterFromLocation(): Filter {
   return { kind: "all", value: "All" };
 }
 
-export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workTypes: PublicWorkType[]; title: string }) {
-  const [mode, setMode] = useState<ViewMode>("grid");
+export function WorksBrowser({
+  basePath = "/works",
+  initialMode = "grid",
+  showViewToggle = true,
+  works,
+  workTypes,
+  title
+}: {
+  basePath?: string;
+  initialMode?: ViewMode;
+  showViewToggle?: boolean;
+  works: Work[];
+  workTypes: PublicWorkType[];
+  title: string;
+}) {
+  const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
   const visibleYears = useMemo(() => {
@@ -54,7 +68,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
     const params = new URLSearchParams();
     if (nextFilter.kind !== "all") params.set(nextFilter.kind, nextFilter.value);
     const query = params.toString();
-    window.history.replaceState(null, "", query ? `/works?${query}` : "/works");
+    window.history.replaceState(null, "", query ? `${basePath}?${query}` : basePath);
   }
 
   function gridCardEntryStyle(index: number) {
@@ -95,6 +109,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
         </aside>
 
         <div className="pw-works-right">
+          {showViewToggle ? (
             <div className="pw-view-toggle" aria-label="Works view">
             <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setMode("grid")} type="button">
               <Image alt="" height={20} src={gridIcon} width={20} />
@@ -105,6 +120,7 @@ export function WorksBrowser({ works, workTypes, title }: { works: Work[]; workT
               List
             </button>
           </div>
+          ) : null}
 
               {filteredWorks.length === 0 ? (
                 <p className="pw-works-empty">No published works match this filter.</p>

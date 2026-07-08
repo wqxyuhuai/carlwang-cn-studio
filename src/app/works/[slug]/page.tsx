@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { RevealMedia } from "@/components/common/RevealMedia";
 import { NotionRenderer } from "@/components/notion/notion-renderer";
+import { WorkDetailClose } from "@/components/works/work-detail-close";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/public-content";
 import { workPublishedLabel } from "@/lib/work-metrics";
@@ -90,13 +91,9 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <main className="pw-detail-page">
+      <WorkDetailClose />
       <aside className="pw-detail-left" aria-label="Work summary">
         <div className="pw-detail-summary">
-          <Link className="pw-detail-back" href="/works">
-            <span className="pw-detail-arrow is-left" aria-hidden="true" />
-            <span>Back</span>
-          </Link>
-
           <DetailImage className="is-cover" media={work.cover} priority revealIndex={0} />
 
           <WorkDetailHeading

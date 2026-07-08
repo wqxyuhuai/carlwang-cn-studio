@@ -8,13 +8,8 @@ import { SiteNav } from "@/components/site-nav";
 
 const themeInitScript = `(() => {
   try {
-    const storedTheme = window.localStorage.getItem("theme");
-    const theme = storedTheme === "dark" || storedTheme === "light"
-      ? storedTheme
-      : window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light";
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.dataset.theme = "dark";
+    window.localStorage.setItem("theme", "dark");
   } catch {
   }
 })();`;
@@ -46,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html data-scroll-behavior="smooth" lang="en" suppressHydrationWarning>
+    <html data-scroll-behavior="smooth" data-theme="dark" lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

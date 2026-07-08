@@ -14,31 +14,15 @@ const navItems = [
 export function SiteNav() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [isScrolled, setIsScrolled] = useState(false);
   const [navOnDark, setNavOnDark] = useState(isHome);
-  const [themeRotation, setThemeRotation] = useState(0);
   const headerRef = useRef<HTMLElement | null>(null);
   const isScrolledRef = useRef(false);
 
   useEffect(() => {
-    const applyTheme = (selectedTheme: "light" | "dark", persist = true) => {
-      setTheme(selectedTheme);
-      document.documentElement.dataset.theme = selectedTheme;
-      if (persist) {
-        window.localStorage.setItem("theme", selectedTheme);
-      }
-    };
-    const storedTheme = window.localStorage.getItem("theme");
-    const initialTheme =
-      storedTheme === "dark" || storedTheme === "light"
-        ? storedTheme
-        : isHome || window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-
-    applyTheme(initialTheme, false);
-  }, [isHome]);
+    document.documentElement.dataset.theme = "dark";
+    window.localStorage.setItem("theme", "dark");
+  }, []);
 
   useEffect(() => {
     const scrollContainers = Array.from(document.querySelectorAll<HTMLElement>(".pw-works-right, .pw-detail-right"));
@@ -148,7 +132,7 @@ export function SiteNav() {
         }
       }
       if (!samples.length) {
-        setNavOnDark(theme === "dark");
+        setNavOnDark(true);
         return;
       }
       const darkVotes = samples.filter((value) => value < 0.5).length;
@@ -168,16 +152,7 @@ export function SiteNav() {
       window.removeEventListener("scroll", scheduleTone);
       window.removeEventListener("resize", scheduleTone);
     };
-  }, [pathname, theme]);
-
-  const activeTheme = theme;
-  const nextTheme = activeTheme === "dark" ? "light" : "dark";
-  const switchTheme = () => {
-    setTheme(nextTheme);
-    setThemeRotation((current) => current + 180);
-    document.documentElement.dataset.theme = nextTheme;
-    window.localStorage.setItem("theme", nextTheme);
-  };
+  }, [pathname]);
 
   return (
     <header
@@ -196,26 +171,17 @@ export function SiteNav() {
 
               return (
                 <Link aria-current={active ? "page" : undefined} className={`cw-nav-link ${active ? "is-active" : ""}`} href={item.href} key={item.href}>
-                  {item.label}
+                  <span className="cw-nav-text-mask">
+                    <span className="cw-nav-text-track">
+                      <span className="cw-nav-text-line">{item.label}</span>
+                      <span className="cw-nav-text-line" aria-hidden="true">{item.label}</span>
+                    </span>
+                  </span>
                 </Link>
               );
             })}
           </div>
-          <div className="cw-nav-tools">
-            <button
-              aria-label={`Switch to ${nextTheme} mode`}
-              className="cw-theme-toggle"
-              data-theme-mode={activeTheme}
-              onClick={switchTheme}
-              type="button"
-            >
-              <span
-                className="cw-theme-mode-icon"
-                aria-hidden="true"
-                style={{ transform: `rotate(${themeRotation}deg)` }}
-              />
-            </button>
-          </div>
+          <div className="cw-nav-tools" aria-hidden="true" />
         </div>
       </nav>
     </header>

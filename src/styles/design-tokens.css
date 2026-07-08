@@ -37,7 +37,8 @@
   --figma-black-40: rgb(0 0 0 / 40%);
   --figma-black-20: rgb(0 0 0 / 20%);
   --figma-black-10: rgb(0 0 0 / 10%);
-  --figma-bg: #f2f3f0;
+  --figma-bg: #10130f;
+  --color-page-bg: var(--figma-bg);
   --figma-green: #b7d075;
   --figma-hero-green-deep: rgb(39 76 38);
   --figma-hero-green-mid: rgb(171 197 64);
@@ -49,7 +50,7 @@
   --color-black-40: var(--figma-black-40);
   --color-black-20: var(--figma-black-20);
   --color-black-10: var(--figma-black-10);
-  --color-bg: var(--figma-bg);
+  --color-bg: var(--color-page-bg);
   --color-green: var(--figma-green);
   --color-line: var(--color-black-40);
   --color-error: #ff5a5a;
@@ -178,13 +179,14 @@
 }
 
 html[data-theme="dark"] {
+  --color-page-bg: #10130f;
   --color-white: #2a2d28;
   --color-black: #f4f5ef;
   --color-black-60: rgb(244 245 239 / 54%);
   --color-black-40: rgb(244 245 239 / 36%);
   --color-black-20: rgb(244 245 239 / 22%);
   --color-black-10: rgb(244 245 239 / 14%);
-  --color-bg: #20231f;
+  --color-bg: var(--color-page-bg);
   --color-line: rgb(244 245 239 / 26%);
   --color-error: #ff5a5a;
   --gradient-home-hero: linear-gradient(
