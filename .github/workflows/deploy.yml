@@ -25,9 +25,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID_INPUT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
+          CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN//$'\r'/}"
+          CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN//$'\n'/}"
 
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "Missing CLOUDFLARE_API_TOKEN in GitHub repo settings."
+            exit 1
+          fi
+
+          token_length=${#CLOUDFLARE_API_TOKEN}
+          token_prefix="${CLOUDFLARE_API_TOKEN:0:8}"
+          echo "CLOUDFLARE_API_TOKEN length: $token_length"
+          echo "CLOUDFLARE_API_TOKEN prefix: ${token_prefix}********"
+
+          if [ "$token_length" -lt 30 ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN looks too short. If your secret is a token name (not the full token string), Cloudflare will reject it."
             exit 1
           fi
 
@@ -43,26 +55,25 @@ jobs:
           fi
 
           echo "No CLOUDFLARE_ACCOUNT_ID secret found. Resolving account id from token..."
-          if ! curl -fsS \
+          account_response_file="$(mktemp)"
+          account_code="$(curl -sS -o "$account_response_file" -w "%{http_code}" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/user/tokens/verify" > /tmp/token_verify.json; then
-            echo "Token verification failed. The secret CLOUDFLARE_API_TOKEN may be wrong/expired or not an API token."
-            echo "If this token is a token name (not the full token string), it will always fail."
+            "https://api.cloudflare.com/client/v4/accounts")"
+
+          if [ "$account_code" != "200" ]; then
+            echo "Cloudflare /accounts returned status: $account_code"
+            echo "Response body:"
+            cat "$account_response_file"
+            echo "If this is only a token name (not the token value), it will always fail here."
+            rm -f "$account_response_file"
             exit 1
           fi
 
-          if ! account_payload=$(curl -fsS \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.cloudflare.com/client/v4/accounts"); then
-            echo "Could not query /client/v4/accounts with the provided token."
-            echo "Required permission: Account > Read, and Workers Scripts > Edit for the target account."
-            cat /tmp/token_verify.json
-            exit 1
-          fi
+          account_payload="$(cat "$account_response_file")"
+          rm -f "$account_response_file"
 
-          account_id=$(printf '%s' "$account_payload" | node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); if (!data.success || !Array.isArray(data.result) || data.result.length===0) {process.exit(1)} console.log(data.result[0].id);")
+          account_id=$(printf '%s' "$account_payload" | node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(0,'utf8')); if (!data.success || !Array.isArray(data.result) || data.result.length===0) { if (!data.success) {console.error('Cloudflare API errors: '+JSON.stringify(data.errors||[]));} process.exit(1);} console.log(data.result[0].id);")
           if [ -z "$account_id" ]; then
             echo "Could not resolve account id from token. Check token permissions and account access."
             exit 1
