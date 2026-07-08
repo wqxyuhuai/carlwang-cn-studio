@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
@@ -42,11 +42,17 @@ const fallbackImages: CanvasImage[] = [
 const INFINITE_CHUNK_SIZE = 68;
 const INFINITE_RENDER_DISTANCE = 1;
 const INFINITE_FADE_MARGIN = 1;
+const INFINITE_ENTRY_CAMERA_Z = 132;
 const INFINITE_INITIAL_CAMERA_Z = 52;
 const INFINITE_MAX_VELOCITY = 1.9;
 const INFINITE_VELOCITY_LERP = 0.16;
 const INFINITE_VELOCITY_DECAY = 0.9;
+const INFINITE_ENTRY_SECONDS = 4.2;
+const INFINITE_ENTRY_BOOST = 0.1;
+const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
+
+export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
 
 const INFINITE_CHUNK_OFFSETS = (() => {
   const maxDistance = INFINITE_RENDER_DISTANCE + INFINITE_FADE_MARGIN;
@@ -64,6 +70,16 @@ const INFINITE_CHUNK_OFFSETS = (() => {
 
   return offsets;
 })();
+
+function shouldPlayFeaturedEntry() {
+  if (typeof window === "undefined") return true;
+
+  const storageKey = "cw-featured-entry-played";
+  if (window.sessionStorage.getItem(storageKey) === "1") return false;
+
+  window.sessionStorage.setItem(storageKey, "1");
+  return true;
+}
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -201,30 +217,42 @@ function InfiniteCanvasPlane({
 }
 
 function InfiniteCanvasField({
+  autoFlightEnabled,
   compact,
   images,
+  isActive,
+  playEntry,
+  onReady,
   onOpen,
   scale,
   textures
 }: {
+  autoFlightEnabled: boolean;
   compact: boolean;
   images: CanvasImage[];
+  isActive: boolean;
+  playEntry: boolean;
+  onReady: () => void;
   onOpen: (href: string) => void;
   scale: number;
   textures: THREE.Texture[];
 }) {
   const { camera, gl } = useThree();
-  const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: INFINITE_INITIAL_CAMERA_Z });
+  const initialCameraZ = playEntry ? INFINITE_ENTRY_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z;
+  const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: initialCameraZ });
+  const readySentRef = useRef(false);
+  const introProgressRef = useRef(playEntry ? 0 : 1);
   const controllerRef = useRef({
     velocity: { x: 0, y: 0, z: 0 },
     targetVelocity: { x: 0, y: 0, z: 0 },
-    basePosition: { x: 0, y: 0, z: INFINITE_INITIAL_CAMERA_Z },
+    basePosition: { x: 0, y: 0, z: initialCameraZ },
     lastMouse: { x: 0, y: 0 },
     scrollAccum: 0,
     isDragging: false,
     keys: new Set<string>(),
     lastChunkKey: ""
   });
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [planes, setPlanes] = useState(() => buildInfinitePlanes(0, 0, 0, textures.length, compact));
 
   useEffect(() => {
@@ -282,7 +310,35 @@ function InfiniteCanvasField({
     };
   }, [gl]);
 
-  useFrame(() => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    if (!prefersReducedMotion) return;
+
+    const controller = controllerRef.current;
+    controller.basePosition.z = INFINITE_INITIAL_CAMERA_Z;
+    controller.targetVelocity.z = 0;
+    controller.velocity.z = 0;
+    introProgressRef.current = 1;
+    camera.position.set(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z);
+    camera.lookAt(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z - 80);
+  }, [camera, prefersReducedMotion]);
+
+  useFrame((_, delta) => {
+    if (!readySentRef.current) {
+      readySentRef.current = true;
+      window.requestAnimationFrame(onReady);
+    }
+
     const controller = controllerRef.current;
     const keys = controller.keys;
     const keyboardSpeed = 0.08;
@@ -293,6 +349,18 @@ function InfiniteCanvasField({
     if (keys.has("d") || keys.has("arrowright")) controller.targetVelocity.x += keyboardSpeed;
     if (keys.has("q")) controller.targetVelocity.y -= keyboardSpeed;
     if (keys.has("e")) controller.targetVelocity.y += keyboardSpeed;
+
+    if (!prefersReducedMotion) {
+      const frameScale = Math.min(delta, 0.05) * 60;
+
+      if (isActive && introProgressRef.current < 1) {
+        introProgressRef.current = Math.min(1, introProgressRef.current + delta / INFINITE_ENTRY_SECONDS);
+        const easedProgress = THREE.MathUtils.smoothstep(introProgressRef.current, 0, 1);
+        controller.targetVelocity.z -= THREE.MathUtils.lerp(INFINITE_ENTRY_BOOST, INFINITE_AUTO_FLIGHT_BOOST, easedProgress) * frameScale;
+      } else if (isActive && autoFlightEnabled && !controller.isDragging) {
+        controller.targetVelocity.z -= INFINITE_AUTO_FLIGHT_BOOST * frameScale;
+      }
+    }
 
     controller.targetVelocity.z += controller.scrollAccum;
     controller.scrollAccum *= 0.78;
@@ -346,13 +414,21 @@ function InfiniteCanvasField({
 }
 
 function InfiniteCanvasWebGL({
+  autoFlightEnabled,
   compact,
   images,
+  isActive,
+  playEntry,
+  onReady,
   onOpen,
   scale
 }: {
+  autoFlightEnabled: boolean;
   compact: boolean;
   images: CanvasImage[];
+  isActive: boolean;
+  playEntry: boolean;
+  onReady: () => void;
   onOpen: (href: string) => void;
   scale: number;
 }) {
@@ -366,7 +442,19 @@ function InfiniteCanvasWebGL({
     texture.magFilter = THREE.LinearFilter;
   });
 
-  return <InfiniteCanvasField compact={compact} images={images} onOpen={onOpen} scale={scale} textures={textures} />;
+  return (
+    <InfiniteCanvasField
+      autoFlightEnabled={autoFlightEnabled}
+      compact={compact}
+      images={images}
+      isActive={isActive}
+      playEntry={playEntry}
+      onReady={onReady}
+      onOpen={onOpen}
+      scale={scale}
+      textures={textures}
+    />
+  );
 }
 
 function repeatImages(images: CanvasImage[], count: number) {
@@ -376,7 +464,12 @@ function repeatImages(images: CanvasImage[], count: number) {
 
 export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const router = useRouter();
+  const { autoFlightEnabled, featuredActive } = useContext(FeaturedCanvasMotionContext);
+  const [playEntry, setPlayEntry] = useState(() => (featuredActive ? shouldPlayFeaturedEntry() : false));
+  const entryResolvedRef = useRef(featuredActive);
+  const [isCanvasReady, setIsCanvasReady] = useState(false);
   const openWork = useCallback((href: string) => {
+    window.sessionStorage.setItem("cw-work-return-href", "/#works");
     router.push(href);
   }, [router]);
 
@@ -394,11 +487,24 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   );
   const canvasImages = repeatImages(images, 24);
 
+  useEffect(() => {
+    if (!featuredActive || entryResolvedRef.current) return;
+
+    entryResolvedRef.current = true;
+    setPlayEntry(shouldPlayFeaturedEntry());
+  }, [featuredActive]);
+
   return (
-    <section className="cw-featured-canvas notion-rb-infinite-canvas-stage" aria-label="Featured works">
+    <section className={`cw-featured-canvas notion-rb-infinite-canvas-stage ${isCanvasReady ? "is-canvas-ready" : ""}`} aria-label="Featured works">
+      <div className="cw-featured-canvas-loader" aria-hidden="true">
+        <span className="cw-featured-canvas-loader-track">
+          <span className="cw-featured-canvas-loader-bar" />
+        </span>
+      </div>
       <Canvas
+        key={playEntry ? "entry" : "direct"}
         className="notion-rb-infinite-canvas-webgl"
-        camera={{ position: [0, 0, INFINITE_INITIAL_CAMERA_Z], fov: 46, near: 1, far: 230 }}
+        camera={{ position: [0, 0, playEntry ? INFINITE_ENTRY_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z], fov: 46, near: 1, far: 230 }}
         dpr={[1, 1.5]}
         flat
         gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true }}
@@ -406,7 +512,16 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
         <color attach="background" args={["#10130f"]} />
         <fog attach="fog" args={["#10130f", 76, 178]} />
         <Suspense fallback={null}>
-          <InfiniteCanvasWebGL compact={false} images={canvasImages} onOpen={openWork} scale={1} />
+          <InfiniteCanvasWebGL
+            autoFlightEnabled={autoFlightEnabled}
+            compact={false}
+            images={canvasImages}
+            isActive={featuredActive}
+            playEntry={playEntry}
+            onReady={() => setIsCanvasReady(true)}
+            onOpen={openWork}
+            scale={1}
+          />
         </Suspense>
       </Canvas>
     </section>

@@ -5,16 +5,17 @@ import type { ProjectVideo } from "@/lib/video/videoTypes";
 
 function PauseIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M7.5 5.5h3.75v13H7.5zM12.75 5.5h3.75v13h-3.75z" />
+    <svg aria-hidden="true" className="video-icon-fill video-icon-pause" viewBox="0 0 24 24">
+      <rect x="7" y="5.5" width="3.75" height="13" rx="1.1" />
+      <rect x="13.25" y="5.5" width="3.75" height="13" rx="1.1" />
     </svg>
   );
 }
 
 function PlayIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="m8 5 11 7-11 7V5z" />
+    <svg aria-hidden="true" className="video-icon-fill video-icon-play" viewBox="0 0 24 24">
+      <path d="M8.25 6.35c0-.88.96-1.42 1.72-.96l9.28 5.65c.72.44.72 1.48 0 1.92l-9.28 5.65c-.76.46-1.72-.08-1.72-.96V6.35z" />
     </svg>
   );
 }
@@ -22,8 +23,8 @@ function PlayIcon() {
 function MutedIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M3.5 8.75v6.5H7l6 4.25v-15L7 8.75H3.5z" />
-      <path d="m17.2 8.7 1.8 2.45 1.8-2.45 1.7 1.25-2.42 3.05 2.42 3.05-1.7 1.25L19 14.85l-1.8 2.45-1.7-1.25 2.42-3.05-2.42-3.05z" />
+      <path d="M4 9.25v5.5h3.35l5.15 3.75v-13L7.35 9.25H4z" />
+      <path d="m17 9.2 4 5.6m0-5.6-4 5.6" />
     </svg>
   );
 }
@@ -31,9 +32,9 @@ function MutedIcon() {
 function SoundIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path d="M3.5 8.75v6.5H7l6 4.25v-15L7 8.75H3.5z" />
-      <path d="M15.9 8.15a6.2 6.2 0 0 1 0 9.7l-1.35-1.55a4.15 4.15 0 0 0 0-6.6z" />
-      <path d="M18.55 5.55a9.65 9.65 0 0 1 0 12.9L17.1 17a7.55 7.55 0 0 0 0-10z" />
+      <path d="M4 9.25v5.5h3.35l5.15 3.75v-13L7.35 9.25H4z" />
+      <path d="M16 8.7a5 5 0 0 1 0 6.6" />
+      <path d="M18.7 6.1a8.5 8.5 0 0 1 0 11.8" />
     </svg>
   );
 }

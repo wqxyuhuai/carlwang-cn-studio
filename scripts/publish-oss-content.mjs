@@ -69,6 +69,7 @@ function getOssConfig() {
     endpoint: envValue("ALIYUN_OSS_ENDPOINT"),
     bucket: envValue("ALIYUN_OSS_BUCKET"),
     publicBaseUrl: envValue("ALIYUN_OSS_PUBLIC_BASE_URL"),
+    uploadPrefix: envValue("ALIYUN_OSS_UPLOAD_PREFIX", "ALIYUN_OSS_DIR") || "uploads/admin",
     contentKey: envValue("ALIYUN_OSS_CONTENT_KEY") || DEFAULT_CONTENT_KEY
   };
 }
@@ -112,6 +113,11 @@ function createOssClient() {
 
 function contentUrlForKey(key = getOssConfig().contentKey) {
   return `${getOssConfig().publicBaseUrl.replace(/\/+$/g, "")}/${key.replace(/^\/+/g, "")}`;
+}
+
+function projectContentKey(slug) {
+  const prefix = getOssConfig().uploadPrefix.replace(/^\/+|\/+$/g, "");
+  return `${prefix}/notion-sync/studio-projects/${slugify(slug, "project")}/content.json`;
 }
 
 function slugify(value, fallback = "item") {
@@ -428,6 +434,8 @@ async function readCategories(notion, missingOss) {
 async function readProjects(notion, categoryById, missingOss, options = {}) {
   const pages = await listAllPages(notion, process.env.NOTION_WORKS_DATABASE_ID);
   const projects = [];
+  const existingById = new Map((options.existingWorks || []).map((work) => [work.id, work]));
+  const existingBySlug = new Map((options.existingWorks || []).map((work) => [work.slug, work]));
 
   for (const page of pages) {
     const properties = page.properties || {};
@@ -449,9 +457,29 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
       console.log(`[publish] skip project without synced OSS cover: ${title}`);
       continue;
     }
-    const content = options.skipBody
-      ? []
-      : await blocksToContent(notion, await listChildren(notion, page.id), missingOss, title);
+    const existingWork = existingById.get(page.id) || existingBySlug.get(slug) || {};
+    let contentUrl = existingWork.contentUrl || "";
+    let content = [];
+    if (!options.skipBody) {
+      const missingBefore = missingOss.length;
+      content = await blocksToContent(notion, await listChildren(notion, page.id), missingOss, title);
+      if (missingOss.length === missingBefore) {
+        const contentKey = projectContentKey(slug);
+        const body = {
+          id: page.id,
+          slug,
+          title,
+          source: "notion",
+          table: "Studio Projects",
+          notionPageId: page.id,
+          notionUrl: page.url,
+          updatedAt: new Date().toISOString(),
+          blocks: content
+        };
+        contentUrl = await uploadJsonObject(contentKey, body, "public, max-age=60");
+        console.log(`[publish] project content ${slug} -> ${contentUrl}`);
+      }
+    }
 
     projects.push({
       id: page.id,
@@ -474,7 +502,8 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
       role: "",
       tools: multiSelectNames(properties.Tools),
       gallery: coverUrl ? [mediaFromUrl(coverUrl, `${title} gallery image 1`)] : [],
-      content,
+      content: [],
+      contentUrl,
       notionPageId: page.id,
       notionUrl: page.url
     });
@@ -599,13 +628,16 @@ async function readExperiences(notion, missingOss) {
 }
 
 async function uploadContentJson(data) {
+  return uploadJsonObject(getOssConfig().contentKey, data, "public, max-age=60");
+}
+
+async function uploadJsonObject(key, data, cacheControl = "public, max-age=60") {
   const client = createOssClient();
-  const key = getOssConfig().contentKey;
   const body = Buffer.from(`${JSON.stringify(data, null, 2)}\n`, "utf8");
   await client.put(key, body, {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=60"
+      "Cache-Control": cacheControl
     }
   });
   return contentUrlForKey(key);
@@ -642,7 +674,7 @@ async function main() {
     if (tableKeys.includes("categories")) nextContent.workTypes = categoryResult.categories;
   }
   if (tableKeys.includes("projects")) {
-    const updatedWorks = await readProjects(notion, categoryById, missingOss, { skipBody, slug: projectSlug });
+    const updatedWorks = await readProjects(notion, categoryById, missingOss, { skipBody, slug: projectSlug, existingWorks: nextContent.works });
     if (projectSlug && updatedWorks.length === 0) throw new Error(`No project found for slug: ${projectSlug}`);
     nextContent.works = projectSlug ? mergeWorks(nextContent.works, updatedWorks) : updatedWorks;
   }

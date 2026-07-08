@@ -2,10 +2,13 @@
 
 import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
 
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
+const bottomBlurBlockSize = "clamp(5.5rem, 14vh, 9rem)";
+const lastWorksHrefKey = "cw-last-works-href";
 
 function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
   if (typeof window === "undefined") return { mainTab: "works", workTab: "featured" };
@@ -13,11 +16,37 @@ function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
   switch (window.location.hash) {
     case "#about":
       return { mainTab: "about", workTab: "featured" };
+    case "#works-index":
     case "#works-list":
       return { mainTab: "works", workTab: "list" };
     default:
       return { mainTab: "works", workTab: "featured" };
   }
+}
+
+function normalizedCurrentHref() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+function isWorksHref(href: string) {
+  return href.endsWith("#works") || href.includes("#works-index") || href.includes("#works-list");
+}
+
+function rememberWorksHref(href = normalizedCurrentHref()) {
+  if (!isWorksHref(href)) return;
+  window.sessionStorage.setItem(lastWorksHrefKey, href.replace("#works-list", "#works-index"));
+}
+
+function lastIndexHref() {
+  const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
+  if (remembered?.includes("#works-index")) return remembered.replace("#works-list", "#works-index");
+  return "/?view=grid#works-index";
+}
+
+function lastWorksHref() {
+  const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
+  if (remembered && isWorksHref(remembered)) return remembered.replace("#works-list", "#works-index");
+  return "/#works";
 }
 
 function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
@@ -134,13 +163,30 @@ export function StudioTabbedShell({
   list: ReactNode;
 }) {
   const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>(() => tabsFromHash());
+  const [isAutoFlightEnabled, setIsAutoFlightEnabled] = useState(true);
+  const [isLogoShaking, setIsLogoShaking] = useState(false);
   const { mainTab, workTab } = tabs;
+  const workTabsRef = useRef<HTMLDivElement>(null);
   const bottomNavRef = useRef<HTMLElement>(null);
+  const autoFlightButtonRef = useRef<HTMLButtonElement>(null);
+  const logoShakeTimerRef = useRef<number | null>(null);
+  const workTabsGlass = useBottomNavGlassSurface(workTabsRef);
   const bottomNavGlass = useBottomNavGlassSurface(bottomNavRef);
+  const autoFlightButtonGlass = useBottomNavGlassSurface(autoFlightButtonRef);
+  const featuredCanvasMotion = useMemo(
+    () => ({ autoFlightEnabled: isAutoFlightEnabled, featuredActive: mainTab === "works" && workTab === "featured" }),
+    [isAutoFlightEnabled, mainTab, workTab]
+  );
 
   useEffect(() => {
     function syncTabsFromHash() {
       setTabs(tabsFromHash());
+      if (window.location.hash === "#works-list") {
+        window.history.replaceState(null, "", "#works-index");
+      }
+      if (isWorksHref(normalizedCurrentHref())) {
+        rememberWorksHref();
+      }
     }
 
     syncTabsFromHash();
@@ -148,14 +194,49 @@ export function StudioTabbedShell({
     return () => window.removeEventListener("hashchange", syncTabsFromHash);
   }, []);
 
+  useEffect(
+    () => () => {
+      if (logoShakeTimerRef.current !== null) {
+        window.clearTimeout(logoShakeTimerRef.current);
+      }
+    },
+    []
+  );
+
   function selectMainTab(nextTab: MainTab) {
-    setTabs((current) => ({ mainTab: nextTab, workTab: current.workTab }));
-    window.history.replaceState(null, "", nextTab === "about" ? "#about" : "#works");
+    if (nextTab === "about") {
+      rememberWorksHref();
+      setTabs((current) => ({ mainTab: "about", workTab: current.workTab }));
+      window.history.replaceState(null, "", "#about");
+      return;
+    }
+
+    const targetHref = lastWorksHref();
+    const nextWorkTab = targetHref.includes("#works-index") ? "list" : "featured";
+    setTabs({ mainTab: "works", workTab: nextWorkTab });
+    window.history.replaceState(null, "", targetHref);
+    rememberWorksHref(targetHref);
+    window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
   }
 
   function selectWorkTab(nextTab: WorkTab) {
+    const targetHref = nextTab === "list" ? lastIndexHref() : "/#works";
     setTabs({ mainTab: "works", workTab: nextTab });
-    window.history.replaceState(null, "", nextTab === "list" ? "#works-list" : "#works");
+    window.history.replaceState(null, "", targetHref);
+    rememberWorksHref(targetHref);
+    window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
+  }
+
+  function triggerLogoShake() {
+    if (logoShakeTimerRef.current !== null) {
+      window.clearTimeout(logoShakeTimerRef.current);
+    }
+
+    setIsLogoShaking(false);
+    window.requestAnimationFrame(() => {
+      setIsLogoShaking(true);
+      logoShakeTimerRef.current = window.setTimeout(() => setIsLogoShaking(false), 520);
+    });
   }
 
   return (
@@ -166,11 +247,87 @@ export function StudioTabbedShell({
 
       {mainTab === "works" ? (
         <div
-          className="cw-work-tabs cw-work-tabs--fallback"
+          className={`cw-work-tabs ${workTabsGlass.supportsSvgFilter ? "cw-work-tabs--svg" : "cw-work-tabs--fallback"}`}
           role="tablist"
           aria-label="Works view"
           data-work-tab={workTab}
+          ref={workTabsRef}
+          style={workTabsGlass.style}
         >
+          <svg
+            className="cw-glass-filter"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            style={{ blockSize: "100%", height: "100%", inset: 0, inlineSize: "100%", opacity: 0, pointerEvents: "none", position: "absolute", width: "100%", zIndex: -1 }}
+          >
+            <defs>
+              <filter id={workTabsGlass.filterId} colorInterpolationFilters="sRGB" x="0%" y="0%" width="100%" height="100%">
+                <feImage
+                  href={workTabsGlass.displacementMap || undefined}
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  preserveAspectRatio="none"
+                  result="map"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispRed"
+                  scale="-180"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispRed"
+                  type="matrix"
+                  values="1 0 0 0 0
+                          0 0 0 0 0
+                          0 0 0 0 0
+                          0 0 0 1 0"
+                  result="red"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispGreen"
+                  scale="-170"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispGreen"
+                  type="matrix"
+                  values="0 0 0 0 0
+                          0 1 0 0 0
+                          0 0 0 0 0
+                          0 0 0 1 0"
+                  result="green"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispBlue"
+                  scale="-160"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispBlue"
+                  type="matrix"
+                  values="0 0 0 0 0
+                          0 0 0 0 0
+                          0 0 1 0 0
+                          0 0 0 1 0"
+                  result="blue"
+                />
+                <feBlend in="red" in2="green" mode="screen" result="rg" />
+                <feBlend in="rg" in2="blue" mode="screen" result="output" />
+                <feGaussianBlur in="output" stdDeviation="0" />
+              </filter>
+            </defs>
+          </svg>
           <button
             aria-controls="cw-featured-panel"
             aria-selected={workTab === "featured"}
@@ -198,8 +355,8 @@ export function StudioTabbedShell({
           >
             <span className="cw-nav-text-mask">
               <span className="cw-nav-text-track">
-                <span className="cw-nav-text-line">List</span>
-                <span className="cw-nav-text-line" aria-hidden="true">List</span>
+                <span className="cw-nav-text-line">Index</span>
+                <span className="cw-nav-text-line" aria-hidden="true">Index</span>
               </span>
             </span>
           </button>
@@ -217,7 +374,9 @@ export function StudioTabbedShell({
           id="cw-featured-panel"
           role="tabpanel"
         >
-          {featured}
+          <FeaturedCanvasMotionContext.Provider value={featuredCanvasMotion}>
+            {featured}
+          </FeaturedCanvasMotionContext.Provider>
         </div>
         <div
           aria-hidden={workTab !== "list"}
@@ -240,15 +399,15 @@ export function StudioTabbedShell({
         {about}
       </section>
 
-      <div className="cw-bottom-blur" aria-hidden="true">
+      <div className="cw-bottom-blur" aria-hidden="true" style={{ blockSize: bottomBlurBlockSize }}>
         <GradualBlur
           curve="ease-in"
           divCount={30}
           exponential={false}
-          heightRem={10}
+          heightRem={9}
           opacity={1}
           position="bottom"
-          strength={4.6}
+          strength={2}
           zIndex={1}
         />
       </div>
@@ -333,7 +492,12 @@ export function StudioTabbedShell({
             </filter>
           </defs>
         </svg>
-        <button className="cw-bottom-logo" aria-label="Carl Wang Studio home" onClick={() => selectMainTab("works")} type="button">
+        <button
+          className={`cw-bottom-logo ${isLogoShaking ? "is-shaking" : ""}`}
+          aria-label="Carl Wang Studio logo"
+          onClick={triggerLogoShake}
+          type="button"
+        >
           <span aria-hidden="true" />
         </button>
         <div className="cw-bottom-tab-group" role="tablist" aria-label="Primary views">
@@ -384,6 +548,108 @@ export function StudioTabbedShell({
           </span>
         </a>
       </nav>
+
+      {mainTab === "works" && workTab === "featured" ? (
+        <button
+          aria-label={isAutoFlightEnabled ? "Pause featured canvas auto flight" : "Play featured canvas auto flight"}
+          aria-pressed={isAutoFlightEnabled}
+          className={`cw-featured-autoflight-toggle ${
+            autoFlightButtonGlass.supportsSvgFilter ? "cw-featured-autoflight-toggle--svg" : "cw-featured-autoflight-toggle--fallback"
+          }`}
+          onClick={() => setIsAutoFlightEnabled((current) => !current)}
+          ref={autoFlightButtonRef}
+          style={autoFlightButtonGlass.style}
+          title={isAutoFlightEnabled ? "Pause auto flight" : "Play auto flight"}
+          type="button"
+        >
+          <svg
+            className="cw-glass-filter"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            style={{ blockSize: "100%", height: "100%", inset: 0, inlineSize: "100%", opacity: 0, pointerEvents: "none", position: "absolute", width: "100%", zIndex: -1 }}
+          >
+            <defs>
+              <filter id={autoFlightButtonGlass.filterId} colorInterpolationFilters="sRGB" x="0%" y="0%" width="100%" height="100%">
+                <feImage
+                  href={autoFlightButtonGlass.displacementMap || undefined}
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  preserveAspectRatio="none"
+                  result="map"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispRed"
+                  scale="-180"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispRed"
+                  type="matrix"
+                  values="1 0 0 0 0
+                          0 0 0 0 0
+                          0 0 0 0 0
+                          0 0 0 1 0"
+                  result="red"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispGreen"
+                  scale="-170"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispGreen"
+                  type="matrix"
+                  values="0 0 0 0 0
+                          0 1 0 0 0
+                          0 0 0 0 0
+                          0 0 0 1 0"
+                  result="green"
+                />
+                <feDisplacementMap
+                  in="SourceGraphic"
+                  in2="map"
+                  result="dispBlue"
+                  scale="-160"
+                  xChannelSelector="R"
+                  yChannelSelector="G"
+                />
+                <feColorMatrix
+                  in="dispBlue"
+                  type="matrix"
+                  values="0 0 0 0 0
+                          0 0 0 0 0
+                          0 0 1 0 0
+                          0 0 0 1 0"
+                  result="blue"
+                />
+                <feBlend in="red" in2="green" mode="screen" result="rg" />
+                <feBlend in="rg" in2="blue" mode="screen" result="output" />
+                <feGaussianBlur in="output" stdDeviation="0" />
+              </filter>
+            </defs>
+          </svg>
+          <span className="cw-featured-autoflight-glyph" aria-hidden="true">
+            {isAutoFlightEnabled ? (
+              <span className="cw-featured-autoflight-pause" />
+            ) : (
+              <svg className="cw-featured-autoflight-play" viewBox="0 0 16 16" focusable="false">
+                <path
+                  d="M3.9 2.42C3.9 1.48 4.92 0.89 5.72 1.37L13.24 5.88C14.02 6.35 14.02 7.48 13.24 7.95L5.72 12.46C4.92 12.94 3.9 12.35 3.9 11.41V2.42Z"
+                  fill="currentColor"
+                />
+              </svg>
+            )}
+          </span>
+        </button>
+      ) : null}
     </main>
   );
 }

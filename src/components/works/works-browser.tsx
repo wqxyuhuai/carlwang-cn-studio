@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
@@ -16,8 +16,9 @@ type Filter = {
   value: string;
 };
 
-const gridIcon = "/figma/pw2-icon-grid.svg?v=2";
-const listIcon = "/figma/pw2-icon-list.svg?v=2";
+const gridIcon = "/figma/pw2-icon-grid.svg?v=3";
+const listIcon = "/figma/pw2-icon-list.svg?v=3";
+const lastWorksHrefKey = "cw-last-works-href";
 
 function filterWorks(works: Work[], filter: Filter) {
   if (filter.kind === "all") return works;
@@ -38,6 +39,12 @@ function initialFilterFromLocation(): Filter {
   return { kind: "all", value: "All" };
 }
 
+function initialModeFromLocation(fallbackMode: ViewMode): ViewMode {
+  if (typeof window === "undefined") return fallbackMode;
+  const view = new URLSearchParams(window.location.search).get("view");
+  return view === "grid" || view === "list" ? view : fallbackMode;
+}
+
 export function WorksBrowser({
   basePath = "/works",
   initialMode = "grid",
@@ -53,7 +60,7 @@ export function WorksBrowser({
   workTypes: PublicWorkType[];
   title: string;
 }) {
-  const [mode, setMode] = useState<ViewMode>(initialMode);
+  const [mode, setMode] = useState<ViewMode>(() => initialModeFromLocation(initialMode));
   const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
   const visibleYears = useMemo(() => {
@@ -63,13 +70,57 @@ export function WorksBrowser({
   const visibleTypes = useMemo(() => workTypes.filter((type) => type.filterVisible && type.status !== "Archived"), [workTypes]);
   const visibleTypedTypes = useMemo(() => visibleTypes.map((type) => ({ type, count: works.filter((work) => matchesType(work, type.slug)).length })).filter((entry) => entry.count > 0), [visibleTypes, works]);
 
-  function setActiveFilter(nextFilter: Filter) {
-    setFilter(nextFilter);
+  useEffect(() => {
+    if (basePath !== "/") return;
+
+    function syncFromLocation() {
+      setMode(initialModeFromLocation(initialMode));
+      setFilter(initialFilterFromLocation());
+    }
+
+    window.addEventListener("cw:works-browser-sync", syncFromLocation);
+    return () => window.removeEventListener("cw:works-browser-sync", syncFromLocation);
+  }, [basePath, initialMode]);
+
+  function browserHref(nextFilter: Filter, nextMode: ViewMode) {
     const params = new URLSearchParams();
     if (nextFilter.kind !== "all") params.set(nextFilter.kind, nextFilter.value);
+    params.set("view", nextMode);
     const query = params.toString();
-    window.history.replaceState(null, "", query ? `${basePath}?${query}` : basePath);
+    const hash = basePath === "/" ? "#works-index" : "";
+    return `${basePath}${query ? `?${query}` : ""}${hash}`;
   }
+
+  function rememberBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
+    if (basePath !== "/") return;
+    window.sessionStorage.setItem(lastWorksHrefKey, browserHref(nextFilter, nextMode));
+  }
+
+  function replaceBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
+    const nextHref = browserHref(nextFilter, nextMode);
+    window.history.replaceState(null, "", nextHref);
+    if (basePath === "/") {
+      window.sessionStorage.setItem(lastWorksHrefKey, nextHref);
+    }
+  }
+
+  function setActiveFilter(nextFilter: Filter) {
+    setFilter(nextFilter);
+    replaceBrowserHref(nextFilter, mode);
+  }
+
+  function setActiveMode(nextMode: ViewMode) {
+    setMode(nextMode);
+    replaceBrowserHref(filter, nextMode);
+  }
+
+  function rememberWorkReturnHref() {
+    const returnHref = browserHref(filter, mode);
+    window.sessionStorage.setItem("cw-work-return-href", returnHref);
+    rememberBrowserHref(filter, mode);
+  }
+
+  const homeTitleStyle = basePath === "/" ? ({ insetBlockEnd: "clamp(5.5rem, 14vh, 9rem)" } as CSSProperties) : undefined;
 
   function gridCardEntryStyle(index: number) {
     const desktopColumnCount = 3;
@@ -101,7 +152,7 @@ export function WorksBrowser({
             ))}
           </div>
 
-          <h1 className="pw-works-title">
+          <h1 className="pw-works-title" style={homeTitleStyle}>
             {title}
             <br />
             &copy; {visibleYears.length > 0 ? `${visibleYears[0]}-${visibleYears[visibleYears.length - 1]}` : ""}
@@ -111,11 +162,11 @@ export function WorksBrowser({
         <div className="pw-works-right">
           {showViewToggle ? (
             <div className="pw-view-toggle" aria-label="Works view">
-            <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setMode("grid")} type="button">
+            <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setActiveMode("grid")} type="button">
               <Image alt="" height={20} src={gridIcon} width={20} />
               Grid
             </button>
-            <button aria-label="Show works as list" className={mode === "list" ? "is-active" : undefined} onClick={() => setMode("list")} type="button">
+            <button aria-label="Show works as list" className={mode === "list" ? "is-active" : undefined} onClick={() => setActiveMode("list")} type="button">
               <Image alt="" height={20} src={listIcon} width={20} />
               List
             </button>
@@ -127,7 +178,7 @@ export function WorksBrowser({
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
-                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} style={gridCardEntryStyle(index)} title={work.intro}>
+                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} onClick={rememberWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
@@ -157,7 +208,7 @@ export function WorksBrowser({
               ) : (
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
-                <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id}>
+                <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id} onClick={rememberWorkReturnHref}>
                   <span className="pw-list-image">
                     <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
                   </span>

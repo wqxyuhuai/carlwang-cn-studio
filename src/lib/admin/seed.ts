@@ -242,7 +242,7 @@ const siteSettings: AdminRecord[] = [
   { id: "logo-url", name: "logo_url", group: "General", type: "URL", value: "", public: true, locked: true, description: "Logo URL", order: 4, createdAt: now, updatedAt: now },
   { id: "favicon-url", name: "favicon_url", group: "General", type: "URL", value: "/icon.svg", public: true, locked: true, description: "Favicon URL", order: 5, createdAt: now, updatedAt: now },
   { id: "footer-copyright", name: "footer_copyright", group: "Footer", type: "Text", value: "© Carl Wang. All rights reserved.", public: true, locked: true, description: "Footer copyright text", order: 6, createdAt: now, updatedAt: now },
-  { id: "contact-email", name: "contact_email", group: "Contact", type: "Text", value: "hello@carlwang.cn", public: true, locked: true, description: "Public contact email", order: 7, createdAt: now, updatedAt: now },
+  { id: "contact-email", name: "contact_email", group: "Contact", type: "Text", value: "wqxyuhuai@163.com", public: true, locked: true, description: "Public contact email", order: 7, createdAt: now, updatedAt: now },
   { id: "oss-public-base-url", name: "oss_public_base_url", group: "Integration", type: "URL", value: process.env.ALIYUN_OSS_PUBLIC_BASE_URL || "", public: true, locked: true, description: "Aliyun OSS public base URL only, never credentials", order: 8, createdAt: now, updatedAt: now },
   { id: "notion-workspace-name", name: "notion_workspace_name", group: "Integration", type: "Text", value: process.env.NOTION_WORKSPACE_NAME || "", public: false, locked: true, description: "Read-only Notion workspace display name", order: 9, createdAt: now, updatedAt: now }
 ];

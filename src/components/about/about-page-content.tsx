@@ -12,6 +12,7 @@ const fallbackDirectionMedia = ["/field-media/a1-2.webp", "/field-media/a2-1.web
 const fallbackSocialIcon = "/figma/social-email.svg";
 const defaultSocialCardBackground = "var(--color-black-10)";
 const defaultSocialLogoColor = "var(--color-black)";
+const contactEmailHref = "mailto:wqxyuhuai@163.com";
 
 const aboutBodyCopy = [
   "and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
@@ -138,17 +139,18 @@ export function AboutPageContent({ content, includeFooter = true }: { content: P
             {socialLinks.map((link) => {
               const socialLogoColor = link.cardLogoColor || defaultSocialLogoColor;
               const socialIconUrl = link.footerIconUrl || link.colorIconUrl || link.iconUrl || fallbackSocialIcon;
+              const socialHref = link.platform.toLowerCase() === "email" || link.url.startsWith("mailto:") ? contactEmailHref : link.url;
               return (
                 <a
                   aria-label={link.label}
                   className="pw-social-tile"
-                  href={link.url}
+                  href={socialHref}
                   style={{
                     backgroundColor: link.cardBackgroundColor || defaultSocialCardBackground
                   }}
                   key={link.id || link.url}
-                  rel={link.url.startsWith("mailto:") ? undefined : "noreferrer"}
-                  target={link.url.startsWith("mailto:") ? undefined : "_blank"}
+                  rel={socialHref.startsWith("mailto:") ? undefined : "noreferrer"}
+                  target={socialHref.startsWith("mailto:") ? undefined : "_blank"}
                 >
                   <span
                     aria-hidden="true"

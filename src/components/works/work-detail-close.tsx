@@ -7,20 +7,9 @@ export function WorkDetailClose({ fallbackHref = "/#works" }: { fallbackHref?: s
   const router = useRouter();
 
   const closeDetail = useCallback(() => {
-    const referrer = document.referrer;
-
-    if (referrer) {
-      try {
-        if (new URL(referrer).origin === window.location.origin) {
-          router.back();
-          return;
-        }
-      } catch {
-        // Fall through to the deterministic fallback route.
-      }
-    }
-
-    router.push(fallbackHref);
+    const storedReturnHref = window.sessionStorage.getItem("cw-work-return-href");
+    window.sessionStorage.removeItem("cw-work-return-href");
+    router.replace(storedReturnHref || fallbackHref);
   }, [fallbackHref, router]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AboutPageContent } from "@/components/about/about-page-content";
+import { redirect } from "next/navigation";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -12,11 +12,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const content = await getPublicContent();
-
-  return (
-    <main>
-      <AboutPageContent content={content} />
-    </main>
-  );
+  redirect("/#about");
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { WorksBrowser } from "@/components/works/works-browser";
+import { redirect } from "next/navigation";
 import { getPublicContent, sectionByKey } from "@/lib/public-content";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -12,13 +12,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function WorksPage() {
-  const content = await getPublicContent();
-  const section = sectionByKey(content, "works_hero");
-  const works = content.works.filter((work) => work.status === "Published").sort((left, right) => left.order - right.order);
-
-  return (
-    <main>
-      <WorksBrowser title={section?.titleEn || "Works from"} workTypes={content.workTypes} works={works} />
-    </main>
-  );
+  redirect("/?view=grid#works-index");
 }

@@ -66,6 +66,7 @@ export type Work = {
   tools: string[];
   gallery: MediaItem[];
   content: NotionBlock[];
+  contentUrl?: string;
   externalUrl?: string;
   notionUrl?: string;
   notionPageId?: string;

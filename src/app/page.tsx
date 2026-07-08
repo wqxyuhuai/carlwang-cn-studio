@@ -6,6 +6,7 @@ import { WorksBrowser } from "@/components/works/works-browser";
 import { getFeaturedWorks, getPublicContent } from "@/lib/public-content";
 
 const fallbackPreviewImage = "/figma/pw2-work-image.png";
+const contactEmailHref = "mailto:wqxyuhuai@163.com";
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPublicContent();
@@ -24,16 +25,12 @@ export default async function Home() {
   const [content, featuredWorks] = await Promise.all([getPublicContent(), getFeaturedWorks()]);
   const works = content.works.filter((work) => work.status === "Published").sort((left, right) => left.order - right.order);
   const featured = featuredWorks.length > 0 ? featuredWorks : works.filter((work) => work.featured).concat(works).slice(0, 8);
-  const emailLink =
-    content.socials.find((link) => link.url.startsWith("mailto:"))?.url ||
-    `mailto:${content.settings.contactEmail || "hello@carlwang.cn"}`;
-
   return (
     <StudioTabbedShell
       about={<AboutPageContent content={content} includeFooter={false} />}
-      contactHref={emailLink}
+      contactHref={contactEmailHref}
       featured={<FeaturedWorkCanvas works={featured} />}
-      list={<WorksBrowser basePath="/" initialMode="list" showViewToggle={false} title="Works from" workTypes={content.workTypes} works={works} />}
+      list={<WorksBrowser basePath="/" initialMode="grid" title="Works from" workTypes={content.workTypes} works={works} />}
     />
   );
 }

@@ -219,7 +219,7 @@ const fallbackWorkTypes: WorkType[] = Array.from(
 );
 
 export const fallbackSocials: SocialLink[] = [
-  { platform: "Email", label: "Email", url: "mailto:hello@carlwang.cn", handle: "hello@carlwang.cn", group: "Contact", active: true, order: 1 },
+  { platform: "Email", label: "Email", url: "mailto:wqxyuhuai@163.com", handle: "wqxyuhuai@163.com", group: "Contact", active: true, order: 1 },
   { platform: "Behance", label: "Behance", url: "https://www.behance.net/", group: "Portfolio", active: true, order: 2 },
   { platform: "Zcool", label: "Zcool", url: "https://www.zcool.com.cn/", group: "Portfolio", active: true, order: 3 },
   { platform: "Xiaohongshu", label: "Xiaohongshu", url: "https://www.xiaohongshu.com/", group: "Social", active: true, order: 4 }
@@ -323,6 +323,53 @@ function normalizeMedia(value: unknown, alt: string): MediaItem | null {
   };
 }
 
+function normalizeNotionBlocks(value: unknown): NotionBlock[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(normalizeNotionBlock).filter((block): block is NotionBlock => Boolean(block));
+}
+
+function normalizeNotionBlock(value: unknown): NotionBlock | null {
+  if (!value || typeof value !== "object") return null;
+  const block = value as NotionBlock;
+  if (block.type === "image" || block.type === "video") {
+    const media = normalizeMedia(block.media, `Notion ${block.type}`);
+    return media ? { ...block, media } : null;
+  }
+  if (block.type === "column_list") {
+    return {
+      type: "column_list",
+      columns: Array.isArray(block.columns) ? block.columns.map((column) => normalizeNotionBlocks(column)) : []
+    };
+  }
+  if (block.type === "toggle") {
+    return {
+      ...block,
+      children: normalizeNotionBlocks(block.children)
+    };
+  }
+  return block;
+}
+
+async function readJsonUrl(url: string) {
+  if (!url) return null;
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (!response.ok) throw new Error(String(response.status));
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getWorkContent(work: Work): Promise<NotionBlock[]> {
+  if (work.content.length > 0) return work.content;
+  if (!work.contentUrl) return [];
+  const json = await readJsonUrl(work.contentUrl);
+  if (!json || typeof json !== "object") return [];
+  const candidate = json as { blocks?: unknown; content?: unknown };
+  return normalizeNotionBlocks(candidate.blocks || candidate.content);
+}
+
 function richContentToBlocks(blocks: OssRichContentBlock[] | undefined, title: string): NotionBlock[] {
   if (!Array.isArray(blocks)) return [];
 
@@ -385,6 +432,7 @@ function normalizeProject(value: OssProject): Work | null {
     tools: [],
     gallery: gallery.length > 0 ? gallery : [cover],
     content: richContentToBlocks(value.richContent, title),
+    contentUrl: undefined,
     notionPageId: value.id
   };
 }
@@ -441,7 +489,8 @@ function normalizeWork(value: unknown): Work | null {
     clientBrand: work.clientBrand,
     tools: work.tools || [],
     gallery: (work.gallery || [cover]).map((item, index) => normalizeMedia(item, `${title} gallery image ${index + 1}`)).filter((item): item is MediaItem => Boolean(item)),
-    content: work.content || [],
+    content: normalizeNotionBlocks(work.content || []),
+    contentUrl: typeof work.contentUrl === "string" ? work.contentUrl : undefined,
     externalUrl: work.externalUrl,
     notionUrl: work.notionUrl,
     notionPageId: work.notionPageId

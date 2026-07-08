@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
-import { fallbackData, getStudioData } from "./site-data";
+import { fallbackData, getStudioData, getWorkContent } from "./site-data";
 import type { AdminRecord, AdminValue } from "./admin/schema";
 import type { MediaItem, NotionBlock, SiteSettings, SocialLink, StudioData, Tool, Work, WorkStatus, WorkType } from "./types";
 
@@ -491,7 +491,7 @@ async function resolveWorkBySlug(slug: string) {
   return {
     work: {
       ...work,
-      content: work.content
+      content: await getWorkContent(work)
     },
     previous: works[(index - 1 + works.length) % works.length],
     next: works[(index + 1) % works.length],

@@ -4,7 +4,6 @@ import "@/components/common/reveal-media.css";
 import "@/components/video/video-player.css";
 import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
 import { SiteCursor } from "@/components/site-cursor";
-import { SiteNav } from "@/components/site-nav";
 
 const themeInitScript = `(() => {
   try {
@@ -49,7 +48,6 @@ export default function RootLayout({
         <GlassDistortionFilter />
         <SiteCursor />
         <div className="site-frame">
-          <SiteNav />
           {children}
         </div>
       </body>

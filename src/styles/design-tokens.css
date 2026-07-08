@@ -169,6 +169,7 @@
   --figma-pad-desktop: 4rem;
   --figma-pad-mobile: 2rem;
   --radius-none: 0;
+  --radius-site-sm: 0.5rem;
 
   --motion-fast: 120ms;
   --motion-base: 240ms;
