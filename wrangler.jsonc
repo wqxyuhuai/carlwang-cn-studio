@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "carlwang-cn-studio",
+  "account_id": "bb840ab4e8fba0abc7676e55d7df2439",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-06-25",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
