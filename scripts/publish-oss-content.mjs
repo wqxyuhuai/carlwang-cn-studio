@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import OSS from "ali-oss";
 import { Client } from "@notionhq/client";
+import { configureProxyFromEnv } from "./lib/proxy.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
 const DEFAULT_CONTENT_KEY = "uploads/admin/site-content.json";
@@ -243,7 +244,7 @@ async function listChildren(notion, blockId) {
   return blocks;
 }
 
-async function retryAsync(fn, label, attempts = 4) {
+async function retryAsync(fn, label, attempts = Number(process.env.NOTION_RETRY_ATTEMPTS || 8)) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -251,6 +252,7 @@ async function retryAsync(fn, label, attempts = 4) {
     } catch (error) {
       lastError = error;
       if (attempt < attempts) {
+        console.log(`[retry] ${label} attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
         await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
       }
     }
@@ -645,6 +647,7 @@ async function uploadJsonObject(key, data, cacheControl = "public, max-age=60") 
 
 async function main() {
   loadEnv(ENV_PATH);
+  configureProxyFromEnv();
   const tableKeys = selectedTables();
   const skipBody = process.argv.includes("--skip-body");
   const projectSlug = argValue("slug");

@@ -1,5 +1,6 @@
 export const workReturnHrefKey = "cw-work-return-href";
 export const lastWorksHrefKey = "cw-last-works-href";
+export const workReturnHrefParam = "from";
 
 function clientOrigin() {
   return typeof window === "undefined" ? "http://localhost" : window.location.origin;
@@ -28,6 +29,18 @@ export function validWorkReturnHref(href: string | null) {
   } catch {
     return null;
   }
+}
+
+export function workDetailHrefWithReturn(workHref: string, returnHref: string | null | undefined) {
+  if (!returnHref) return workHref;
+
+  const normalizedReturnHref = normalizeWorksHref(returnHref);
+  const hashIndex = workHref.indexOf("#");
+  const hrefWithoutHash = hashIndex >= 0 ? workHref.slice(0, hashIndex) : workHref;
+  const hash = hashIndex >= 0 ? workHref.slice(hashIndex) : "";
+  const separator = hrefWithoutHash.includes("?") ? "&" : "?";
+
+  return `${hrefWithoutHash}${separator}${workReturnHrefParam}=${encodeURIComponent(normalizedReturnHref)}${hash}`;
 }
 
 export function currentWorkSurfaceHref(defaultHash = "#works") {

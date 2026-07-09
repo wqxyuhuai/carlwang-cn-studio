@@ -8,6 +8,7 @@ import { WorkDetailClose } from "@/components/works/work-detail-close";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
 import { WorkDetailScrollTop } from "@/components/works/work-detail-scroll-top";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/public-content";
+import { workDetailHrefWithReturn, workReturnHrefParam } from "@/lib/work-detail-return";
 import { workPublishedLabel } from "@/lib/work-metrics";
 import type { MediaItem, Tool, Work } from "@/lib/types";
 
@@ -41,11 +42,11 @@ function DetailImage({ media, className = "", priority = false, revealIndex = 0 
   );
 }
 
-function PagerItem({ direction, revealIndex, work }: { direction: "previous" | "next"; revealIndex: number; work: Work }) {
+function PagerItem({ direction, returnHref, revealIndex, work }: { direction: "previous" | "next"; returnHref?: string; revealIndex: number; work: Work }) {
   const isNext = direction === "next";
 
   return (
-    <Link className={`pw-detail-pager-item ${isNext ? "is-next" : ""}`} href={`/works/${work.slug}`}>
+    <Link className={`pw-detail-pager-item ${isNext ? "is-next" : ""}`} href={workDetailHrefWithReturn(`/works/${work.slug}`, returnHref)}>
       <span className="pw-detail-pager-label">
         {!isNext ? <span className="pw-detail-arrow is-left" aria-hidden="true" /> : null}
         <span>{isNext ? "Next" : "Previous"}</span>
@@ -77,8 +78,16 @@ function toolIconFor(name: string, tools: Tool[]) {
   return tools.find((tool) => toolKey(tool.name) === normalized && tool.iconUrl)?.iconUrl || fallbackToolIcons[normalized] || "";
 }
 
-export default async function WorkDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function WorkDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { slug } = await params;
+  const query = searchParams ? await searchParams : {};
+  const returnHref = typeof query[workReturnHrefParam] === "string" ? query[workReturnHrefParam] : undefined;
   const result = await getWorkBySlug(slug);
   if (!result) notFound();
 
@@ -120,8 +129,8 @@ export default async function WorkDetailPage({ params }: { params: Promise<{ slu
         </div>
 
         <nav className="pw-detail-pager" aria-label="Adjacent works">
-          {previous ? <PagerItem direction="previous" revealIndex={1} work={previous} /> : null}
-          {next ? <PagerItem direction="next" revealIndex={2} work={next} /> : null}
+          {previous ? <PagerItem direction="previous" returnHref={returnHref} revealIndex={1} work={previous} /> : null}
+          {next ? <PagerItem direction="next" returnHref={returnHref} revealIndex={2} work={next} /> : null}
         </nav>
       </aside>
 

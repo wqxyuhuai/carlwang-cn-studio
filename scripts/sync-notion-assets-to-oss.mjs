@@ -1,10 +1,13 @@
 ﻿import { randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import OSS from "ali-oss";
 import { Client } from "@notionhq/client";
+import { optimizeImageBuffer, optimizedObjectKeyFor } from "./lib/asset-optimizer.mjs";
+import { configureProxyFromEnv } from "./lib/proxy.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
 const SYNC_STATUS_NAME = String.fromCharCode(0x540c, 0x6b65, 0x72b6, 0x6001);
@@ -16,6 +19,18 @@ const MAX_FILE_SIZE = 200 * 1024 * 1024;
 const ASSET_TIMEOUT_MS = Number(process.env.ASSET_TIMEOUT_MS || 20000);
 const ASSET_PROGRESS_MS = Number(process.env.ASSET_PROGRESS_MS || 5000);
 const MAX_FAILED_MEDIA_PER_ITEM = Number(process.env.MAX_FAILED_MEDIA_PER_ITEM || 3);
+const LOCAL_ASSET_MAX_FILES = Number(process.env.LOCAL_ASSET_MAX_FILES || 500);
+const LOCAL_PATH_PROPERTY_NAMES = [
+  String.fromCharCode(0x672c, 0x5730, 0x5730, 0x5740),
+  "Local Path",
+  "Local Folder",
+  "Local Asset Folder",
+  "Local Assets"
+];
+const GENERIC_LOCAL_MATCH_STEMS = new Set(["asset", "image", "video", "file", "pdf", "media"]);
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "svg", "avif"]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v"]);
+const DOCUMENT_EXTENSIONS = new Set(["pdf"]);
 
 const tables = {
   categories: {
@@ -32,6 +47,7 @@ const tables = {
     titleProperty: "Title",
     slugProperty: "Slug",
     fileProperties: ["Cover"],
+    localPathProperties: LOCAL_PATH_PROPERTY_NAMES,
     includeBodyMedia: true
   },
   tools: {
@@ -140,6 +156,23 @@ function richTextFromProperty(property) {
   return textFromRichText(property?.rich_text);
 }
 
+function plainTextFromProperty(property) {
+  if (!property) return "";
+  if (property.type === "title") return titleFromProperty(property);
+  if (property.type === "rich_text") return richTextFromProperty(property);
+  if (property.type === "url") return property.url || "";
+  if (property.type === "email") return property.email || "";
+  if (property.type === "phone_number") return property.phone_number || "";
+  if (property.type === "formula") {
+    const formula = property.formula;
+    if (formula?.type === "string") return formula.string || "";
+    if (formula?.type === "number" && typeof formula.number === "number") return String(formula.number);
+    if (formula?.type === "date") return formula.date?.start || "";
+    if (formula?.type === "boolean") return formula.boolean ? "true" : "false";
+  }
+  return "";
+}
+
 function fileArrayFromProperty(property) {
   if (!property || property.type !== "files" || !Array.isArray(property.files)) return [];
   return property.files;
@@ -157,6 +190,7 @@ function mediaPayload(block) {
     payload,
     sourceType: mediaType,
     url,
+    name: media?.name || "",
     caption: payload.caption || []
   };
 }
@@ -178,6 +212,24 @@ function extensionFromMime(mime) {
     "application/pdf": "pdf"
   };
   return map[mime] || "";
+}
+
+function mimeFromExtension(extension) {
+  const map = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    avif: "image/avif",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    m4v: "video/mp4",
+    pdf: "application/pdf"
+  };
+  return map[String(extension || "").toLowerCase()] || "";
 }
 
 function mimeFromBuffer(buffer) {
@@ -245,7 +297,7 @@ async function withTimeout(promise, label) {
   }
 }
 
-async function retryAsync(fn, label, attempts = 4) {
+async function retryAsync(fn, label, attempts = Number(process.env.NOTION_RETRY_ATTEMPTS || 8)) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
@@ -253,6 +305,7 @@ async function retryAsync(fn, label, attempts = 4) {
     } catch (error) {
       lastError = error;
       if (attempt < attempts) {
+        console.log(`[retry] ${label} attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
         await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
       }
     }
@@ -279,6 +332,155 @@ function shortUrl(url) {
   } catch {
     return String(url || "").slice(0, 100);
   }
+}
+
+function normalizeLocalPath(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\u200b/g, "");
+}
+
+function normalizeFileStem(value) {
+  return slugify(String(value || "").replace(/\.[^.]+$/, ""), "asset");
+}
+
+function mediaKindFromExtension(extension) {
+  const ext = String(extension || "").toLowerCase();
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (DOCUMENT_EXTENSIONS.has(ext)) return "document";
+  return "";
+}
+
+function mediaKindFromBlockType(blockType) {
+  if (blockType === "image") return "image";
+  if (blockType === "video") return "video";
+  if (blockType === "pdf") return "document";
+  return "";
+}
+
+function naturalCompare(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function scanLocalAssetFolder(folderPath) {
+  const normalizedFolder = normalizeLocalPath(folderPath);
+  if (!normalizedFolder) return null;
+  const resolvedFolder = path.resolve(normalizedFolder);
+  if (!fs.existsSync(resolvedFolder) || !fs.statSync(resolvedFolder).isDirectory()) {
+    console.log(`[local] folder not found ${normalizedFolder}`);
+    return null;
+  }
+
+  const files = [];
+  const stack = [resolvedFolder];
+  while (stack.length && files.length < LOCAL_ASSET_MAX_FILES) {
+    const current = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch (error) {
+      console.log(`[local] cannot read ${current}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      const extension = extensionFromName(entry.name);
+      const kind = mediaKindFromExtension(extension);
+      if (!kind) continue;
+      let size = 0;
+      try {
+        size = fs.statSync(fullPath).size;
+      } catch {
+        size = 0;
+      }
+      files.push({
+        fullPath,
+        name: entry.name,
+        extension,
+        kind,
+        size,
+        stem: normalizeFileStem(entry.name)
+      });
+    }
+  }
+
+  files.sort((a, b) => naturalCompare(a.fullPath, b.fullPath));
+  const byKind = new Map();
+  const byStem = new Map();
+  for (const file of files) {
+    if (!byKind.has(file.kind)) byKind.set(file.kind, []);
+    byKind.get(file.kind).push(file);
+    if (!byStem.has(file.stem)) byStem.set(file.stem, []);
+    byStem.get(file.stem).push(file);
+  }
+
+  console.log(`[local] indexed ${files.length} media files from ${resolvedFolder}`);
+  return {
+    folder: resolvedFolder,
+    files,
+    byKind,
+    byStem,
+    used: new Set()
+  };
+}
+
+function localAssetIndexFromPage(page, tableConfig) {
+  const names = tableConfig.localPathProperties || [];
+  for (const propertyName of names) {
+    const value = plainTextFromProperty(page.properties?.[propertyName]);
+    if (!value) continue;
+    const index = scanLocalAssetFolder(value);
+    if (index) return index;
+  }
+  return null;
+}
+
+function candidateStemsFromMedia(media, blockId) {
+  const stems = [];
+  const values = [
+    media.name,
+    media.url,
+    blockId
+  ];
+  for (const value of values.filter(Boolean)) {
+    let source = String(value);
+    try {
+      const parsed = new URL(source);
+      source = decodeURIComponent(path.basename(parsed.pathname));
+    } catch {
+      source = path.basename(source);
+    }
+    const stem = normalizeFileStem(source);
+    if (stem && !GENERIC_LOCAL_MATCH_STEMS.has(stem) && !stems.includes(stem)) stems.push(stem);
+  }
+  return stems;
+}
+
+function matchLocalAsset(localIndex, media, blockId, mediaKind, sequenceByKind) {
+  if (!localIndex || !mediaKind) return null;
+  for (const stem of candidateStemsFromMedia(media, blockId)) {
+    const candidates = localIndex.byStem.get(stem) || [];
+    const match = candidates.find((file) => file.kind === mediaKind && !localIndex.used.has(file.fullPath));
+    if (match) {
+      localIndex.used.add(match.fullPath);
+      return { file: match, strategy: `name:${stem}` };
+    }
+  }
+
+  const candidates = localIndex.byKind.get(mediaKind) || [];
+  const sequence = sequenceByKind[mediaKind] || 0;
+  const match = candidates.find((file) => !localIndex.used.has(file.fullPath));
+  if (!match) return null;
+  localIndex.used.add(match.fullPath);
+  return { file: match, strategy: `order:${sequence + 1}` };
 }
 
 async function downloadAsset(url, label = "asset") {
@@ -351,6 +553,93 @@ function publicUrlForObject(objectKey) {
   return `${getOssConfig().publicBaseUrl.replace(/\/+$/g, "")}/${objectKey}`;
 }
 
+async function uploadBufferToOss(client, manifest, asset, objectBasePath, originalName, options = {}) {
+  const { buffer, contentType } = asset;
+  const sha256 = sha256Buffer(buffer);
+  const existing = manifest.bySha256[sha256];
+  const existingManifestObjectKey = existing?.url ? objectKeyFromOssUrl(existing.url) : "";
+  if (existing?.url && isOssUrl(existing.url) && (!options.rehomeOss || existingManifestObjectKey.startsWith(`${objectBasePath}/`))) {
+    const reusedUrl = options.optimizeOnUpload && existing.optimizedUrl ? existing.optimizedUrl : existing.url;
+    const reusedObjectKey = options.optimizeOnUpload && existing.optimizedObjectKey
+      ? existing.optimizedObjectKey
+      : existing.objectKey || objectKeyFromOssUrl(existing.url);
+    return {
+      url: reusedUrl,
+      skipped: false,
+      reused: true,
+      objectKey: reusedObjectKey,
+      originalObjectKey: existing.objectKey || objectKeyFromOssUrl(existing.url),
+      sha256
+    };
+  }
+
+  const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
+  const nameBase = slugify(String(originalName || "asset").replace(/\.[^.]+$/, ""), "asset");
+  const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
+  console.log(`[oss-upload] start ${objectKey} ${formatBytes(buffer.length)}`);
+  await withTimeout(client.put(objectKey, buffer, {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  }), "oss upload");
+  console.log(`[oss-upload] done ${objectKey}`);
+  const publicUrl = publicUrlForObject(objectKey);
+  let optimizedUrl = "";
+  let optimizedObjectKey = "";
+  let optimizedBytes = 0;
+  if (options.optimizeOnUpload) {
+    try {
+      const optimized = await optimizeImageBuffer(buffer, contentType, options);
+      if (optimized) {
+        optimizedObjectKey = optimizedObjectKeyFor(objectKey);
+        console.log(`[optimize] ${objectKey} ${formatBytes(buffer.length)} -> ${formatBytes(optimized.buffer.length)}`);
+        await withTimeout(client.put(optimizedObjectKey, optimized.buffer, {
+          headers: {
+            "Content-Type": optimized.contentType,
+            "Cache-Control": "public, max-age=31536000, immutable"
+          }
+        }), "optimized image upload");
+        optimizedUrl = publicUrlForObject(optimizedObjectKey);
+        optimizedBytes = optimized.buffer.length;
+        console.log(`[optimize] done ${optimizedObjectKey}`);
+      }
+    } catch (error) {
+      console.log(`[optimize] skipped ${objectKey}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  manifest.bySha256[sha256] = {
+    url: publicUrl,
+    objectKey,
+    optimizedUrl,
+    optimizedObjectKey,
+    contentType,
+    byteLength: buffer.length,
+    optimizedByteLength: optimizedBytes,
+    updatedAt: new Date().toISOString()
+  };
+  return {
+    url: optimizedUrl || publicUrl,
+    originalUrl: publicUrl,
+    skipped: false,
+    reused: false,
+    objectKey: optimizedObjectKey || objectKey,
+    originalObjectKey: objectKey,
+    oldObjectKey: "",
+    sha256
+  };
+}
+
+async function uploadLocalFileToOss(client, manifest, localFile, objectBasePath, options = {}) {
+  const buffer = fs.readFileSync(localFile.fullPath);
+  if (buffer.length > MAX_FILE_SIZE) {
+    throw new Error(`local file too large: ${formatBytes(buffer.length)}`);
+  }
+  const contentType = mimeFromBuffer(buffer) || mimeFromExtension(localFile.extension) || "application/octet-stream";
+  console.log(`[local] upload ${localFile.fullPath} ${formatBytes(buffer.length)}`);
+  return uploadBufferToOss(client, manifest, { buffer, contentType }, objectBasePath, localFile.name, options);
+}
+
 async function uploadUrlToOss(client, manifest, url, objectBasePath, originalName, options = {}) {
   const existingObjectKey = objectKeyFromOssUrl(url);
   if (existingObjectKey) {
@@ -374,34 +663,8 @@ async function uploadUrlToOss(client, manifest, url, objectBasePath, originalNam
     };
   }
 
-  const { buffer, contentType } = await downloadAsset(url, `${path.basename(objectBasePath)}/${originalName || "asset"}`);
-  const sha256 = sha256Buffer(buffer);
-  const existing = manifest.bySha256[sha256];
-  const existingManifestObjectKey = existing?.url ? objectKeyFromOssUrl(existing.url) : "";
-  if (existing?.url && isOssUrl(existing.url) && (!options.rehomeOss || existingManifestObjectKey.startsWith(`${objectBasePath}/`))) {
-    return { url: existing.url, skipped: false, reused: true, objectKey: existing.objectKey || objectKeyFromOssUrl(existing.url), sha256 };
-  }
-
-  const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
-  const nameBase = slugify(String(originalName || "asset").replace(/\.[^.]+$/, ""), "asset");
-  const objectKey = `${objectBasePath}/${Date.now()}-${randomBytes(4).toString("hex")}-${nameBase}.${extension}`;
-  console.log(`[oss-upload] start ${objectKey} ${formatBytes(buffer.length)}`);
-  await withTimeout(client.put(objectKey, buffer, {
-    headers: {
-      "Content-Type": contentType,
-      "Cache-Control": "public, max-age=31536000, immutable"
-    }
-  }), "oss upload");
-  console.log(`[oss-upload] done ${objectKey}`);
-  const publicUrl = publicUrlForObject(objectKey);
-  manifest.bySha256[sha256] = {
-    url: publicUrl,
-    objectKey,
-    contentType,
-    byteLength: buffer.length,
-    updatedAt: new Date().toISOString()
-  };
-  return { url: publicUrl, skipped: false, reused: false, objectKey, oldObjectKey: existingObjectKey || "", sha256 };
+  const asset = await downloadAsset(url, `${path.basename(objectBasePath)}/${originalName || "asset"}`);
+  return uploadBufferToOss(client, manifest, asset, objectBasePath, originalName, options);
 }
 
 async function deleteOldObjectKeys(client, objectKeys) {
@@ -453,6 +716,7 @@ async function listChildren(notion, blockId) {
 
 async function processBlockTree(notion, client, manifest, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun, options = {}) {
   const stack = await listChildren(notion, pageId);
+  const localSequenceByKind = { image: 0, video: 0, document: 0 };
   while (stack.length) {
     if (stats.failedMedia >= MAX_FAILED_MEDIA_PER_ITEM) {
       console.log(`[body] ${itemLabel} skipped remaining media after ${stats.failedMedia} failures`);
@@ -465,14 +729,21 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
       stats.seen += 1;
       const originalName = `${media.blockType}-${block.id}`;
       const objectBasePath = ossPath(tableFolder, itemFolder, "notion-page-body");
+      const mediaKind = mediaKindFromBlockType(media.blockType);
       console.log(`[body] ${itemLabel} media #${stats.seen} ${media.blockType}`);
       if (isOssUrl(media.url) && (!options.rehomeOss || objectKeyFromOssUrl(media.url).startsWith(`${objectBasePath}/`))) {
         stats.skipped += 1;
         console.log(`[body] ${itemLabel} media #${stats.seen} skipped`);
       } else {
+        const localMatch = matchLocalAsset(options.localAssetIndex, media, block.id, mediaKind, localSequenceByKind);
+        if (localMatch) {
+          console.log(`[local] matched ${itemLabel} media #${stats.seen} ${localMatch.strategy} -> ${localMatch.file.fullPath}`);
+        }
         try {
           if (!dryRun) {
-            const uploaded = await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
+            const uploaded = localMatch
+              ? await uploadLocalFileToOss(client, manifest, localMatch.file, objectBasePath, options)
+              : await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
             const nextPayload = {
               external: { url: uploaded.url },
               caption: media.caption
@@ -483,23 +754,26 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
             });
             if (uploaded.reused) {
               stats.reused += 1;
-              console.log(`[body] ${itemLabel} media #${stats.seen} reused`);
+              console.log(`[body] ${itemLabel} media #${stats.seen} ${localMatch ? "local-reused" : "reused"}`);
             } else if (uploaded.copied) {
               stats.uploaded += 1;
               console.log(`[body] ${itemLabel} media #${stats.seen} copied`);
             } else {
               stats.uploaded += 1;
-              console.log(`[body] ${itemLabel} media #${stats.seen} uploaded`);
+              console.log(`[body] ${itemLabel} media #${stats.seen} ${localMatch ? "local-uploaded" : "uploaded"}`);
             }
             if (uploaded.oldObjectKey) stats.oldObjectKeys.push(uploaded.oldObjectKey);
           } else {
             stats.uploaded += 1;
-            console.log(`[body] ${itemLabel} media #${stats.seen} would-upload`);
+            console.log(`[body] ${itemLabel} media #${stats.seen} ${localMatch ? "would-upload-local" : "would-upload"}`);
           }
         } catch (error) {
           stats.failedMedia += 1;
           console.log(`[body] ${itemLabel} media #${stats.seen} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
+      }
+      if (mediaKind && mediaKind in localSequenceByKind) {
+        localSequenceByKind[mediaKind] += 1;
       }
     }
 
@@ -594,6 +868,24 @@ function syncStatusValue(page) {
   if (property.type === "status") return property.status?.name || "";
   if (property.type === "select") return property.select?.name || "";
   return "";
+}
+
+function publishProjectContent(slug) {
+  if (!slug) throw new Error("Cannot publish project content without slug");
+  console.log(`[publish-checkpoint] project ${slug} start`);
+  const result = spawnSync(process.execPath, [
+    "scripts/publish-oss-content.mjs",
+    "--table=projects",
+    `--slug=${slug}`
+  ], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "inherit"
+  });
+  if (result.status !== 0) {
+    throw new Error(`project JSON publish failed for ${slug}`);
+  }
+  console.log(`[publish-checkpoint] project ${slug} done`);
 }
 
 function shouldProcessPending(page) {
@@ -781,7 +1073,11 @@ async function runTable(tableKey, options = {}) {
       }
 
       if (tableConfig.includeBodyMedia && !options.skipBody) {
-        await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun, options);
+        const localAssetIndex = localAssetIndexFromPage(page, tableConfig);
+        await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun, {
+          ...options,
+          localAssetIndex
+        });
       }
 
       let rowUpdated = false;
@@ -789,6 +1085,15 @@ async function runTable(tableKey, options = {}) {
       if (!options.dryRun && Object.keys(fileProperties).length > 0) {
         await notion.pages.update({ page_id: page.id, properties: fileProperties });
         rowUpdated = true;
+      }
+
+      if (
+        !options.dryRun &&
+        options.publishBeforeStatus &&
+        tableKey === "projects" &&
+        stats.failedMedia === 0
+      ) {
+        publishProjectContent(slug || itemFolder);
       }
 
       const statusUpdate = stats.failedMedia === 0 ? syncStatusUpdate(page.properties) : null;
@@ -825,6 +1130,7 @@ async function runTable(tableKey, options = {}) {
 
 async function main() {
   loadEnv(ENV_PATH);
+  configureProxyFromEnv();
 
   const missing = requiredEnv().filter(([, ok]) => !ok).map(([key]) => key);
   if (missing.length) {
@@ -839,6 +1145,8 @@ async function main() {
   const includeSynced = process.argv.includes("--include-synced");
   const rehomeOss = process.argv.includes("--rehome-oss");
   const deleteOldOss = process.argv.includes("--delete-old-oss");
+  const optimizeOnUpload = process.argv.includes("--optimize-on-upload");
+  const publishBeforeStatus = process.argv.includes("--publish-before-status");
   const auditMissing = process.argv.includes("--audit-missing");
   const titleContains = process.argv.find((arg) => arg.startsWith("--title-contains="))?.split("=").slice(1).join("=") || "";
   const selected = tableArg === "all" ? Object.keys(tables) : [tableArg];
@@ -859,11 +1167,11 @@ async function main() {
     return;
   }
 
-  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${rehomeOss ? " rehomeOss=true" : ""}${deleteOldOss ? " deleteOldOss=true" : ""}${titleContains ? ` titleContains=${titleContains}` : ""}`);
+  console.log(`sync start tables=${selected.join(", ")} dryRun=${dryRun}${limit ? ` limit=${limit}` : ""}${skipBody ? " skipBody=true" : ""}${includeSynced ? " includeSynced=true" : " statuses=待同步,待更新"}${rehomeOss ? " rehomeOss=true" : ""}${deleteOldOss ? " deleteOldOss=true" : ""}${optimizeOnUpload ? " optimizeOnUpload=true" : ""}${publishBeforeStatus ? " publishBeforeStatus=true" : ""}${titleContains ? ` titleContains=${titleContains}` : ""}`);
 
   const summary = {};
   for (const tableKey of selected) {
-    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, includeSynced, rehomeOss, deleteOldOss, titleContains });
+    summary[tableKey] = await runTable(tableKey, { dryRun, limit, skipBody, includeSynced, rehomeOss, deleteOldOss, optimizeOnUpload, publishBeforeStatus, titleContains });
   }
 
   console.log(`sync complete ${JSON.stringify(summary)}`);

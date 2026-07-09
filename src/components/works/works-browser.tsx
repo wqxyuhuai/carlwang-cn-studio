@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
-import { lastWorksHrefKey, rememberLastWorksHref, rememberWorkReturnHref } from "@/lib/work-detail-return";
+import { lastWorksHrefKey, rememberLastWorksHref, rememberWorkReturnHref, workDetailHrefWithReturn } from "@/lib/work-detail-return";
 import { metricLabel, workPublishedLabel } from "@/lib/work-metrics";
 
 type ViewMode = "grid" | "list";
@@ -121,6 +121,10 @@ export function WorksBrowser({
     rememberBrowserHref(filter, mode);
   }
 
+  function workDetailHref(slug: string) {
+    return workDetailHrefWithReturn(`/works/${slug}`, browserHref(filter, mode));
+  }
+
   const homeTitleStyle = basePath === "/" ? ({ insetBlockEnd: "clamp(5.5rem, 14vh, 9rem)" } as CSSProperties) : undefined;
 
   function gridCardEntryStyle(index: number) {
@@ -179,7 +183,7 @@ export function WorksBrowser({
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
-                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} onClick={rememberCurrentWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
+                    <Link className="pw-works-grid-card" href={workDetailHref(work.slug)} key={work.id} onClick={rememberCurrentWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
@@ -209,7 +213,7 @@ export function WorksBrowser({
               ) : (
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
-                <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id} onClick={rememberCurrentWorkReturnHref}>
+                <Link className="pw-list-row" href={workDetailHref(work.slug)} key={work.id} onClick={rememberCurrentWorkReturnHref}>
                   <span className="pw-list-image">
                     <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
                   </span>

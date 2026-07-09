@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { lastWorksHrefKey, validWorkReturnHref, workReturnHrefKey } from "@/lib/work-detail-return";
+import { lastWorksHrefKey, validWorkReturnHref, workReturnHrefKey, workReturnHrefParam } from "@/lib/work-detail-return";
 
 export function WorkDetailClose({ fallbackHref = "/#works" }: { fallbackHref?: string }) {
   const router = useRouter();
 
   const closeDetail = useCallback(() => {
+    const paramReturnHref = validWorkReturnHref(new URLSearchParams(window.location.search).get(workReturnHrefParam));
     const storedReturnHref = validWorkReturnHref(window.sessionStorage.getItem(workReturnHrefKey));
     const lastWorksHref = validWorkReturnHref(window.sessionStorage.getItem(lastWorksHrefKey));
     const referrerHref =
@@ -16,11 +17,12 @@ export function WorkDetailClose({ fallbackHref = "/#works" }: { fallbackHref?: s
         : null;
 
     window.sessionStorage.removeItem(workReturnHrefKey);
-    router.replace(storedReturnHref || referrerHref || lastWorksHref || fallbackHref);
+    router.replace(paramReturnHref || storedReturnHref || referrerHref || lastWorksHref || fallbackHref);
   }, [fallbackHref, router]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (document.querySelector(".video-player-overlay")) return;
       if (event.key === "Escape") closeDetail();
     }
 

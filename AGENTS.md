@@ -21,7 +21,7 @@ Carl Wang Studio is a personal portfolio and lightweight content platform for `s
 - Keep user-facing animation isolated in client leaf components, currently under `src/components/home` and `src/components/about`.
 - Preserve reduced-motion fallbacks and avoid adding scroll or pointer listeners without cleanup.
 - Images used by public components must live under `public/` or come from the public content JSON / OSS URL.
-- Work detail exits are contextual: every public entry point to `/works/[slug]` must remember the current page URL in `cw-work-return-href`, and the close button or Escape key must return to that stored source page instead of hard-coding Featured or `/#works`. Detail-to-detail pager links must not overwrite the original source page.
+- Work detail exits are contextual: every public entry point to `/works/[slug]` must carry the current page URL in a `from` query parameter and mirror it into `cw-work-return-href`. The close button or Escape key must read `from` first, then stored state, and return to that source page instead of hard-coding Featured or `/#works`. Detail-to-detail pager links must preserve the original source page.
 
 ## Admin Rules
 

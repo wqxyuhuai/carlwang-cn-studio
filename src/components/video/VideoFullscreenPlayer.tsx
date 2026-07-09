@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent, PointerEvent } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VideoControls } from "./VideoControls";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
@@ -42,6 +42,7 @@ export function VideoFullscreenPlayer({
   video: ProjectVideo;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const closeBubbleRef = useRef<HTMLSpanElement | null>(null);
   const cloudRef = useRef<HTMLSpanElement | null>(null);
   const inactivityTimerRef = useRef<number | null>(null);
@@ -56,11 +57,13 @@ export function VideoFullscreenPlayer({
   const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState(16 / 9);
+  const [frameSize, setFrameSize] = useState<{ height: number; width: number } | null>(null);
 
   const closePlayer = useCallback(() => {
     if (isClosing) return;
     setIsClosing(true);
-    window.setTimeout(onClose, supportsReducedMotion() ? 0 : 520);
+    window.setTimeout(onClose, supportsReducedMotion() ? 0 : 460);
   }, [isClosing, onClose]);
 
   const togglePlay = useCallback(() => {
@@ -107,6 +110,9 @@ export function VideoFullscreenPlayer({
     const syncTime = () => setCurrentTime(element.currentTime || 0);
     const syncDuration = () => {
       if (Number.isFinite(element.duration)) setDuration(element.duration);
+      if (element.videoWidth > 0 && element.videoHeight > 0) {
+        setAspectRatio(element.videoWidth / element.videoHeight);
+      }
     };
 
     element.addEventListener("play", syncState);
@@ -123,10 +129,33 @@ export function VideoFullscreenPlayer({
     };
   }, [video.mutedDefault, video.src]);
 
+  const updateFrameSize = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const bounds = stage.getBoundingClientRect();
+    let width = bounds.width;
+    let height = width / aspectRatio;
+
+    if (height > bounds.height) {
+      height = bounds.height;
+      width = height * aspectRatio;
+    }
+
+    setFrameSize({ height, width });
+  }, [aspectRatio]);
+
+  useEffect(() => {
+    updateFrameSize();
+    window.addEventListener("resize", updateFrameSize);
+    return () => window.removeEventListener("resize", updateFrameSize);
+  }, [updateFrameSize]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         closePlayer();
       }
       if (event.code === "Space") {
@@ -190,6 +219,7 @@ export function VideoFullscreenPlayer({
   }
 
   function handleOverlayClick(event: MouseEvent<HTMLDivElement>) {
+    event.stopPropagation();
     const element = videoRef.current;
     if (!element || !isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element))) return;
     closePlayer();
@@ -215,18 +245,31 @@ export function VideoFullscreenPlayer({
       <span className="video-player-cloud" ref={cloudRef} />
       <span className={["video-cursor-bubble is-close", isPointerOnVideo && !isDimmed ? "is-visible" : ""].filter(Boolean).join(" ")} ref={closeBubbleRef}>
         <span aria-hidden="true" className="video-cursor-glass-effect" />
-        <span className="video-cursor-bubble-text">Stop</span>
+        <span className="video-cursor-bubble-text">Close</span>
       </span>
-      <div className="video-player-stage">
-        <video
-          className="video-player-video"
-          controls={false}
-          muted={isMuted}
-          playsInline
-          poster={video.poster}
-          ref={videoRef}
-          src={video.src}
-        />
+      <div className="video-player-stage" ref={stageRef}>
+        <div
+          className="video-player-video-frame"
+          style={
+            frameSize
+              ? ({
+                  blockSize: `${frameSize.height}px`,
+                  inlineSize: `${frameSize.width}px`,
+                  "--video-aspect-ratio": `${aspectRatio}`
+                } as CSSProperties)
+              : ({ "--video-aspect-ratio": `${aspectRatio}` } as CSSProperties)
+          }
+        >
+          <video
+            className="video-player-video"
+            controls={false}
+            muted={isMuted}
+            playsInline
+            poster={video.poster}
+            ref={videoRef}
+            src={video.src}
+          />
+        </div>
       </div>
       <VideoControls
         currentTime={currentTime}

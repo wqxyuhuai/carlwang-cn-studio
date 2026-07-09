@@ -283,6 +283,9 @@
   --video-theme-ink: var(--figma-black);
   --video-theme-paper: var(--color-bg);
   --video-theme-line: var(--color-line);
+  --video-control-clearance: clamp(6.5rem, 12vh, 8.5rem);
+  --video-player-radius: clamp(0.875rem, 1.1vw, 1.5rem);
+  --video-stage-inset: clamp(1.5rem, 4vh, 3.5rem);
   align-items: center;
   animation: video-overlay-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
   background: #05070c;
@@ -296,7 +299,8 @@
 }
 
 .video-player-overlay.is-closing {
-  animation: video-overlay-out 420ms cubic-bezier(0.7, 0, 0.84, 0) both;
+  animation: video-overlay-out 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none;
 }
 
 .video-player-backdrop {
@@ -337,24 +341,41 @@
   z-index: -1;
 }
 
+.video-player-overlay.is-closing .video-player-cloud {
+  animation: video-cloud-out 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
 .video-player-stage {
   align-items: center;
   animation: video-stage-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
   display: grid;
-  inset: 0;
+  inset: var(--video-stage-inset) var(--video-stage-inset) var(--video-control-clearance);
   justify-items: center;
   position: fixed;
 }
 
-.video-player-video {
-  block-size: 100dvh;
-  display: block;
-  inline-size: 100vw;
-  max-block-size: 100dvh;
-  max-inline-size: 100vw;
-  object-fit: contain;
+.video-player-overlay.is-closing .video-player-stage {
+  animation: video-stage-out 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.video-player-video-frame {
+  aspect-ratio: var(--video-aspect-ratio, 16 / 9);
+  background: #05070c;
+  border-radius: var(--video-player-radius);
+  clip-path: inset(0 round var(--video-player-radius));
+  inline-size: min(100%, calc(100vw - var(--video-stage-inset) * 2));
+  max-block-size: calc(100dvh - var(--video-stage-inset) - var(--video-control-clearance));
+  max-inline-size: calc(100vw - var(--video-stage-inset) * 2);
+  overflow: hidden;
   position: relative;
   z-index: 1;
+}
+
+.video-player-video {
+  block-size: 100%;
+  display: block;
+  inline-size: 100%;
+  object-fit: cover;
 }
 
 .video-controls {
@@ -383,6 +404,15 @@
     opacity 260ms ease,
     transform 260ms ease;
   z-index: 10003;
+}
+
+.video-player-overlay.is-closing .video-controls {
+  animation: video-controls-out 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.video-player-overlay.is-closing .video-cursor-bubble {
+  opacity: 0;
+  transition: opacity 180ms ease;
 }
 
 .video-controls.is-dimmed {
@@ -542,6 +572,7 @@
   from {
     opacity: 1;
   }
+
   to {
     opacity: 0;
   }
@@ -558,6 +589,18 @@
   }
 }
 
+@keyframes video-stage-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.995);
+  }
+}
+
 @keyframes video-controls-in {
   from {
     opacity: 0;
@@ -566,6 +609,28 @@
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes video-controls-out {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(1rem);
+  }
+}
+
+@keyframes video-cloud-out {
+  0% {
+    opacity: 0.26;
+  }
+
+  100% {
+    opacity: 0;
   }
 }
 

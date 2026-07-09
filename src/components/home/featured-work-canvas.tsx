@@ -6,7 +6,7 @@ import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
 import * as THREE from "three";
 import type { Work } from "@/lib/types";
-import { currentWorkSurfaceHref, rememberWorkReturnHref } from "@/lib/work-detail-return";
+import { currentWorkSurfaceHref, rememberWorkReturnHref, workDetailHrefWithReturn } from "@/lib/work-detail-return";
 
 type CanvasImage = {
   src: string;
@@ -470,8 +470,9 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const entryResolvedRef = useRef(featuredActive);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const openWork = useCallback((href: string) => {
-    rememberWorkReturnHref(currentWorkSurfaceHref("#works"));
-    router.push(href);
+    const returnHref = currentWorkSurfaceHref("#works");
+    rememberWorkReturnHref(returnHref);
+    router.push(workDetailHrefWithReturn(href, returnHref));
   }, [router]);
 
   const images = useMemo<CanvasImage[]>(
