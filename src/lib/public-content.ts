@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { fallbackData, getStudioData, getWorkContent } from "./site-data";
 import type { AdminRecord, AdminValue } from "./admin/schema";
 import type { MediaItem, NotionBlock, SiteSettings, SocialLink, StudioData, Tool, Work, WorkStatus, WorkType } from "./types";
+import { applyWorkViewCounts } from "./work-view-counts";
 
 export const PUBLIC_CONTENT_CACHE_TAG = "public-content";
 
@@ -349,7 +350,7 @@ function fallbackSections(): PublicSection[] {
       subtitleEn: "A designer working across digital interfaces, brand visuals, motion content and spatial experiences.",
       subtitleCn: "",
       bodyEn: [
-        "and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
+        "I’m a designer who enjoys working between different forms of visual expression — from websites and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
         "My work often starts with structure: understanding what needs to be communicated, how people will see it, and what kind of feeling the design should leave behind. From there, I focus on layout, rhythm, details and interaction, trying to make the final result feel clear, refined and purposeful.",
         "I'm interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
       ].join("\n\n"),
@@ -432,7 +433,7 @@ async function buildPublicContent(): Promise<PublicContent> {
   const baseHasOssWorks = base.sync.source === "oss" && base.works.length > 0;
   const workTypesFromOss = workTypesFromOssData(base.workTypes);
   const workTypes = workTypesFromOss.length > 0 ? workTypesFromOss : workTypesFromWorks(base.works);
-  const works = baseHasOssWorks ? base.works : fallbackData.works;
+  const works = await applyWorkViewCounts(baseHasOssWorks ? base.works : fallbackData.works);
 
   return {
     settings: base.settings,

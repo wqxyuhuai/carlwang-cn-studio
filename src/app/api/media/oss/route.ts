@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 const CACHE_MAX_AGE_SECONDS = 31_536_000;
 const DISK_CACHE_DIR = ".media-cache/oss";
+const RANGE_RUNTIME_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 
 type CachedMedia = {
   body: Uint8Array;
@@ -14,6 +15,11 @@ type CachedMedia = {
 type RuntimeMediaCache = {
   match(request: Request): Promise<Response | undefined>;
   put(request: Request, response: Response): Promise<void>;
+};
+
+type ByteRange = {
+  end: number;
+  start: number;
 };
 
 function isAllowedOssUrl(url: URL) {
@@ -39,6 +45,8 @@ function cacheHeaders(media: CachedMedia, cacheStatus: string) {
   headers.set("Content-Type", media.contentType);
   headers.set("Content-Disposition", "inline");
   headers.set("Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
+  headers.set("CDN-Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
+  headers.set("Cloudflare-CDN-Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
   headers.set("Content-Length", String(media.body.byteLength));
   headers.set("X-Media-Cache", cacheStatus);
 
@@ -54,6 +62,87 @@ function mediaResponse(media: CachedMedia, cacheStatus: string) {
     status: media.status,
     headers: cacheHeaders(media, cacheStatus)
   });
+}
+
+function runtimeCacheKey(url: string) {
+  return new Request(url, { method: "GET" });
+}
+
+function runtimeRangeCacheKey(url: string, rangeHeader: string) {
+  const cacheUrl = new URL(url);
+  cacheUrl.searchParams.set("__range", rangeHeader);
+  return new Request(cacheUrl.toString(), { method: "GET" });
+}
+
+function parseByteRange(rangeHeader: string | null, size: number): ByteRange | null {
+  if (!rangeHeader || size <= 0) return null;
+
+  const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+  if (!match) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+
+  if (!rawStart) {
+    const suffixLength = Number(rawEnd);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) return null;
+    const start = Math.max(0, size - suffixLength);
+    return { start, end: size - 1 };
+  }
+
+  const start = Number(rawStart);
+  const end = rawEnd ? Number(rawEnd) : size - 1;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || start >= size) return null;
+
+  return {
+    start,
+    end: Math.min(end, size - 1)
+  };
+}
+
+function rangeResponseFromFullMedia(media: CachedMedia, rangeHeader: string | null, cacheStatus: string) {
+  if (media.status !== 200 || media.contentRange) return null;
+
+  const range = parseByteRange(rangeHeader, media.body.byteLength);
+  if (!range) {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${media.body.byteLength}`
+      }
+    });
+  }
+
+  const body = media.body.slice(range.start, range.end + 1);
+  return mediaResponse({
+    body,
+    contentType: media.contentType,
+    status: 206,
+    contentRange: `bytes ${range.start}-${range.end}/${media.body.byteLength}`,
+    acceptRanges: "bytes"
+  }, cacheStatus);
+}
+
+async function cachedMediaFromRuntimeHit(response: Response): Promise<CachedMedia> {
+  const body = new Uint8Array(await response.arrayBuffer());
+  return {
+    body,
+    contentType: response.headers.get("content-type")?.split(";")[0] || "application/octet-stream",
+    status: response.status,
+    contentRange: response.headers.get("content-range") || undefined,
+    acceptRanges: response.headers.get("accept-ranges") || undefined
+  };
+}
+
+async function cachedRangeResponseFromRuntimeHit(response: Response, cacheStatus: string) {
+  const media = await cachedMediaFromRuntimeHit(response);
+  if (!media.contentRange) return null;
+
+  return mediaResponse({
+    ...media,
+    status: 206,
+    acceptRanges: media.acceptRanges || "bytes"
+  }, cacheStatus);
 }
 
 async function sha256Hex(value: string) {
@@ -148,27 +237,46 @@ export async function GET(request: NextRequest) {
     return new Response("Unsupported media host.", { status: 400 });
   }
 
-  const hasRange = Boolean(request.headers.get("range"));
-  const runtimeCache = hasRange ? null : await getRuntimeCache();
-  const runtimeCacheKey = new Request(request.url, { method: "GET" });
-  const runtimeHit = await runtimeCache?.match(runtimeCacheKey);
+  const rangeHeader = request.headers.get("range");
+  const hasRange = Boolean(rangeHeader);
+  const runtimeCache = await getRuntimeCache();
+  const fullCacheKey = runtimeCacheKey(request.url);
+  const rangeCacheKey = hasRange ? runtimeRangeCacheKey(request.url, rangeHeader || "") : null;
+  const runtimeHit = await runtimeCache?.match(fullCacheKey);
   if (runtimeHit) {
+    if (hasRange) {
+      const media = await cachedMediaFromRuntimeHit(runtimeHit);
+      const response = rangeResponseFromFullMedia(media, rangeHeader, "runtime-range-hit");
+      if (response) return response;
+    }
+
     const response = new Response(runtimeHit.body, runtimeHit);
     response.headers.set("X-Media-Cache", "runtime-hit");
     return response;
   }
 
-  if (!hasRange) {
-    const diskHit = await readDiskCache(sourceUrl.href);
-    if (diskHit) {
-      const response = mediaResponse(diskHit, "disk-hit");
-      await runtimeCache?.put(runtimeCacheKey, response.clone());
-      return response;
+  if (rangeCacheKey) {
+    const rangeHit = await runtimeCache?.match(rangeCacheKey);
+    if (rangeHit) {
+      const response = await cachedRangeResponseFromRuntimeHit(rangeHit, "runtime-range-partial-hit");
+      if (response) return response;
     }
   }
 
+  const diskHit = await readDiskCache(sourceUrl.href);
+  if (diskHit) {
+    if (hasRange) {
+      const response = rangeResponseFromFullMedia(diskHit, rangeHeader, "disk-range-hit");
+      if (response) return response;
+    }
+
+    const response = mediaResponse(diskHit, "disk-hit");
+    await runtimeCache?.put(fullCacheKey, response.clone());
+    return response;
+  }
+
   const upstream = await fetch(sourceUrl, {
-    headers: hasRange ? { Range: request.headers.get("range") || "" } : undefined
+    headers: hasRange ? { Range: rangeHeader || "" } : undefined
   });
 
   if (!upstream.ok && upstream.status !== 206) {
@@ -191,8 +299,14 @@ export async function GET(request: NextRequest) {
   if (!hasRange) {
     await Promise.all([
       writeDiskCache(sourceUrl.href, media),
-      runtimeCache?.put(runtimeCacheKey, response.clone()) || Promise.resolve()
+      runtimeCache?.put(fullCacheKey, response.clone()) || Promise.resolve()
     ]);
+  } else if (rangeCacheKey && media.status === 206 && media.body.byteLength <= RANGE_RUNTIME_CACHE_MAX_BYTES) {
+    await runtimeCache?.put(rangeCacheKey, mediaResponse({
+      ...media,
+      status: 200,
+      acceptRanges: media.acceptRanges || "bytes"
+    }, "range-partial-store"));
   }
 
   return response;

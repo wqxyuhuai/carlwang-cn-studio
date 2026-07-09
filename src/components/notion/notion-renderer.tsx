@@ -48,17 +48,25 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
   );
 }
 
-export function NotionRenderer({ blocks, className = "" }: { blocks: NotionBlock[]; className?: string }) {
+export function NotionRenderer({
+  blocks,
+  className = "",
+  fallbackVideoPoster
+}: {
+  blocks: NotionBlock[];
+  className?: string;
+  fallbackVideoPoster?: string;
+}) {
   return (
     <div className={["notion-body", className].filter(Boolean).join(" ")}>
       {blocks.map((block, index) => (
-        <NotionBlockView block={block} index={index} key={`${block.type}-${index}`} />
+        <NotionBlockView block={block} fallbackVideoPoster={fallbackVideoPoster} index={index} key={`${block.type}-${index}`} />
       ))}
     </div>
   );
 }
 
-function NotionBlockView({ block, index }: { block: NotionBlock; index: number }) {
+function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionBlock; fallbackVideoPoster?: string; index: number }) {
   switch (block.type) {
     case "paragraph":
       return (
@@ -129,7 +137,7 @@ function NotionBlockView({ block, index }: { block: NotionBlock; index: number }
             video={{
               duration: block.media.duration,
               mutedDefault: block.media.mutedDefault,
-              poster: block.media.poster,
+              poster: block.media.poster || fallbackVideoPoster,
               spriteColumns: block.media.spriteColumns,
               spriteFrameCount: block.media.spriteFrameCount,
               spriteRows: block.media.spriteRows,
@@ -157,7 +165,7 @@ function NotionBlockView({ block, index }: { block: NotionBlock; index: number }
       return (
         <div className="notion-columns" style={columnStyle}>
           {block.columns.map((column, index) => (
-            <NotionRenderer blocks={column} key={index} />
+            <NotionRenderer blocks={column} fallbackVideoPoster={fallbackVideoPoster} key={index} />
           ))}
         </div>
       );
@@ -167,7 +175,7 @@ function NotionBlockView({ block, index }: { block: NotionBlock; index: number }
           <summary>
             <RichText spans={block.title} />
           </summary>
-          <NotionRenderer blocks={block.children} />
+          <NotionRenderer blocks={block.children} fallbackVideoPoster={fallbackVideoPoster} />
         </details>
       );
     case "unsupported":

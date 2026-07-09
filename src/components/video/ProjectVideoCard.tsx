@@ -1,10 +1,12 @@
 "use client";
 
-import type { MouseEvent, PointerEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RevealMedia } from "@/components/common/RevealMedia";
 import { VideoFullscreenPlayer } from "./VideoFullscreenPlayer";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
+
+const PLAY_BADGE_OFFSET = 20;
 
 export function ProjectVideoCard({
   className = "",
@@ -16,11 +18,36 @@ export function ProjectVideoCard({
   video: ProjectVideo;
 }) {
   const bubbleRef = useRef<HTMLSpanElement | null>(null);
+  const cardRef = useRef<HTMLButtonElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const targetRef = useRef({ x: 0, y: 0 });
-  const currentRef = useRef({ x: 0, y: 0 });
+  const targetRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
+  const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const [isHovering, setIsHovering] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const previewKey = `${video.src}|${video.poster || ""}`;
+  const [posterReadyKey, setPosterReadyKey] = useState<string | null>(null);
+  const [videoReadyKey, setVideoReadyKey] = useState<string | null>(null);
+  const [posterFailedKey, setPosterFailedKey] = useState<string | null>(null);
+
+  const isPosterReady = posterReadyKey === previewKey;
+  const isVideoReady = videoReadyKey === previewKey;
+  const hasPosterFailed = posterFailedKey === previewKey;
+  const hasPoster = Boolean(video.poster && !hasPosterFailed);
+  const isPreviewReady = hasPoster ? isPosterReady : isVideoReady;
+  const mediaStyle = video.poster
+    ? ({
+        "--project-video-poster": `url("${video.poster}")`
+      } as CSSProperties)
+    : undefined;
+
+  const handlePosterRef = useCallback(
+    (node: HTMLImageElement | null) => {
+      if (node?.complete && node.naturalWidth > 0) {
+        setPosterReadyKey(previewKey);
+      }
+    },
+    [previewKey]
+  );
 
   useEffect(() => {
     const tick = () => {
@@ -29,7 +56,8 @@ export function ProjectVideoCard({
       current.x += (target.x - current.x) * 0.12;
       current.y += (target.y - current.y) * 0.12;
       if (bubbleRef.current) {
-        bubbleRef.current.style.transform = `translate3d(${current.x}px, ${current.y}px, 0) translate(-50%, -50%)`;
+        bubbleRef.current.style.setProperty("--video-play-x", `${current.x}px`);
+        bubbleRef.current.style.setProperty("--video-play-y", `${current.y}px`);
       }
       rafRef.current = window.requestAnimationFrame(tick);
     };
@@ -41,10 +69,20 @@ export function ProjectVideoCard({
   }, []);
 
   function updateTarget(clientX: number, clientY: number) {
-    targetRef.current = { x: clientX, y: clientY };
-    if (currentRef.current.x === 0 && currentRef.current.y === 0) {
-      currentRef.current = { x: clientX, y: clientY };
-    }
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const x = Math.max(PLAY_BADGE_OFFSET, Math.min(clientX - rect.left, rect.width - PLAY_BADGE_OFFSET));
+    const y = Math.max(PLAY_BADGE_OFFSET, Math.min(clientY - rect.top, rect.height - PLAY_BADGE_OFFSET));
+    targetRef.current = { x, y };
+  }
+
+  function resetTarget() {
+    targetRef.current = { x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET };
+  }
+
+  function syncCurrentToTarget() {
+    currentRef.current = { ...targetRef.current };
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
@@ -60,35 +98,76 @@ export function ProjectVideoCard({
       <RevealMedia className="project-video-reveal" index={revealIndex}>
         <button
           aria-label={`Play ${video.title || "project video"}`}
-          className={["project-video-card", className, isHovering ? "is-hovering" : ""].filter(Boolean).join(" ")}
+          className={["project-video-card", className, isHovering ? "is-hovering" : "", isPreviewReady ? "is-preview-ready" : ""]
+            .filter(Boolean)
+            .join(" ")}
           onClick={() => setIsOpen(true)}
           onPointerEnter={(event) => {
             setIsHovering(true);
             handlePointerMove(event);
+            syncCurrentToTarget();
           }}
-          onPointerLeave={() => setIsHovering(false)}
+          onPointerLeave={() => {
+            setIsHovering(false);
+            resetTarget();
+          }}
           onPointerMove={handlePointerMove}
           onMouseEnter={(event) => {
             setIsHovering(true);
             handleMouseMove(event);
+            syncCurrentToTarget();
           }}
-          onMouseLeave={() => setIsHovering(false)}
+          onMouseLeave={() => {
+            setIsHovering(false);
+            resetTarget();
+          }}
           onMouseMove={handleMouseMove}
+          ref={cardRef}
           type="button"
         >
-          <span className="project-video-card-media">
-            <video aria-hidden="true" muted playsInline poster={video.poster} preload="metadata" src={video.src} />
+          <span
+            className={[
+              "project-video-card-media",
+              video.poster ? "has-poster" : "",
+              isPreviewReady ? "is-preview-ready" : "is-preview-loading"
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={mediaStyle}
+          >
+            {video.poster ? (
+              // eslint-disable-next-line @next/next/no-img-element -- decorative arbitrary external poster, loaded only as a preview layer
+              <img
+                alt=""
+                aria-hidden="true"
+                className="project-video-card-poster"
+                onError={() => setPosterFailedKey(previewKey)}
+                onLoad={() => setPosterReadyKey(previewKey)}
+                ref={handlePosterRef}
+                src={video.poster}
+              />
+            ) : null}
+            <video
+              aria-hidden="true"
+              muted
+              onCanPlay={() => setVideoReadyKey(previewKey)}
+              onError={() => setVideoReadyKey(previewKey)}
+              onLoadedData={() => setVideoReadyKey(previewKey)}
+              playsInline
+              poster={video.poster}
+              preload="metadata"
+              src={video.src}
+            />
+            <span aria-hidden="true" className="project-video-card-loader">
+              <span className="project-video-card-loader-track" />
+            </span>
           </span>
-          <span className="project-video-mobile-play">
+          <span className="project-video-mobile-play" ref={bubbleRef}>
             <span aria-hidden="true" className="video-cursor-glass-effect" />
             <span className="video-cursor-bubble-text">Play</span>
           </span>
         </button>
       </RevealMedia>
-      <span className={["video-cursor-bubble is-play", isHovering ? "is-visible" : ""].filter(Boolean).join(" ")} ref={bubbleRef}>
-        <span aria-hidden="true" className="video-cursor-glass-effect" />
-        <span className="video-cursor-bubble-text">Play</span>
-      </span>
       {isOpen ? <VideoFullscreenPlayer onClose={() => setIsOpen(false)} video={video} /> : null}
     </>
   );

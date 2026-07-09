@@ -12,6 +12,14 @@
   "images": {
     "binding": "IMAGES"
   },
+  "d1_databases": [
+    {
+      "binding": "WORK_METRICS_DB",
+      "database_name": "carlwang-cn-studio-metrics",
+      "database_id": "bcfedbb5-fc84-4abe-864c-85a03664787b",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true
   },

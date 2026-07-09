@@ -152,7 +152,7 @@ export function ContactForm({ sourcePage = "/about#contact", variant = "default"
         <input aria-hidden="true" className="contact-honeypot" name="website" tabIndex={-1} />
         {feedback.tone !== "idle" ? <p className={`body-copy pw-form-feedback pw-form-feedback--${feedback.tone}`}>{feedback.text}</p> : null}
         <button className="pw-static-submit" disabled={state === "loading"} type="submit">
-          {state === "loading" ? "Sending" : "Send Message"}
+          <span className="pw-static-submit-label">{state === "loading" ? "Sending" : "Send Message"}</span>
         </button>
       </form>
     );

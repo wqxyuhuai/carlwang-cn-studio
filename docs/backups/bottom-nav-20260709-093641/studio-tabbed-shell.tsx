@@ -4,11 +4,11 @@ import type { CSSProperties, ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
-import { lastWorksHrefKey, normalizeWorksHref, rememberLastWorksHref } from "@/lib/work-detail-return";
 
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
 const bottomBlurBlockSize = "clamp(5.5rem, 14vh, 9rem)";
+const lastWorksHrefKey = "cw-last-works-href";
 
 function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
   if (typeof window === "undefined") return { mainTab: "works", workTab: "featured" };
@@ -34,7 +34,7 @@ function isWorksHref(href: string) {
 
 function rememberWorksHref(href = normalizedCurrentHref()) {
   if (!isWorksHref(href)) return;
-  rememberLastWorksHref(normalizeWorksHref(href));
+  window.sessionStorage.setItem(lastWorksHrefKey, href.replace("#works-list", "#works-index"));
 }
 
 function lastIndexHref() {
@@ -47,12 +47,6 @@ function lastWorksHref() {
   const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
   if (remembered && isWorksHref(remembered)) return remembered.replace("#works-list", "#works-index");
   return "/#works";
-}
-
-function titleFromCurrentView(mainTab: MainTab) {
-  const isHomeLanding = window.location.pathname === "/" && !window.location.search && (!window.location.hash || window.location.hash === "#works");
-  if (isHomeLanding) return "Studio | Carl Wang";
-  return `${mainTab === "about" ? "About" : "Works"} | Carl Wang Studio`;
 }
 
 function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
@@ -168,10 +162,9 @@ export function StudioTabbedShell({
   featured: ReactNode;
   list: ReactNode;
 }) {
-  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>({ mainTab: "works", workTab: "featured" });
+  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>(() => tabsFromHash());
   const [isAutoFlightEnabled, setIsAutoFlightEnabled] = useState(true);
   const [isLogoShaking, setIsLogoShaking] = useState(false);
-  const [viewTitle, setViewTitle] = useState("Studio | Carl Wang");
   const { mainTab, workTab } = tabs;
   const workTabsRef = useRef<HTMLDivElement>(null);
   const bottomNavRef = useRef<HTMLElement>(null);
@@ -210,26 +203,6 @@ export function StudioTabbedShell({
     []
   );
 
-  useEffect(() => {
-    function applyTitle() {
-      const title = titleFromCurrentView(mainTab);
-      setViewTitle(title);
-      document.title = title;
-      document.querySelectorAll("head title").forEach((element) => {
-        element.textContent = title;
-      });
-    }
-
-    applyTitle();
-    const frame = window.requestAnimationFrame(applyTitle);
-    const timeouts = [80, 300, 1000].map((delay) => window.setTimeout(applyTitle, delay));
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      timeouts.forEach((timeout) => window.clearTimeout(timeout));
-    };
-  }, [mainTab, workTab]);
-
   function selectMainTab(nextTab: MainTab) {
     if (nextTab === "about") {
       rememberWorksHref();
@@ -267,8 +240,6 @@ export function StudioTabbedShell({
   }
 
   return (
-    <>
-    <title>{viewTitle}</title>
     <main className="cw-studio-shell">
       {mainTab === "works" ? (
         <div className="cw-work-top-mask" aria-hidden="true" />
@@ -680,6 +651,5 @@ export function StudioTabbedShell({
         </button>
       ) : null}
     </main>
-    </>
   );
 }

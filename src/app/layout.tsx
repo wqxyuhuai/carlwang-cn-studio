@@ -3,6 +3,7 @@ import "./globals.css";
 import "@/components/common/reveal-media.css";
 import "@/components/video/video-player.css";
 import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
+import { ImageProtection } from "@/components/image-protection";
 import { SiteCursor } from "@/components/site-cursor";
 
 const themeInitScript = `(() => {
@@ -46,6 +47,7 @@ export default function RootLayout({
       </head>
       <body>
         <GlassDistortionFilter />
+        <ImageProtection />
         <SiteCursor />
         <div className="site-frame">
           {children}

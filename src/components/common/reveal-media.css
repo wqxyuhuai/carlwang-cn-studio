@@ -1,9 +1,11 @@
 /* Reveal media animation for project detail images and video thumbnails */
 .reveal-media {
-  clip-path: inset(8% 8% 8% 8%);
+  border-radius: var(--reveal-media-radius, inherit);
+  clip-path: inset(8% 8% 8% 8% round var(--reveal-media-radius, 0));
   display: block;
   filter: blur(10px);
   opacity: 0;
+  overflow: hidden;
   transform: scale(0.92) translateY(24px);
   transition:
     opacity 800ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -15,7 +17,7 @@
 }
 
 .reveal-media.is-visible {
-  clip-path: inset(0 0 0 0);
+  clip-path: inset(0 0 0 0 round var(--reveal-media-radius, 0));
   filter: blur(0);
   opacity: 1;
   transform: scale(1) translateY(0);
@@ -24,6 +26,7 @@
 .reveal-media > img,
 .reveal-media > video,
 .reveal-media .media-inner {
+  border-radius: inherit;
   display: block;
   height: 100%;
   width: 100%;
@@ -31,7 +34,7 @@
 
 @media (max-width: 768px) {
   .reveal-media {
-    clip-path: inset(5% 5% 5% 5%);
+    clip-path: inset(5% 5% 5% 5% round var(--reveal-media-radius, 0));
     filter: blur(4px);
     transform: scale(0.96) translateY(16px);
   }

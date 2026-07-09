@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
+import { lastWorksHrefKey, rememberLastWorksHref, rememberWorkReturnHref } from "@/lib/work-detail-return";
 import { metricLabel, workPublishedLabel } from "@/lib/work-metrics";
 
 type ViewMode = "grid" | "list";
@@ -18,7 +19,6 @@ type Filter = {
 
 const gridIcon = "/figma/pw2-icon-grid.svg?v=3";
 const listIcon = "/figma/pw2-icon-list.svg?v=3";
-const lastWorksHrefKey = "cw-last-works-href";
 
 function filterWorks(works: Work[], filter: Filter) {
   if (filter.kind === "all") return works;
@@ -60,8 +60,8 @@ export function WorksBrowser({
   workTypes: PublicWorkType[];
   title: string;
 }) {
-  const [mode, setMode] = useState<ViewMode>(() => initialModeFromLocation(initialMode));
-  const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
+  const [mode, setMode] = useState<ViewMode>(initialMode);
+  const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
   const visibleYears = useMemo(() => {
     const yearSource = filteredWorks.length > 0 ? filteredWorks : works;
@@ -78,6 +78,7 @@ export function WorksBrowser({
       setFilter(initialFilterFromLocation());
     }
 
+    syncFromLocation();
     window.addEventListener("cw:works-browser-sync", syncFromLocation);
     return () => window.removeEventListener("cw:works-browser-sync", syncFromLocation);
   }, [basePath, initialMode]);
@@ -93,14 +94,14 @@ export function WorksBrowser({
 
   function rememberBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
     if (basePath !== "/") return;
-    window.sessionStorage.setItem(lastWorksHrefKey, browserHref(nextFilter, nextMode));
+    rememberLastWorksHref(browserHref(nextFilter, nextMode));
   }
 
   function replaceBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
     const nextHref = browserHref(nextFilter, nextMode);
     window.history.replaceState(null, "", nextHref);
     if (basePath === "/") {
-      window.sessionStorage.setItem(lastWorksHrefKey, nextHref);
+      rememberLastWorksHref(nextHref);
     }
   }
 
@@ -114,9 +115,9 @@ export function WorksBrowser({
     replaceBrowserHref(filter, nextMode);
   }
 
-  function rememberWorkReturnHref() {
+  function rememberCurrentWorkReturnHref() {
     const returnHref = browserHref(filter, mode);
-    window.sessionStorage.setItem("cw-work-return-href", returnHref);
+    rememberWorkReturnHref(returnHref);
     rememberBrowserHref(filter, mode);
   }
 
@@ -178,7 +179,7 @@ export function WorksBrowser({
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
-                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} onClick={rememberWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
+                    <Link className="pw-works-grid-card" href={`/works/${work.slug}`} key={work.id} onClick={rememberCurrentWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
@@ -208,7 +209,7 @@ export function WorksBrowser({
               ) : (
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
-                <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id} onClick={rememberWorkReturnHref}>
+                <Link className="pw-list-row" href={`/works/${work.slug}`} key={work.id} onClick={rememberCurrentWorkReturnHref}>
                   <span className="pw-list-image">
                     <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
                   </span>

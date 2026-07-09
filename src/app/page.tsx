@@ -11,7 +11,9 @@ const contactEmailHref = "mailto:wqxyuhuai@163.com";
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPublicContent();
   return {
-    title: content.settings.seoTitle || "Carl Wang Studio",
+    title: {
+      absolute: "Studio | Carl Wang"
+    },
     description: content.settings.seoDescription || "A designer working across visual, digital and spatial systems.",
     openGraph: {
       title: content.settings.seoTitle || "Carl Wang Studio",

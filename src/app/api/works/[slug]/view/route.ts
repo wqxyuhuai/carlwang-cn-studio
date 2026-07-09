@@ -2,6 +2,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { getOssConfig, ossPublicUrl, putJsonToOss } from "@/lib/admin/oss";
 import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/public-content";
+import { incrementWorkViewCount } from "@/lib/work-view-counts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,10 +42,14 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ ok: false, error: "Work not found." }, { status: 404 });
   }
 
-  const viewCount = numberValue(target.viewCount) + 1;
+  const baseViewCount = numberValue(target.viewCount);
+  const d1ViewCount = await incrementWorkViewCount(slug, baseViewCount);
+  const viewCount = d1ViewCount ?? baseViewCount + 1;
   target.viewCount = viewCount;
 
-  await putJsonToOss(contentKey, content);
+  if (d1ViewCount === null) {
+    await putJsonToOss(contentKey, content);
+  }
 
   revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");
   revalidatePath("/works", "page");
