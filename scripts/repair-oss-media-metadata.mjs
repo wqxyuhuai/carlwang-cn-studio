@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ENV_PATH = path.resolve(".env.local");
-const DEFAULT_CONTENT_URL = "https://carlwang-cn.oss-cn-shanghai.aliyuncs.com/uploads/site-content.json";
+const DEFAULT_CONTENT_URL = "https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json";
 const MAX_REPAIR_BYTES = Number(process.env.OSS_REPAIR_MAX_BYTES || 30 * 1024 * 1024);
 
 function loadEnv(filePath) {

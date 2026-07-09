@@ -85,6 +85,8 @@ export function VideoScrubTimeline({
   const [generatedThumbs, setGeneratedThumbs] = useState<{ items: string[]; src: string } | null>(null);
   const frameCount = video.spriteFrameCount || 8;
   const progress = duration > 0 ? clamp(currentTime / duration) : 0;
+  const hoverProgress = hoverTime !== null && duration > 0 ? clamp(hoverTime / duration) : progress;
+  const hoverTimeEdgeClass = hoverProgress < 0.08 ? "is-start" : hoverProgress > 0.92 ? "is-end" : "";
   const fallbackThumbs = useMemo(
     () => (!video.spriteSrc && video.poster ? Array.from({ length: frameCount }, () => video.poster as string) : []),
     [frameCount, video.poster, video.spriteSrc]
@@ -159,7 +161,7 @@ export function VideoScrubTimeline({
       onPointerUp={handlePointerUp}
       ref={trackRef}
       role="slider"
-      style={{ "--video-progress": `${progress * 100}%` } as CSSProperties}
+      style={{ "--video-hover-progress": `${hoverProgress * 100}%`, "--video-progress": `${progress * 100}%` } as CSSProperties}
       tabIndex={0}
     >
       <div className="video-scrub-strip">
@@ -172,7 +174,7 @@ export function VideoScrubTimeline({
         )}
       </div>
       <span className="video-scrub-progress" />
-      {hoverTime !== null ? <span className="video-scrub-time">{formatTime(hoverTime)}</span> : null}
+      {hoverTime !== null ? <span className={["video-scrub-time", hoverTimeEdgeClass].filter(Boolean).join(" ")}>{formatTime(hoverTime)}</span> : null}
     </div>
   );
 }

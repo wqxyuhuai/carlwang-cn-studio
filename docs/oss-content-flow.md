@@ -2,10 +2,10 @@
 
 ## Phase 1
 
-The static front end reads the temporary public JSON:
+The public front end reads the normalized OSS content index:
 
 ```ts
-https://carlwang-cn.oss-cn-shanghai.aliyuncs.com/uploads/site-content.json
+https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json
 ```
 
 If that JSON fails or does not match the PW2 shape, the front end falls back to local reference data.
@@ -19,8 +19,8 @@ Notion databases and page bodies
   -> upload images and videos to Aliyun OSS
   -> write preview JSON
   -> validate
-  -> publish public JSON
-  -> static front end reads public JSON
+  -> publish public index JSON and per-project body JSON
+  -> public front end reads the index and resolves work bodies from contentUrl
 ```
 
 ## Security Rules

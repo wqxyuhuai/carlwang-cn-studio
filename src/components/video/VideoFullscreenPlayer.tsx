@@ -1,12 +1,37 @@
 "use client";
 
-import type { PointerEvent } from "react";
+import type { MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VideoControls } from "./VideoControls";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
 
 function supportsReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getRenderedVideoRect(element: HTMLVideoElement) {
+  const bounds = element.getBoundingClientRect();
+  const videoWidth = element.videoWidth || bounds.width;
+  const videoHeight = element.videoHeight || bounds.height;
+
+  if (!videoWidth || !videoHeight || !bounds.width || !bounds.height) return bounds;
+
+  const videoRatio = videoWidth / videoHeight;
+  const boundsRatio = bounds.width / bounds.height;
+
+  if (boundsRatio > videoRatio) {
+    const width = bounds.height * videoRatio;
+    const left = bounds.left + (bounds.width - width) / 2;
+    return new DOMRect(left, bounds.top, width, bounds.height);
+  }
+
+  const height = bounds.width / videoRatio;
+  const top = bounds.top + (bounds.height - height) / 2;
+  return new DOMRect(bounds.left, top, bounds.width, height);
+}
+
+function isPointInsideRect(x: number, y: number, rect: DOMRect) {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 export function VideoFullscreenPlayer({
@@ -28,6 +53,7 @@ export function VideoFullscreenPlayer({
   const [isDimmed, setIsDimmed] = useState(false);
   const [isMuted, setIsMuted] = useState(video.mutedDefault ?? true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -145,14 +171,28 @@ export function VideoFullscreenPlayer({
   }, []);
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    const element = videoRef.current;
+    const nextIsPointerOnVideo = element ? isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element)) : false;
+
     targetRef.current = { x: event.clientX, y: event.clientY };
     if (bubbleRef.current.x === 0 && bubbleRef.current.y === 0) {
       bubbleRef.current = { x: event.clientX, y: event.clientY };
       auraRef.current = { x: event.clientX, y: event.clientY };
     }
+    setIsPointerOnVideo(nextIsPointerOnVideo);
     setIsDimmed(false);
     if (inactivityTimerRef.current) window.clearTimeout(inactivityTimerRef.current);
     inactivityTimerRef.current = window.setTimeout(() => setIsDimmed(true), 2000);
+  }
+
+  function handlePointerLeave() {
+    setIsPointerOnVideo(false);
+  }
+
+  function handleOverlayClick(event: MouseEvent<HTMLDivElement>) {
+    const element = videoRef.current;
+    if (!element || !isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element))) return;
+    closePlayer();
   }
 
   function seekTo(time: number) {
@@ -166,13 +206,14 @@ export function VideoFullscreenPlayer({
     <div
       aria-label="Fullscreen video player"
       className={["video-player-overlay", isClosing ? "is-closing" : "", isDimmed ? "is-idle" : ""].filter(Boolean).join(" ")}
-      onClick={closePlayer}
+      onClick={handleOverlayClick}
+      onPointerLeave={handlePointerLeave}
       onPointerMove={handlePointerMove}
       role="dialog"
     >
       <span className="video-player-backdrop" style={{ backgroundImage: video.poster ? `url(${video.poster})` : undefined }} />
       <span className="video-player-cloud" ref={cloudRef} />
-      <span className="video-cursor-bubble is-close" ref={closeBubbleRef}>
+      <span className={["video-cursor-bubble is-close", isPointerOnVideo && !isDimmed ? "is-visible" : ""].filter(Boolean).join(" ")} ref={closeBubbleRef}>
         <span aria-hidden="true" className="video-cursor-glass-effect" />
         <span className="video-cursor-bubble-text">Stop</span>
       </span>

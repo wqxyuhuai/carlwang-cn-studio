@@ -141,8 +141,7 @@
   transition: opacity 180ms ease;
 }
 
-.video-cursor-bubble.is-visible,
-.video-player-overlay:not(.is-idle) .video-cursor-bubble.is-close {
+.video-cursor-bubble.is-visible {
   opacity: 1;
 }
 
@@ -320,15 +319,17 @@
   border-radius: calc(var(--radius-site-sm) - 2px);
   cursor: ew-resize;
   inline-size: clamp(18rem, 28vw, 26rem);
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   touch-action: none;
 }
 
 .video-scrub-strip,
 .video-scrub-sprite {
+  border-radius: inherit;
   display: flex;
   inset: 0;
+  overflow: hidden;
   position: absolute;
 }
 
@@ -382,12 +383,25 @@
   color: var(--video-theme-ink);
   font-size: 0.75rem;
   inset-block-start: 50%;
-  inset-inline-start: var(--video-progress, 0%);
+  inset-inline-start: var(--video-hover-progress, 0%);
   line-height: 1;
   padding: 0.25rem 0.5rem;
   pointer-events: none;
   position: absolute;
   transform: translate(-50%, -50%);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.video-scrub-time.is-start {
+  inset-inline-start: 0.375rem;
+  transform: translateY(-50%);
+}
+
+.video-scrub-time.is-end {
+  inset-inline-end: 0.375rem;
+  inset-inline-start: auto;
+  transform: translateY(-50%);
 }
 
 @keyframes video-overlay-in {
