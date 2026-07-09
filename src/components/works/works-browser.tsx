@@ -3,7 +3,8 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
@@ -60,6 +61,8 @@ export function WorksBrowser({
   workTypes: PublicWorkType[];
   title: string;
 }) {
+  const router = useRouter();
+  const prefetchedDetailHrefs = useRef(new Set<string>());
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
@@ -125,6 +128,13 @@ export function WorksBrowser({
     return workDetailHrefWithReturn(`/works/${slug}`, browserHref(filter, mode));
   }
 
+  function prefetchWorkDetail(slug: string) {
+    const href = workDetailHref(slug);
+    if (prefetchedDetailHrefs.current.has(href)) return;
+    prefetchedDetailHrefs.current.add(href);
+    router.prefetch(href);
+  }
+
   const homeTitleStyle = basePath === "/" ? ({ insetBlockEnd: "clamp(5.5rem, 14vh, 9rem)" } as CSSProperties) : undefined;
 
   function gridCardEntryStyle(index: number) {
@@ -183,7 +193,17 @@ export function WorksBrowser({
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
-                    <Link className="pw-works-grid-card" href={workDetailHref(work.slug)} key={work.id} onClick={rememberCurrentWorkReturnHref} style={gridCardEntryStyle(index)} title={work.intro}>
+                    <Link
+                      className="pw-works-grid-card"
+                      href={workDetailHref(work.slug)}
+                      key={work.id}
+                      onClick={rememberCurrentWorkReturnHref}
+                      onFocus={() => prefetchWorkDetail(work.slug)}
+                      onPointerEnter={() => prefetchWorkDetail(work.slug)}
+                      prefetch={false}
+                      style={gridCardEntryStyle(index)}
+                      title={work.intro}
+                    >
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
@@ -213,7 +233,15 @@ export function WorksBrowser({
               ) : (
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
-                <Link className="pw-list-row" href={workDetailHref(work.slug)} key={work.id} onClick={rememberCurrentWorkReturnHref}>
+                <Link
+                  className="pw-list-row"
+                  href={workDetailHref(work.slug)}
+                  key={work.id}
+                  onClick={rememberCurrentWorkReturnHref}
+                  onFocus={() => prefetchWorkDetail(work.slug)}
+                  onPointerEnter={() => prefetchWorkDetail(work.slug)}
+                  prefetch={false}
+                >
                   <span className="pw-list-image">
                     <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
                   </span>

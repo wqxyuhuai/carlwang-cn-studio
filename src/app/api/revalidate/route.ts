@@ -1,7 +1,6 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin/auth";
-import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/public-content";
+import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/cache-tags";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,8 +14,7 @@ function hasValidSecret(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   if (!hasValidSecret(request)) {
-    const auth = requireAdmin(request, { mutate: true });
-    if (!auth.ok) return auth.response;
+    return NextResponse.json({ ok: false, error: "Invalid revalidate secret." }, { status: 401 });
   }
 
   revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");

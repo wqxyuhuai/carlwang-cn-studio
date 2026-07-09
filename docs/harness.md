@@ -29,7 +29,8 @@ The root `HARNESS.md` is the canonical project validation checklist. This file k
 
 - `npm run lint` passes.
 - `npm run build` passes.
-- `/admin` is blocked by robots.
+- `/api/revalidate` rejects requests without `REVALIDATE_SECRET`.
+- Work view count increments do not force full public cache revalidation when D1 succeeds.
 - No front-end secret variables.
 - Reduced motion is respected.
 

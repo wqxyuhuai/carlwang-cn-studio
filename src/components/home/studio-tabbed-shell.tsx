@@ -103,21 +103,29 @@ function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (typeof window === "undefined" || typeof navigator === "undefined") return;
 
-    const frame = window.requestAnimationFrame(() => {
+    const mediaQuery = window.matchMedia("(max-width: 760px), (pointer: coarse)");
+    const updateFilterSupport = () => {
       const isWebkit = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
       const isFirefox = /Firefox/.test(navigator.userAgent);
       const supportsUrlFilter =
         Boolean(window.CSS?.supports("backdrop-filter", `url(#${filterId})`)) ||
         Boolean(window.CSS?.supports("-webkit-backdrop-filter", `url(#${filterId})`));
 
-      setSupportsSvgFilter(!isWebkit && !isFirefox && supportsUrlFilter);
-    });
+      setSupportsSvgFilter(!mediaQuery.matches && !isWebkit && !isFirefox && supportsUrlFilter);
+    };
 
-    return () => window.cancelAnimationFrame(frame);
+    const frame = window.requestAnimationFrame(updateFilterSupport);
+    mediaQuery.addEventListener("change", updateFilterSupport);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      mediaQuery.removeEventListener("change", updateFilterSupport);
+    };
   }, [filterId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!supportsSvgFilter) return;
 
     const element = navRef.current;
     let frame = window.requestAnimationFrame(updateDisplacementMap);
@@ -137,7 +145,7 @@ function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
       window.cancelAnimationFrame(frame);
       resizeObserver.disconnect();
     };
-  }, [navRef, updateDisplacementMap]);
+  }, [navRef, supportsSvgFilter, updateDisplacementMap]);
 
   const style = useMemo(
     () =>
@@ -403,9 +411,11 @@ export function StudioTabbedShell({
           id="cw-featured-panel"
           role="tabpanel"
         >
-          <FeaturedCanvasMotionContext.Provider value={featuredCanvasMotion}>
-            {featured}
-          </FeaturedCanvasMotionContext.Provider>
+          {mainTab === "works" && workTab === "featured" ? (
+            <FeaturedCanvasMotionContext.Provider value={featuredCanvasMotion}>
+              {featured}
+            </FeaturedCanvasMotionContext.Provider>
+          ) : null}
         </div>
         <div
           aria-hidden={workTab !== "list"}

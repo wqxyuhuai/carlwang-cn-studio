@@ -24,8 +24,6 @@
     "enabled": true
   },
   "vars": {
-    "NEXT_PUBLIC_CONTENT_URL": "https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json",
-    "ADMIN_CONTENT_SOURCE": "local",
-    "ADMIN_COOKIE_SECURE": "true"
+    "NEXT_PUBLIC_CONTENT_URL": "https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json"
   }
 }

@@ -1,6 +1,6 @@
 # Project Harness
 
-This harness is the required self-check for every staged change. Use it before publishing and after any change touching visual layout, data access, Notion, OSS or admin routes.
+Use this checklist before publishing and after changes touching visual layout, public data access, Notion sync scripts, OSS assets, metrics or cache behavior.
 
 ## Local Run
 
@@ -11,47 +11,55 @@ npm run lint
 npm run typecheck
 npm run build
 npm run check
-npm run format
 ```
 
 Notes:
 
 - `npm run check` runs lint, TypeScript and production build.
 - `npm run format` uses ESLint auto-fix. Review the diff after running it.
-- Admin APIs require a server runtime. Static export mode is only for public-only previews: `npm run build:export`.
-- If publishing the ignored `out/` directory, run `npm run build:export` immediately before upload so stale static files are not deployed.
+- Public content comes from OSS and cached server data, so validate with real `NEXT_PUBLIC_CONTENT_URL` when possible.
+- `/api/revalidate` requires `REVALIDATE_SECRET` and replaces the removed admin revalidation route.
 
-## Required Checks
+## Required Public Checks
 
 Every modification should verify:
 
 1. Homepage `/` opens normally.
 2. Works page `/works` opens normally.
-3. Work Detail page such as `/works/studio-web-system` opens normally.
+3. Work detail page such as `/works/studio-web-system` opens normally.
 4. About page `/about` opens normally.
-5. Contact and Footer links are clickable.
-6. Admin login page `/admin` renders.
-7. Admin Dashboard renders after login when auth is configured.
-8. Admin Works management view renders after login.
-9. Admin Integrations view renders after login.
-10. TypeScript has no errors.
-11. Browser console has no obvious runtime errors.
+5. Contact and footer links are clickable.
+6. Works filtering and grid/list mode switching work.
+7. Detail close button and Escape return to the source page, including `/?view=grid#works-index`.
+8. Detail previous/next links preserve the original return page.
+9. Text selection is white background with black text.
+10. Browser console has no obvious runtime errors.
+11. TypeScript has no errors.
 12. Production build passes.
 
-## Task 03 Data Checks
+## Performance Checks
+
+Before release, verify:
+
+1. Opening a work detail page does not trigger repeated `site-content.json` refetches on every navigation.
+2. Work detail body JSON loaded through `contentUrl` is cached and reused.
+3. Closing a detail page returns to the works list without a noticeable cold navigation pause.
+4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches only the intended route.
+5. `/api/works/[slug]/view` increments the displayed count but does not invalidate the full public content cache on every D1-backed view.
+6. Multimedia requests use browser/server cache headers where supported and do not reload unchanged OSS assets unnecessarily.
+
+## Content Checks
 
 Before release, verify the real content path:
 
-1. Admin Dashboard loads from Notion when `ADMIN_CONTENT_SOURCE=notion`.
-2. Studio Projects, Studio Project Categories, Studio Tools, Studio Social Links and Studio Contact Messages list without raw Notion errors.
-3. Integrations shows each target Notion table, expected schema fields and OSS status.
-4. Creating, editing, duplicating, publishing and archiving a Work works from admin.
-5. Work publish validation blocks missing Title, Slug, Date, Category or Cover.
-6. OSS upload writes File URL, Object Key, Type, Usage, Size and Uploaded At to Media Library.
-7. Media delete is blocked when another record references File URL or Object Key.
-8. Home, Works, Work Detail, About and Footer render dynamic data with fallback content when Notion is empty.
-9. Contact Form writes to Studio Contact Messages and keeps raw fields read-only.
-10. Saving content triggers revalidate feedback in admin.
+1. `npm run content:sync-all` can sync Notion assets to OSS.
+2. `npm run content:publish` writes the public OSS index JSON.
+3. Public Home, Works, Work Detail, About and Footer render OSS data with fallback content if the OSS read fails.
+4. Published works require Title, Slug, Date, Category, Cover and published display status in Notion.
+5. Draft or hidden works are excluded from public route generation.
+6. Tool icons and social links tolerate missing optional assets.
+7. Unsupported Notion page-body blocks are skipped safely.
+8. `/api/revalidate` refreshes public caches when called with the revalidation secret.
 
 ## Visual Protection
 
@@ -60,18 +68,16 @@ Do not casually change:
 1. Homepage layout, intro direction, gradient background and motion layer.
 2. Featured Works card ratio, hover logic and horizontal scroll rhythm.
 3. About page structure, direction list, experience rhythm and contact composition.
-4. Admin dark, clear and restrained management UI.
-5. Current font, color token, spacing and square-radius systems.
-6. Figma typography mapping in `AGENTS.md` and `docs/design-tokens.md`: footer/body text uses `正文 r` 16/125, navigation and emphasized labels use `正文 m` 16/125, true small metadata uses `小字`, and display text uses Bebas Neue tokens.
+4. Current font, color token, spacing and square-radius systems.
+5. Figma typography mapping in `AGENTS.md` and `docs/design-tokens.md`.
 
 ## Data Protection
 
 1. Do not delete real Notion data.
-2. Delete should archive by default, not physically delete.
-3. Contact form raw name, email and message are read-only.
-4. Do not delete OSS files if any record or page still references them.
-5. Notion tokens and Aliyun secrets must never appear in front-end code.
-6. `.env`, `.env.local` and real secret values must never be committed.
+2. Do not delete OSS files if any record or page still references them.
+3. Notion tokens and Aliyun secrets must never appear in front-end code.
+4. `.env`, `.env.local` and real secret values must never be committed.
+5. Contact submissions must not be logged raw or exposed through public JSON.
 
 ## Manual QA Checklist
 
@@ -82,13 +88,10 @@ Check these after each stage:
 - Tablet width.
 - Mobile width.
 - Text readability on dark backgrounds.
-- Works filtering or mode switching still works.
 - Images do not distort.
 - Links are clickable and not covered by pinned motion layers.
-- Admin save shows success or failure feedback.
-- Saved content can update the public front end after revalidation or data refresh.
 - Responsive widths: 1440, 1280, 1024, 768, 430 and 390 px.
-- Check keyboard focus, reduced motion behavior and no obvious console errors.
+- Keyboard focus, reduced motion behavior and no obvious console errors.
 
 ## Route Checklist
 
@@ -99,14 +102,12 @@ Public:
 - `/works/studio-web-system`
 - `/about`
 
-Admin and API:
+API:
 
-- `/admin`
-- `/api/admin/session`
-- `/api/admin/dashboard`
-- `/api/admin/integrations/status`
 - `/api/contact`
+- `/api/works/[slug]/view`
+- `/api/revalidate`
 
 ## Rollback Note
 
-If a change visibly breaks the approved public pages or admin shell, revert the most recent relevant edit first. Do not stack new fixes on top of a broken visual baseline unless the root cause is already isolated.
+A backup branch should be created before large cleanup or performance work. If a change visibly breaks the approved public pages, revert the most recent relevant edit first instead of stacking unrelated fixes on top of a broken baseline.

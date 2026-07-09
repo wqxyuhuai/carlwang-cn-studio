@@ -55,6 +55,23 @@ const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
 
 export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
 
+function useFeaturedCanvasCompactMode() {
+  const [isCompact, setIsCompact] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(max-width: 760px), (pointer: coarse)");
+    const updateCompactMode = () => setIsCompact(mediaQuery.matches);
+    updateCompactMode();
+    mediaQuery.addEventListener("change", updateCompactMode);
+
+    return () => mediaQuery.removeEventListener("change", updateCompactMode);
+  }, []);
+
+  return isCompact;
+}
+
 const INFINITE_CHUNK_OFFSETS = (() => {
   const maxDistance = INFINITE_RENDER_DISTANCE + INFINITE_FADE_MARGIN;
   const offsets: Array<[number, number, number]> = [];
@@ -71,6 +88,16 @@ const INFINITE_CHUNK_OFFSETS = (() => {
 
   return offsets;
 })();
+
+const INFINITE_COMPACT_CHUNK_OFFSETS: Array<[number, number, number]> = [
+  [0, 0, 0],
+  [0, 0, -1],
+  [0, 0, 1],
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0]
+];
 
 function shouldPlayFeaturedEntry() {
   if (typeof window === "undefined") return true;
@@ -151,7 +178,8 @@ function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCo
 }
 
 function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean) {
-  return INFINITE_CHUNK_OFFSETS.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
+  const offsets = compact ? INFINITE_COMPACT_CHUNK_OFFSETS : INFINITE_CHUNK_OFFSETS;
+  return offsets.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
 }
 
 function InfiniteCanvasPlane({
@@ -466,6 +494,7 @@ function repeatImages(images: CanvasImage[], count: number) {
 export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const router = useRouter();
   const { autoFlightEnabled, featuredActive } = useContext(FeaturedCanvasMotionContext);
+  const isCompact = useFeaturedCanvasCompactMode();
   const [playEntry, setPlayEntry] = useState(() => (featuredActive ? shouldPlayFeaturedEntry() : false));
   const entryResolvedRef = useRef(featuredActive);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
@@ -487,7 +516,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
         })),
     [works]
   );
-  const canvasImages = repeatImages(images, 24);
+  const canvasImages = repeatImages(images, isCompact ? 12 : 24);
 
   useEffect(() => {
     if (!featuredActive || entryResolvedRef.current) return;
@@ -509,14 +538,14 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
         camera={{ position: [0, 0, playEntry ? INFINITE_ENTRY_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z], fov: 46, near: 1, far: 230 }}
         dpr={[1, 1.5]}
         flat
-        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true }}
+        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false }}
       >
         <color attach="background" args={["#10130f"]} />
         <fog attach="fog" args={["#10130f", 76, 178]} />
         <Suspense fallback={null}>
           <InfiniteCanvasWebGL
             autoFlightEnabled={autoFlightEnabled}
-            compact={false}
+            compact={isCompact}
             images={canvasImages}
             isActive={featuredActive}
             playEntry={playEntry}

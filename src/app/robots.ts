@@ -7,8 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
-        disallow: ["/admin"]
+        allow: "/"
       }
     ],
     sitemap: "https://studio.carlwang.cn/sitemap.xml"

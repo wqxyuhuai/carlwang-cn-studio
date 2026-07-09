@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+import { PUBLIC_CONTENT_CACHE_TAG } from "./cache-tags";
 import type { Experience, MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 
 export const CONTENT_URL =
@@ -353,7 +355,7 @@ function normalizeNotionBlock(value: unknown): NotionBlock | null {
 async function readJsonUrl(url: string) {
   if (!url) return null;
   try {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetch(url, { next: { revalidate: 300, tags: [PUBLIC_CONTENT_CACHE_TAG] } });
     if (!response.ok) throw new Error(String(response.status));
     return await response.json();
   } catch {
@@ -361,10 +363,15 @@ async function readJsonUrl(url: string) {
   }
 }
 
+const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v1"], {
+  revalidate: 300,
+  tags: [PUBLIC_CONTENT_CACHE_TAG]
+});
+
 export async function getWorkContent(work: Work): Promise<NotionBlock[]> {
   if (work.content.length > 0) return work.content;
   if (!work.contentUrl) return [];
-  const json = await readJsonUrl(work.contentUrl);
+  const json = await readWorkContentJson(work.contentUrl);
   if (!json || typeof json !== "object") return [];
   const candidate = json as { blocks?: unknown; content?: unknown };
   return normalizeNotionBlocks(candidate.blocks || candidate.content);
@@ -728,7 +735,7 @@ function normalizeProjectData(value: unknown): StudioData | null {
 
 export async function getStudioData(): Promise<StudioData> {
   try {
-    const response = await fetch(CONTENT_URL, { cache: "no-store" });
+    const response = await fetch(CONTENT_URL, { next: { revalidate: 60, tags: [PUBLIC_CONTENT_CACHE_TAG] } });
     if (!response.ok) throw new Error(`OSS responded ${response.status}`);
     const json = (await response.json()) as unknown;
 

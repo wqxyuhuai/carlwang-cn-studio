@@ -1,134 +1,113 @@
 # Data Flow
 
-This document describes the runtime flow for the current five-database Notion model. Field-level rules live in `docs/NOTION_SCHEMA.md`.
+This document describes the current public runtime and publishing flow. Field-level Notion rules live in `docs/NOTION_SCHEMA.md`.
 
-## Current Notion Sources
+## Current Sources
 
 ```plain text
-Studio Project Categories -> Works filters and category labels
-Studio Projects           -> Home featured works, Works list and Work Detail
-Studio Tools              -> About tools and Project tool icon lookup
-Studio Social Links       -> About, Contact and Footer links
-Studio Contact Messages   -> Contact form submissions
+Notion source databases
+  -> local publishing scripts
+  -> Aliyun OSS media and JSON
+  -> public Next.js data layer
+  -> public pages
 ```
 
-`Studio Site Settings` is no longer part of the data model and is not read by the app.
+The site no longer has an in-site admin console or `/api/admin/*` routes.
 
-## Works Flow
-
-```plain text
-Admin or Notion edits a Studio Project
-  -> record is read through the Notion adapter
-  -> 展示状态 controls public visibility
-  -> Date controls public ordering and year filters
-  -> Category relation resolves against Studio Project Categories
-  -> Tools multi-select labels match Studio Tools.Name
-  -> public Home reads Featured + 展示 projects
-  -> public Works reads 展示 projects sorted by Date descending
-  -> Work Detail reads the Project page body blocks
-```
-
-Rules:
-
-- Works page shows only `展示状态 = 展示`.
-- Home featured shows only `Featured = true` and `展示状态 = 展示`.
-- `Year`, `Status` and Project `Order` are deprecated.
-- Work Detail uses `Slug` for routing.
-- Unsupported Notion page-body blocks are skipped safely.
-
-## Tool Icon Flow
+## Publishing Flow
 
 ```plain text
-Studio Projects.Tools multi-select tag
-  -> match tag text to Studio Tools.Name
-  -> if Active = true and Logo SVG exists, render icon
-  -> if no match exists, render text label only
+Notion edits
+  -> npm run content:sync-all
+  -> scripts sync Notion media to OSS
+  -> npm run content:publish
+  -> uploads/admin/site-content.json is updated
+  -> optional POST /api/revalidate with REVALIDATE_SECRET
+  -> public caches refresh
 ```
 
 Rules:
 
-- `Studio Projects.Tools` is not a relation.
-- Matching is name-based and case-insensitive.
-- Missing icons must not break the detail page.
+- `uploads/admin/...` remains the remote OSS path for compatibility.
+- Public pages never query Notion from client components.
+- Secrets stay in local/server environments only.
+- `contentUrl` points each work to a per-project body JSON file under OSS.
 
-## Category Flow
+## Public Read Flow
 
 ```plain text
-Studio Project Categories
-  -> sort by Order ascending
-  -> create Works filter options
-  -> Project Category relation resolves display label
+src/lib/public-content.ts
+  -> getStudioData()
+  -> read NEXT_PUBLIC_CONTENT_URL
+  -> normalize works, types, tools, socials and experiences
+  -> overlay D1 view counts
+  -> cache with PUBLIC_CONTENT_CACHE_TAG
 ```
 
 Rules:
 
-- Filters are not hard-coded.
-- `同步状态 = 编辑中` is skipped.
+- Public content uses a short TTL plus tag revalidation.
+- Missing or invalid OSS JSON must fall back safely.
+- Public components should consume the shared data layer instead of hard-coded long-lived content.
 
-## Social Link Flow
+## Work Detail Flow
 
 ```plain text
-Studio Social Links
-  -> filter Active = true
-  -> sort by Order
-  -> Group controls placement
-  -> 点击处理方式 controls copy/new-window/mail behavior
+/works/[slug]
+  -> getWorkBySlug(slug)
+  -> read cached public work index
+  -> read cached per-project contentUrl JSON when needed
+  -> render Notion blocks
 ```
 
 Rules:
 
-- Footer uses configured links and hides empty URLs.
-- External links open in a new tab.
-- Email links should use `mailto:` when the Notion URL is configured that way.
+- Detail route uses `slug` from the published work index.
+- Detail body JSON should remain cacheable to avoid repeated multimedia metadata fetches.
+- Every entry point must preserve the current return URL with `from`.
+- Close button and Escape use `from`, then session storage, then referrer, then fallback.
+
+## View Count Flow
+
+```plain text
+Work detail mounts
+  -> POST /api/works/[slug]/view
+  -> D1 WORK_METRICS_DB increments views
+  -> detail heading updates from API response
+```
+
+Rules:
+
+- Counts are cumulative across browsers and devices.
+- Successful D1 increments must not revalidate the full public content cache on every view.
+- If D1 is unavailable, the route can fall back to updating the public OSS index JSON and then revalidate public caches.
 
 ## Contact Flow
 
 ```plain text
 Public Contact Form submit
-  -> frontend validation
+  -> client validation
   -> /api/contact server validation
-  -> honeypot and rate limit checks
-  -> write Studio Contact Messages
-  -> Status defaults to New
-  -> 邮件通知状态 and Notion 通知状态 default to 未通知
-  -> admin reviews and updates Status
+  -> honeypot and rate-limit checks
+  -> ok/error JSON response
 ```
 
 Rules:
 
-- Name, Email, Message, Source Page and Created At are read-only.
-- Message length is limited to 2000 characters.
-- Source Page is written as an absolute URL because Notion uses a URL property.
-
-## OSS Upload Flow
-
-```plain text
-Admin chooses a file
-  -> protected server upload API validates type and size
-  -> server uploads to Aliyun OSS
-  -> server generates public File URL and Object Key
-  -> local Media Library stores upload history
-  -> admin can paste/select URLs into Notion Files or relevant fields
-```
-
-Rules:
-
-- AccessKey and Secret stay server-side.
-- The browser never receives Aliyun credentials.
-- File names are normalized to a generated safe name.
-- Public read access must work for front-end rendering.
+- Raw contact name, email and message are user data.
+- Do not log or expose raw submissions unless a protected destination is explicitly added.
+- Message length is limited server-side.
 
 ## Revalidate Flow
 
 ```plain text
-Admin saves content
-  -> server persists content
-  -> server calls protected revalidate
-  -> public route cache refreshes
-  -> admin shows saved-and-updated or saved-but-cache-may-update-later
+POST /api/revalidate
+  -> validate REVALIDATE_SECRET from header or query
+  -> revalidate PUBLIC_CONTENT_CACHE_TAG
+  -> revalidate public routes
 ```
 
 Rules:
 
-- `/api/admin/revalidate` is protected by admin auth or `REVALIDATE_SECRET`.
+- `/api/revalidate` is secret-only.
 - Revalidation covers `/`, `/works`, `/about` and dynamic work detail routes.

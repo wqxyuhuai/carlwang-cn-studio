@@ -2,40 +2,50 @@
 
 ## Project Goal
 
-Carl Wang Studio is a personal portfolio and lightweight content platform for `studio.carlwang.cn`. The current priority is to preserve the approved static visual system while connecting real data from OSS, Notion and the protected admin console in controlled stages.
+Carl Wang Studio is a personal portfolio and lightweight public content platform for `studio.carlwang.cn`. Preserve the approved static visual system while reading real published data from Aliyun OSS and Notion-derived publishing scripts. The in-site `/admin` console has been removed.
 
 ## Page Structure
 
-- `/` renders the homepage hero, featured work strip, about copy, field hover showcase and footer.
+- `/` renders the homepage hero, featured work strip, about copy, works browser and footer/contact navigation.
 - `/works` renders the works browser.
-- `/works/[slug]` renders a work detail page from the shared data layer.
+- `/works/[slug]` renders a work detail page from the shared public data layer.
 - `/about` renders the About, direction, experience, contact and social sections.
-- `/admin` renders the protected admin console.
-- `/api/contact` receives public contact submissions.
-- `/api/admin/*` contains authenticated admin read/write, integration, upload and revalidation endpoints.
+- `/api/contact` receives public contact submissions and validates them without storing raw messages in an admin store.
+- `/api/works/[slug]/view` increments real work view counts through D1 with OSS fallback.
+- `/api/revalidate` refreshes cached public content when called with `REVALIDATE_SECRET`.
 
 ## Frontend Rules
 
 - Do not rewrite the approved homepage background, featured work card sizing, hover behavior, About page structure or footer rhythm without explicit direction.
 - Public pages should read display data through `src/lib/public-content.ts` or a shared data-layer replacement. Do not scatter long-lived content constants across pages.
-- Keep user-facing animation isolated in client leaf components, currently under `src/components/home` and `src/components/about`.
+- Keep user-facing animation isolated in client leaf components, currently under `src/components/home`, `src/components/about` and `src/components/works`.
 - Preserve reduced-motion fallbacks and avoid adding scroll or pointer listeners without cleanup.
 - Images used by public components must live under `public/` or come from the public content JSON / OSS URL.
 - Work detail exits are contextual: every public entry point to `/works/[slug]` must carry the current page URL in a `from` query parameter and mirror it into `cw-work-return-href`. The close button or Escape key must read `from` first, then stored state, and return to that source page instead of hard-coding Featured or `/#works`. Detail-to-detail pager links must preserve the original source page.
+- Do not enable default viewport prefetch for every work card if it causes many detail pages to load at once. Prefer intent-based hover/focus prefetch.
 
-## Admin Rules
+## Data And Cache Rules
 
-- `/admin` is a dark, restrained, utility-first management surface. Do not restyle it into a marketing page.
-- All admin write routes must call `requireAdmin(request, { mutate: true })`.
-- Login, session, CSRF and cookie handling lives in `src/lib/admin/auth.ts`.
-- Admin schemas are centralized in `src/lib/admin/schema.ts`; do not create one-off admin field definitions in pages.
-- Delete actions should archive records by default. Physical deletion is only acceptable for explicitly disposable media records and must be documented.
+- `src/lib/public-content.ts` is the public aggregation layer and owns the published works, work types, tools, socials and experience data consumed by pages.
+- `src/lib/site-data.ts` reads the public OSS index JSON and per-project `contentUrl` JSON. Keep per-project content fetches cacheable unless a task explicitly needs uncached debugging.
+- `src/lib/cache-tags.ts` owns cache tag constants. Public data revalidation should use `PUBLIC_CONTENT_CACHE_TAG`.
+- `src/lib/work-view-counts.ts` owns D1-backed work metrics. Do not invalidate the full public content cache for every successful D1 view increment.
+- `src/lib/oss.ts` contains minimal server-side OSS helpers used by public runtime fallbacks. Browser code must never receive Aliyun credentials.
+- `/api/revalidate` is secret-only and replaces the removed admin revalidation endpoint.
+- The OSS folder name `uploads/admin/...` is retained for compatibility with already published assets and JSON. Do not rename the remote path casually.
+
+## Content Publishing Rules
+
+- Notion is the editorial source, but public pages do not query Notion directly from client components.
+- Use `npm run content:sync-all` or the narrower `content:sync-*` scripts to sync Notion assets to OSS.
+- Use `npm run content:publish` after sync to write the public index JSON.
+- Use `/api/revalidate` with `REVALIDATE_SECRET` after publishing when immediate cache refresh is needed.
+- Keep Notion and OSS scripts server/local only. Do not move tokens, AccessKeys or publishing operations into client components.
 
 ## Component Naming
 
 - Page-specific interactive components belong in `src/components/home`, `src/components/about` or `src/components/works`.
 - Shared site components remain in `src/components` until there is enough duplication to justify `components/site` or `components/common`.
-- Admin components currently live inside `src/app/admin/admin-app.tsx`; split only when a clear repeated boundary appears.
 - Use PascalCase for React components and kebab-case for route or asset folders.
 
 ## Style And Token Rules
@@ -52,9 +62,9 @@ Use the Figma `PW2 design` text styles as the source of truth. Do not add new pu
 
 - `正文 r`: SF Pro Display Regular, 16px, 125%, 0 tracking. Use for body copy, footer links/copy, meta copy that is not explicitly small, form text and ordinary UI text. CSS source: `--type-body-r-*`; utility class: `.body-copy` or `.caption-copy`.
 - `正文 m`: SF Pro Display Medium, 16px, 125%, 0 tracking. Use for navigation, footer group headings, medium UI labels and text links that need emphasis. CSS source: `--type-body-m-*`; apply explicitly in component CSS.
-- `小字`: SF Pro Regular, 12px, 22px, 0 tracking. Use only for compact metadata, admin labels, image captions, status text and dense list stats. CSS source: `--type-small-*` / `--text-caption`.
+- `小字`: SF Pro Regular, 12px, 22px, 0 tracking. Use only for compact metadata, image captions, status text and dense list stats. CSS source: `--type-small-*` / `--text-caption`.
 - `小标题`: SF Pro Display Medium, 36px, 145%, -0.5% tracking. Use for `Featured Works`, `About` link headings and comparable public-page link headings. CSS source: `--type-subtitle-*`.
-- `标题`: SF Pro Medium, 26px, auto/approximately 120%, -0.4px tracking. Use for work titles, detail headings and card titles. CSS source: `--type-title-*` / `--text-title`.
+- `标题`: SF Pro Medium, 26px, approximately 120%, -0.4px tracking. Use for work titles, detail headings and card titles. CSS source: `--type-title-*` / `--text-title`.
 - `be 大标题`, `be 中标题`, `be 小标题`: Bebas Neue Bold with -0.5% tracking. Use only for hero, category, large display and section kicker typography. CSS source: `--type-display-*` plus the existing display-size tokens.
 
 Do not repurpose `.caption-copy` for 12px text. It intentionally maps to Figma `正文 r` because footer and meta text in the design are 16px. Use `--text-caption` directly in scoped CSS for true small text.
@@ -66,16 +76,15 @@ Do not casually change:
 - Homepage hero gradient, intro motion, custom cursor and work strip rhythm.
 - Featured Works card proportion, hover expansion and scroll-linked horizontal movement.
 - About page section order, large typography and media rhythm.
-- The admin dark interface structure, table/editor layout and status tiles.
 - Existing theme variables, type scale and spacing system.
 
 ## Notion And Aliyun Security
 
-- `NOTION_TOKEN`, Aliyun AccessKey secrets, `ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET` and `REVALIDATE_SECRET` are server-only.
+- `NOTION_TOKEN`, Aliyun AccessKey secrets and `REVALIDATE_SECRET` are server-only.
 - Never expose secrets through `NEXT_PUBLIC_*`, client components, logs, serialized props or public JSON.
 - `.env` and `.env.local` must not be committed.
-- OSS uploads must go through server-side API routes. The browser should never receive Aliyun credentials.
-- Contact messages are user submissions; raw name, email and message should remain read-only in admin.
+- OSS uploads and publishing must go through server/local scripts or server-side API routes. The browser should never receive Aliyun credentials.
+- Contact submissions are user data. Do not log raw name, email or message content unless the user explicitly adds a protected destination.
 
 ## Before Editing
 
@@ -87,7 +96,7 @@ Do not casually change:
 ## After Editing
 
 - Run `npm run lint` for small code edits.
-- Run `npm run check` before publishing, data-layer changes or admin changes.
-- Manually verify `/`, `/works`, one `/works/[slug]`, `/about` and `/admin`.
+- Run `npm run check` before publishing or data-layer changes.
+- Manually verify `/`, `/works`, one `/works/[slug]`, `/about`, `/api/contact`, `/api/works/[slug]/view` and `/api/revalidate` where relevant.
 - Check the browser console for obvious errors.
 - Confirm desktop and mobile widths still preserve the approved static visual direction.

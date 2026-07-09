@@ -33,14 +33,12 @@
     "content:update-notion-optimized": "node scripts/update-notion-body-media-to-optimized.mjs",
     "content:delete-unused-originals": "node scripts/delete-unused-oss-originals.mjs",
     "content:delete-unused-originals:apply": "node scripts/delete-unused-oss-originals.mjs --delete",
-    "admin:hash": "node scripts/generate-admin-password-hash.mjs",
     "check": "npm run lint && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@notionhq/client": "^5.22.0",
     "@react-three/fiber": "^9.6.1",
     "ali-oss": "^6.23.0",
-    "bcryptjs": "^3.0.3",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
     "gsap": "^3.15.0",

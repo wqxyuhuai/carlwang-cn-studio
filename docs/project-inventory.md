@@ -1,115 +1,59 @@
 # Project Inventory
 
-## Current Frontend Pages
+## Public Routes
 
-- `src/app/page.tsx`: homepage hero, featured work strip, about copy, field hover showcase and footer.
-- `src/app/works/page.tsx`: works listing surface through `WorksBrowser`.
-- `src/app/works/[slug]/page.tsx`: work detail page using `getWorkBySlug` and `getPublishedWorks`.
-- `src/app/about/page.tsx`: About hero, direction showcase, experience rows, contact form and footer.
-- `src/app/not-found.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`: app-level support routes.
+- `/`: homepage shell, featured work canvas, works browser and About preview.
+- `/works`: works browser.
+- `/works/[slug]`: work detail page with contextual return behavior.
+- `/about`: About, direction showcase, experience, contact form and social links.
+- `/video-player-demo`: local video player inspection route.
 
-## Current Admin Pages
+## API Routes
 
-- `src/app/admin/page.tsx`: admin route wrapper.
-- `src/app/admin/admin-app.tsx`: login, dashboard, collection editor, integrations, media upload and security UI.
-- Admin styling is in the `admin-*` section of `src/app/globals.css`.
+- `/api/contact`: validates contact form submissions and returns public success/error JSON.
+- `/api/media/oss`: server-side OSS media proxy/cache for public assets.
+- `/api/works/[slug]/view`: increments D1-backed work view counts, with OSS fallback.
+- `/api/revalidate`: secret-only public cache revalidation.
 
-## Current Route Structure
+There is no `/admin` route and no `/api/admin/*` runtime surface.
 
-Public routes:
+## Core Public Components
 
-- `/`
-- `/works`
-- `/works/[slug]`
-- `/about`
+- `src/components/home/*`: homepage shell, featured work canvas, tabbed navigation and hover showcase.
+- `src/components/about/*`: About page structure, direction media and experience/contact composition.
+- `src/components/works/*`: works browser, detail heading, detail close, detail scroll helpers.
+- `src/components/notion/notion-renderer.tsx`: renders published Notion body blocks.
+- `src/components/video/*`: custom project video player and related styling.
+- `src/components/image-protection.tsx`: public image interaction protection.
 
-Admin and API routes:
+## Data Layer
 
-- `/admin`
-- `/api/contact`
-- `/api/admin/login`
-- `/api/admin/logout`
-- `/api/admin/session`
-- `/api/admin/dashboard`
-- `/api/admin/[collection]`
-- `/api/admin/[collection]/[id]`
-- `/api/admin/integrations/status`
-- `/api/admin/integrations/test-notion`
-- `/api/admin/integrations/test-oss`
-- `/api/admin/media/upload`
-- `/api/admin/revalidate`
+- `src/lib/public-content.ts`: public aggregation and cache layer.
+- `src/lib/site-data.ts`: OSS index JSON reader, fallback content and per-project body reader.
+- `src/lib/cache-tags.ts`: shared cache tag constants.
+- `src/lib/work-view-counts.ts`: D1 work metrics.
+- `src/lib/oss.ts`: minimal server-side OSS helper for runtime fallback writes.
+- `src/lib/work-detail-return.ts`: detail-page return URL storage and validation.
+- `src/lib/work-metrics.ts`: public metric label formatting.
 
-## Current Component Directories
+## Publishing And Asset Scripts
 
-- `src/components/home`: homepage motion and hover showcase components.
-- `src/components/about`: About direction showcase.
-- `src/components/works`: works browser.
-- `src/components/notion`: Notion block renderer.
-- `src/components`: shared site navigation, footer, contact form, cascade text and glass SVG filter.
+- `scripts/sync-notion-assets-to-oss.mjs`: syncs Notion asset references to OSS.
+- `scripts/publish-oss-content.mjs`: publishes public `site-content.json` and per-project `content.json` files.
+- `scripts/optimize-oss-assets.mjs`: optimizes image assets.
+- `scripts/optimize-oss-videos.mjs`: optimizes video assets.
+- `scripts/update-notion-body-media-to-optimized.mjs`: rewrites Notion body media to optimized URLs.
+- `scripts/delete-unused-oss-originals.mjs`: audits or deletes unused original OSS media when run with `--delete`.
+- `scripts/capture-screenshots.mjs`: local visual screenshot helper.
 
-The current directory structure is intentionally kept stable for Task 01. A broader move into `components/site`, `components/common` or `components/admin` should wait until a later refactor with visual regression checks.
+## Runtime Bindings
 
-## Current Style Files
+- `WORK_METRICS_DB`: Cloudflare D1 database for work view counts.
+- `ASSETS`: OpenNext asset binding.
+- `IMAGES`: Cloudflare Images binding if used by runtime.
 
-- `src/app/globals.css`: global CSS, public page styles, motion styles and admin styles.
-- `src/styles/design-tokens.css`: fonts, color tokens, type scale, spacing, layout dimensions and motion tokens.
-- `postcss.config.mjs`: Tailwind v4 PostCSS configuration.
+## Important Compatibility Notes
 
-## Current Mock And Fallback Data
-
-- `src/lib/site-data.ts`: public data layer, OSS JSON fetch, normalization and fallback site content.
-- `src/lib/admin/seed.ts`: local admin seed derived from fallback content.
-- `.admin/admin-content.json`: ignored local admin store when created at runtime.
-
-Fallback data is still active and must stay until real public content is fully connected.
-
-## Current Notion And Aliyun Code
-
-- `src/lib/admin/notion-store.ts`: Notion token access, database ID resolution, read/write/archive helpers and connection tests.
-- `src/lib/admin/oss.ts`: Aliyun OSS config, upload helper, object URL generation and health check upload.
-- `src/lib/admin/integrations.ts`: masked integration status and test wrappers.
-- `src/lib/admin/content-store.ts`: local vs Notion collection source routing, validation, archive/delete behavior and dashboard data.
-- `src/lib/admin/schema.ts`: admin collection schema, Notion property mapping and navigation.
-- `src/lib/admin/auth.ts`: password verification, session token, CSRF, cookie and lockout logic.
-
-## Current Environment Files
-
-- `.env.example`: placeholder-only public, admin, Notion and Aliyun variables.
-- `.env`, `.env.local` and `.env.*.local`: ignored and must never be committed.
-
-Key server-only variables:
-
-- `ADMIN_PASSWORD_HASH`
-- `ADMIN_SESSION_SECRET`
-- `REVALIDATE_SECRET`
-- `NOTION_TOKEN`
-- `ALIYUN_ACCESS_KEY_ID`
-- `ALIYUN_ACCESS_KEY_SECRET`
-- `ALIYUN_OSS_ACCESS_KEY_ID`
-- `ALIYUN_OSS_ACCESS_KEY_SECRET`
-
-## Current Package Scripts
-
-- `npm run dev`: local Next dev server.
-- `npm run build`: production build.
-- `npm run start`: production server.
-- `npm run lint`: ESLint.
-- `npm run format`: ESLint auto-fix.
-- `npm run typecheck`: TypeScript no-emit check.
-- `npm run screenshots`: Playwright screenshot capture.
-- `npm run admin:hash`: admin password hash generator.
-- `npm run check`: lint, typecheck and build.
-
-## Current Docs
-
-- `README.md`: basic local commands and project scope.
-- `AGENTS.md`: agent working rules and project guardrails.
-- `HARNESS.md`: canonical validation checklist.
-- `docs/harness.md`: Figma and token-specific harness notes.
-- `docs/admin.md`: admin runtime, auth, content and API notes.
-- `docs/NOTION_SCHEMA.md`: Notion schema mapping notes.
-- `docs/DATA_FLOW.md`: Notion, OSS, contact and settings data flow notes.
-- `docs/oss-content-flow.md`: OSS content flow notes.
-- `docs/design-tokens.md`: token documentation.
-- `docs/figma-implementation.md`: Figma implementation notes.
-- `docs/cleanup-notes.md`: cleanup decisions and deferred cleanup.
+- Published OSS paths still use `uploads/admin/...`. This is a legacy object prefix and should not be interpreted as an active admin feature.
+- Public content caches are refreshed by TTL and `/api/revalidate`, not by admin saves.
+- Contact submissions are not stored in the removed admin system.
