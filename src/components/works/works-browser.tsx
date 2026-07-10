@@ -62,8 +62,10 @@ export function WorksBrowser({
   title: string;
 }) {
   const router = useRouter();
+  const pageRef = useRef<HTMLElement>(null);
   const prefetchedDetailHrefs = useRef(new Set<string>());
   const pendingDetailHrefRef = useRef<string | null>(null);
+  const worksRightRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
@@ -86,6 +88,33 @@ export function WorksBrowser({
     window.addEventListener("cw:works-browser-sync", syncFromLocation);
     return () => window.removeEventListener("cw:works-browser-sync", syncFromLocation);
   }, [basePath, initialMode]);
+
+  useEffect(() => {
+    const page = pageRef.current;
+    const worksRight = worksRightRef.current;
+    if (!page || !worksRight) return;
+    const scrollTarget = worksRight;
+
+    function forwardWheelToWorks(event: WheelEvent) {
+      if (event.ctrlKey || scrollTarget.contains(event.target as Node)) return;
+      if (getComputedStyle(scrollTarget).overflowY === "visible" || scrollTarget.scrollHeight <= scrollTarget.clientHeight) return;
+
+      const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? event.deltaY * 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? event.deltaY * scrollTarget.clientHeight
+          : event.deltaY;
+      const maxScrollTop = scrollTarget.scrollHeight - scrollTarget.clientHeight;
+      const nextScrollTop = Math.max(0, Math.min(maxScrollTop, scrollTarget.scrollTop + delta));
+
+      if (nextScrollTop === scrollTarget.scrollTop) return;
+      event.preventDefault();
+      scrollTarget.scrollTop = nextScrollTop;
+    }
+
+    page.addEventListener("wheel", forwardWheelToWorks, { passive: false });
+    return () => page.removeEventListener("wheel", forwardWheelToWorks);
+  }, []);
 
   function browserHref(nextFilter: Filter, nextMode: ViewMode) {
     const params = new URLSearchParams();
@@ -179,7 +208,7 @@ export function WorksBrowser({
   }
 
   return (
-    <section className="pw-works-page" aria-label="Works">
+    <section className="pw-works-page" aria-label="Works" ref={pageRef}>
       <div className="pw-works-layout">
         <aside className="pw-works-left">
           <div className="pw-category-list" aria-label="Work filters">
@@ -206,7 +235,7 @@ export function WorksBrowser({
           </h1>
         </aside>
 
-        <div className="pw-works-right">
+        <div className="pw-works-right" ref={worksRightRef}>
           {showViewToggle ? (
             <div className="pw-view-toggle" aria-label="Works view">
             <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setActiveMode("grid")} type="button">
@@ -242,7 +271,8 @@ export function WorksBrowser({
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
                           {work.featured ? (
                             <span aria-label="Featured work" className="pw-works-featured-mark" role="img">
-                              <Image alt="" height={15} src="/figma/pw2-featured-star.svg" width={16} />
+                              {/* eslint-disable-next-line @next/next/no-img-element -- Fixed-size local SVG icon. */}
+                              <img alt="" aria-hidden="true" className="pw-works-featured-mark-icon" src="/figma/pw2-featured-star.svg" />
                             </span>
                           ) : null}
                         </span>
@@ -280,9 +310,15 @@ export function WorksBrowser({
                   onPointerDown={(event) => handleWorkPointerDown(event, work.slug)}
                   onPointerEnter={() => prefetchWorkDetail(work.slug)}
                   prefetch={false}
-                >
+                  >
                   <span className="pw-list-image">
                     <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
+                    {work.featured ? (
+                      <span aria-label="Featured work" className="pw-works-featured-mark pw-works-featured-mark--list" role="img">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- Fixed-size local SVG icon. */}
+                        <img alt="" aria-hidden="true" className="pw-works-featured-mark-icon" src="/figma/pw2-featured-star.svg" />
+                      </span>
+                    ) : null}
                   </span>
                   <span>
                     <strong className="pw-list-title">{work.title}</strong>

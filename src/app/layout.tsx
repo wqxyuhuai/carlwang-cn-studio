@@ -10,6 +10,9 @@ const themeInitScript = `(() => {
   try {
     document.documentElement.dataset.theme = "dark";
     window.localStorage.setItem("theme", "dark");
+    const view = new URLSearchParams(window.location.search).get("view");
+    const isWorksIndex = window.location.hash === "#works-index" || window.location.hash === "#works-list" || view === "grid" || view === "list";
+    document.documentElement.dataset.workTab = isWorksIndex ? "list" : "featured";
   } catch {
   }
 })();`;

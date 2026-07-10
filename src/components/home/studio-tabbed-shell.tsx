@@ -1,14 +1,16 @@
 "use client";
 
-import type { CSSProperties, ReactNode, RefObject } from "react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
+import { useLiquidGlassSurface as useBottomNavGlassSurface } from "@/components/liquid-glass-surface";
 import { lastWorksHrefKey, normalizeWorksHref, rememberLastWorksHref } from "@/lib/work-detail-return";
 
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
 const bottomBlurBlockSize = "clamp(5.5rem, 14vh, 9rem)";
+const useLocationLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
   if (typeof window === "undefined") return { mainTab: "works", workTab: "featured" };
@@ -22,6 +24,11 @@ function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
     default:
       return { mainTab: "works", workTab: "featured" };
   }
+}
+
+function syncDocumentWorkTab(workTab: WorkTab) {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.workTab = workTab;
 }
 
 function normalizedCurrentHref() {
@@ -55,116 +62,6 @@ function titleFromCurrentView(mainTab: MainTab) {
   return `${mainTab === "about" ? "About" : "Works"} | Carl Wang Studio`;
 }
 
-function useBottomNavGlassSurface(navRef: RefObject<HTMLElement | null>) {
-  const reactId = useId();
-  const stableId = useMemo(() => reactId.replace(/[^a-zA-Z0-9_-]/g, ""), [reactId]);
-  const filterId = `cw-bottom-glass-filter-${stableId}`;
-  const redGradId = `cw-bottom-glass-red-${stableId}`;
-  const blueGradId = `cw-bottom-glass-blue-${stableId}`;
-  const [displacementMap, setDisplacementMap] = useState("");
-  const [supportsSvgFilter, setSupportsSvgFilter] = useState(false);
-
-  const generateDisplacementMap = useCallback(() => {
-    const rect = navRef.current?.getBoundingClientRect();
-    const styles = navRef.current ? window.getComputedStyle(navRef.current) : null;
-    const actualWidth = Math.max(1, Math.round(rect?.width || 380));
-    const actualHeight = Math.max(1, Math.round(rect?.height || 56));
-    const radius = styles ? Number.parseFloat(styles.borderTopLeftRadius) || 12 : 12;
-    const edgeSize = Math.min(actualWidth, actualHeight) * 0.035;
-
-    const svgContent = `
-      <svg viewBox="0 0 ${actualWidth} ${actualHeight}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="${redGradId}" x1="100%" y1="0%" x2="0%" y2="0%">
-            <stop offset="0%" stop-color="#0000"/>
-            <stop offset="100%" stop-color="red"/>
-          </linearGradient>
-          <linearGradient id="${blueGradId}" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stop-color="#0000"/>
-            <stop offset="100%" stop-color="blue"/>
-          </linearGradient>
-        </defs>
-        <rect x="0" y="0" width="${actualWidth}" height="${actualHeight}" fill="black"></rect>
-        <rect x="0" y="0" width="${actualWidth}" height="${actualHeight}" rx="${radius}" fill="url(#${redGradId})" />
-        <rect x="0" y="0" width="${actualWidth}" height="${actualHeight}" rx="${radius}" fill="url(#${blueGradId})" style="mix-blend-mode: difference" />
-        <rect x="${edgeSize}" y="${edgeSize}" width="${actualWidth - edgeSize * 2}" height="${
-          actualHeight - edgeSize * 2
-        }" rx="${radius}" fill="hsl(0 0% 50% / 0.93)" style="filter: blur(11px)" />
-      </svg>
-    `;
-
-    return `data:image/svg+xml,${encodeURIComponent(svgContent)}`;
-  }, [blueGradId, navRef, redGradId]);
-
-  const updateDisplacementMap = useCallback(() => {
-    setDisplacementMap(generateDisplacementMap());
-  }, [generateDisplacementMap]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof navigator === "undefined") return;
-
-    const mediaQuery = window.matchMedia("(max-width: 760px), (pointer: coarse)");
-    const updateFilterSupport = () => {
-      const isWebkit = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
-      const isFirefox = /Firefox/.test(navigator.userAgent);
-      const supportsUrlFilter =
-        Boolean(window.CSS?.supports("backdrop-filter", `url(#${filterId})`)) ||
-        Boolean(window.CSS?.supports("-webkit-backdrop-filter", `url(#${filterId})`));
-
-      setSupportsSvgFilter(!mediaQuery.matches && !isWebkit && !isFirefox && supportsUrlFilter);
-    };
-
-    const frame = window.requestAnimationFrame(updateFilterSupport);
-    mediaQuery.addEventListener("change", updateFilterSupport);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      mediaQuery.removeEventListener("change", updateFilterSupport);
-    };
-  }, [filterId]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!supportsSvgFilter) return;
-
-    const element = navRef.current;
-    let frame = window.requestAnimationFrame(updateDisplacementMap);
-
-    if (!element || typeof ResizeObserver === "undefined") {
-      return () => window.cancelAnimationFrame(frame);
-    }
-
-    const resizeObserver = new ResizeObserver(() => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(updateDisplacementMap);
-    });
-
-    resizeObserver.observe(element);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      resizeObserver.disconnect();
-    };
-  }, [navRef, supportsSvgFilter, updateDisplacementMap]);
-
-  const style = useMemo(
-    () =>
-      ({
-        "--cw-bottom-glass-filter": `url(#${filterId})`
-      }) as CSSProperties,
-    [filterId]
-  );
-
-  return {
-    blueGradId,
-    displacementMap,
-    filterId,
-    redGradId,
-    style,
-    supportsSvgFilter
-  };
-}
-
 export function StudioTabbedShell({
   about,
   contactHref,
@@ -176,7 +73,8 @@ export function StudioTabbedShell({
   featured: ReactNode;
   list: ReactNode;
 }) {
-  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>({ mainTab: "works", workTab: "featured" });
+  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>(tabsFromHash);
+  const [isLocationSynced, setIsLocationSynced] = useState(false);
   const [isAutoFlightEnabled, setIsAutoFlightEnabled] = useState(true);
   const [isLogoShaking, setIsLogoShaking] = useState(false);
   const [viewTitle, setViewTitle] = useState("Studio | Carl Wang");
@@ -193,9 +91,11 @@ export function StudioTabbedShell({
     [isAutoFlightEnabled, mainTab, workTab]
   );
 
-  useEffect(() => {
+  useLocationLayoutEffect(() => {
     function syncTabsFromHash() {
-      setTabs(tabsFromHash());
+      const nextTabs = tabsFromHash();
+      setTabs(nextTabs);
+      syncDocumentWorkTab(nextTabs.workTab);
       if (window.location.hash === "#works-list") {
         window.history.replaceState(null, "", "#works-index");
       }
@@ -205,8 +105,16 @@ export function StudioTabbedShell({
     }
 
     syncTabsFromHash();
+    let settledFrame: number | null = null;
+    const firstFrame = window.requestAnimationFrame(() => {
+      settledFrame = window.requestAnimationFrame(() => setIsLocationSynced(true));
+    });
     window.addEventListener("hashchange", syncTabsFromHash);
-    return () => window.removeEventListener("hashchange", syncTabsFromHash);
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (settledFrame !== null) window.cancelAnimationFrame(settledFrame);
+      window.removeEventListener("hashchange", syncTabsFromHash);
+    };
   }, []);
 
   useEffect(
@@ -249,6 +157,7 @@ export function StudioTabbedShell({
     const targetHref = lastWorksHref();
     const nextWorkTab = targetHref.includes("#works-index") ? "list" : "featured";
     setTabs({ mainTab: "works", workTab: nextWorkTab });
+    syncDocumentWorkTab(nextWorkTab);
     window.history.replaceState(null, "", targetHref);
     rememberWorksHref(targetHref);
     window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
@@ -257,6 +166,7 @@ export function StudioTabbedShell({
   function selectWorkTab(nextTab: WorkTab) {
     const targetHref = nextTab === "list" ? lastIndexHref() : "/#works";
     setTabs({ mainTab: "works", workTab: nextTab });
+    syncDocumentWorkTab(nextTab);
     window.history.replaceState(null, "", targetHref);
     rememberWorksHref(targetHref);
     window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
@@ -277,7 +187,7 @@ export function StudioTabbedShell({
   return (
     <>
     <title>{viewTitle}</title>
-    <main className="cw-studio-shell">
+    <main className={`cw-studio-shell${isLocationSynced ? "" : " is-location-syncing"}`}>
       {mainTab === "works" ? (
         <div className="cw-work-top-mask" aria-hidden="true" />
       ) : null}
@@ -411,7 +321,7 @@ export function StudioTabbedShell({
           id="cw-featured-panel"
           role="tabpanel"
         >
-          {mainTab === "works" && workTab === "featured" ? (
+          {mainTab === "works" ? (
             <FeaturedCanvasMotionContext.Provider value={featuredCanvasMotion}>
               {featured}
             </FeaturedCanvasMotionContext.Provider>

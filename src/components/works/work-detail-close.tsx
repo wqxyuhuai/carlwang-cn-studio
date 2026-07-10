@@ -3,7 +3,8 @@
 import type { MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { lastWorksHrefKey, validWorkReturnHref, workReturnHrefKey, workReturnHrefParam } from "@/lib/work-detail-return";
+import { LiquidGlassFilter, useLiquidGlassSurface } from "@/components/liquid-glass-surface";
+import { lastWorksHrefKey, rememberLastWorksHref, validWorkReturnHref, workReturnHrefKey, workReturnHrefParam } from "@/lib/work-detail-return";
 
 function resolveCloseHref(fallbackHref: string) {
   const paramReturnHref = validWorkReturnHref(new URLSearchParams(window.location.search).get(workReturnHrefParam));
@@ -19,8 +20,10 @@ function resolveCloseHref(fallbackHref: string) {
 
 export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { fallbackHref?: string }) {
   const router = useRouter();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const pendingCloseRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
+  const closeGlass = useLiquidGlassSurface(closeButtonRef);
 
   const closeDetail = useCallback(() => {
     if (pendingCloseRef.current) return;
@@ -28,6 +31,7 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     pendingCloseRef.current = true;
     setIsClosing(true);
     const closeHref = resolveCloseHref(fallbackHref);
+    rememberLastWorksHref(closeHref);
     window.sessionStorage.removeItem(workReturnHrefKey);
     router.replace(closeHref);
   }, [fallbackHref, router]);
@@ -62,11 +66,14 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     <button
       aria-label="Close work detail"
       aria-disabled={isClosing}
-      className={`pw-detail-close${isClosing ? " is-closing" : ""}`}
+      className={`pw-detail-close ${closeGlass.supportsSvgFilter ? "pw-detail-close--svg" : "pw-detail-close--fallback"}${isClosing ? " is-closing" : ""}`}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
+      ref={closeButtonRef}
+      style={closeGlass.style}
       type="button"
     >
+      <LiquidGlassFilter surface={closeGlass} />
       <span aria-hidden="true" />
     </button>
   );

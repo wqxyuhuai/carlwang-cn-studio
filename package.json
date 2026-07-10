@@ -16,6 +16,7 @@
     "screenshots": "node scripts/capture-screenshots.mjs",
     "content:publish": "node scripts/publish-oss-content.mjs",
     "content:sync-assets": "node scripts/sync-notion-assets-to-oss.mjs",
+    "content:generate-video-posters": "node scripts/generate-video-posters.mjs",
     "content:sync-all": "node scripts/sync-notion-assets-to-oss.mjs --rehome-oss --publish-before-status",
     "content:sync-projects": "node scripts/sync-notion-assets-to-oss.mjs --table=projects --rehome-oss --publish-before-status",
     "content:update-all": "npm run content:sync-all && npm run content:publish",

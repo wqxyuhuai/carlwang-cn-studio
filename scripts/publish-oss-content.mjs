@@ -390,6 +390,37 @@ async function blocksToContent(notion, blocks, missingOss, projectTitle) {
   return content;
 }
 
+function collectVideoPosters(blocks, posters = new Map()) {
+  if (!Array.isArray(blocks)) return posters;
+  for (const block of blocks) {
+    if (block?.type === "video" && block.media?.src && block.media?.poster) {
+      posters.set(block.media.src, block.media.poster);
+    }
+    if (block?.type === "column_list") {
+      for (const column of block.columns || []) collectVideoPosters(column, posters);
+    }
+    if (block?.type === "toggle") collectVideoPosters(block.children, posters);
+  }
+  return posters;
+}
+
+function preserveVideoPosters(blocks, existingBlocks) {
+  const posters = collectVideoPosters(existingBlocks);
+  if (posters.size === 0 || !Array.isArray(blocks)) return blocks;
+
+  for (const block of blocks) {
+    if (block?.type === "video" && block.media?.src && !block.media.poster) {
+      const poster = posters.get(block.media.src);
+      if (poster) block.media.poster = poster;
+    }
+    if (block?.type === "column_list") {
+      for (const column of block.columns || []) preserveVideoPosters(column, existingBlocks);
+    }
+    if (block?.type === "toggle") preserveVideoPosters(block.children, existingBlocks);
+  }
+  return blocks;
+}
+
 async function fetchJson(url) {
   try {
     const response = await fetch(url, { cache: "no-store" });
@@ -475,6 +506,8 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
       const missingBefore = missingOss.length;
       content = await blocksToContent(notion, await listChildren(notion, page.id), missingOss, title);
       if (missingOss.length === missingBefore) {
+        const existingBody = contentUrl ? await fetchJson(contentUrl) : null;
+        preserveVideoPosters(content, existingBody?.blocks);
         const contentKey = projectContentKey(slug);
         const body = {
           id: page.id,

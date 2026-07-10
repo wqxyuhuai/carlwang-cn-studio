@@ -2,6 +2,7 @@
 
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { RevealMedia } from "@/components/common/RevealMedia";
 import { VideoFullscreenPlayer } from "./VideoFullscreenPlayer";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
@@ -19,11 +20,13 @@ export function ProjectVideoCard({
 }) {
   const bubbleRef = useRef<HTMLSpanElement | null>(null);
   const cardRef = useRef<HTMLButtonElement | null>(null);
+  const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const targetRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const [isHovering, setIsHovering] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isPrepared, setIsPrepared] = useState(false);
   const previewKey = `${video.src}|${video.poster || ""}`;
   const [posterReadyKey, setPosterReadyKey] = useState<string | null>(null);
   const [videoReadyKey, setVideoReadyKey] = useState<string | null>(null);
@@ -93,6 +96,23 @@ export function ProjectVideoCard({
     updateTarget(event.clientX, event.clientY);
   }
 
+  function playFullscreenVideo() {
+    const element = fullscreenVideoRef.current;
+    if (!element) return;
+    element.muted = false;
+    void element.play();
+  }
+
+  function openFullscreenVideo() {
+    flushSync(() => setIsOpen(true));
+    playFullscreenVideo();
+  }
+
+  function prepareFullscreenVideo() {
+    flushSync(() => setIsPrepared(true));
+    playFullscreenVideo();
+  }
+
   return (
     <>
       <RevealMedia className="project-video-reveal" index={revealIndex}>
@@ -101,8 +121,10 @@ export function ProjectVideoCard({
           className={["project-video-card", className, isHovering ? "is-hovering" : "", isPreviewReady ? "is-preview-ready" : ""]
             .filter(Boolean)
             .join(" ")}
-          onClick={() => setIsOpen(true)}
+          onClick={openFullscreenVideo}
+          onFocus={() => flushSync(() => setIsPrepared(true))}
           onPointerEnter={(event) => {
+            setIsPrepared(true);
             setIsHovering(true);
             handlePointerMove(event);
             syncCurrentToTarget();
@@ -111,6 +133,7 @@ export function ProjectVideoCard({
             setIsHovering(false);
             resetTarget();
           }}
+          onPointerDown={prepareFullscreenVideo}
           onPointerMove={handlePointerMove}
           onMouseEnter={(event) => {
             setIsHovering(true);
@@ -168,7 +191,17 @@ export function ProjectVideoCard({
           </span>
         </button>
       </RevealMedia>
-      {isOpen ? <VideoFullscreenPlayer onClose={() => setIsOpen(false)} video={video} /> : null}
+      {isPrepared ? (
+        <VideoFullscreenPlayer
+          isOpen={isOpen}
+          onClose={() => {
+            setIsOpen(false);
+            setIsPrepared(false);
+          }}
+          video={video}
+          videoElementRef={fullscreenVideoRef}
+        />
+      ) : null}
     </>
   );
 }

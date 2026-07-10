@@ -51,9 +51,12 @@ const INFINITE_VELOCITY_DECAY = 0.9;
 const INFINITE_ENTRY_SECONDS = 4.2;
 const INFINITE_ENTRY_BOOST = 0.1;
 const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
+const INFINITE_COMPACT_ENTRY_BOOST = 0.15;
+const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
 
 export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
+const featuredCanvasReadyKey = "cw-featured-canvas-ready";
 
 function useFeaturedCanvasCompactMode() {
   const [isCompact, setIsCompact] = useState(false);
@@ -381,13 +384,15 @@ function InfiniteCanvasField({
 
     if (!prefersReducedMotion) {
       const frameScale = Math.min(delta, 0.05) * 60;
+      const entryBoost = compact ? INFINITE_COMPACT_ENTRY_BOOST : INFINITE_ENTRY_BOOST;
+      const autoFlightBoost = compact ? INFINITE_COMPACT_AUTO_FLIGHT_BOOST : INFINITE_AUTO_FLIGHT_BOOST;
 
       if (isActive && introProgressRef.current < 1) {
         introProgressRef.current = Math.min(1, introProgressRef.current + delta / INFINITE_ENTRY_SECONDS);
         const easedProgress = THREE.MathUtils.smoothstep(introProgressRef.current, 0, 1);
-        controller.targetVelocity.z -= THREE.MathUtils.lerp(INFINITE_ENTRY_BOOST, INFINITE_AUTO_FLIGHT_BOOST, easedProgress) * frameScale;
+        controller.targetVelocity.z -= THREE.MathUtils.lerp(entryBoost, autoFlightBoost, easedProgress) * frameScale;
       } else if (isActive && autoFlightEnabled && !controller.isDragging) {
-        controller.targetVelocity.z -= INFINITE_AUTO_FLIGHT_BOOST * frameScale;
+        controller.targetVelocity.z -= autoFlightBoost * frameScale;
       }
     }
 
@@ -498,6 +503,10 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const [playEntry, setPlayEntry] = useState(() => (featuredActive ? shouldPlayFeaturedEntry() : false));
   const entryResolvedRef = useRef(featuredActive);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
+  const markCanvasReady = useCallback(() => {
+    setIsCanvasReady(true);
+    window.sessionStorage.setItem(featuredCanvasReadyKey, "1");
+  }, []);
   const openWork = useCallback((href: string) => {
     const returnHref = currentWorkSurfaceHref("#works");
     rememberWorkReturnHref(returnHref);
@@ -525,6 +534,13 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
     setPlayEntry(shouldPlayFeaturedEntry());
   }, [featuredActive]);
 
+  useEffect(() => {
+    if (window.sessionStorage.getItem(featuredCanvasReadyKey) !== "1") return;
+
+    const frame = window.requestAnimationFrame(() => setIsCanvasReady(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <section className={`cw-featured-canvas notion-rb-infinite-canvas-stage ${isCanvasReady ? "is-canvas-ready" : ""}`} aria-label="Featured works">
       <div className="cw-featured-canvas-loader" aria-hidden="true">
@@ -549,7 +565,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
             images={canvasImages}
             isActive={featuredActive}
             playEntry={playEntry}
-            onReady={() => setIsCanvasReady(true)}
+            onReady={markCanvasReady}
             onOpen={openWork}
             scale={1}
           />

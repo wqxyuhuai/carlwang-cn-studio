@@ -1,13 +1,15 @@
 "use client";
 
-import type { CSSProperties, MouseEvent, PointerEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent, RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { VideoControls } from "./VideoControls";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
 
 function supportsReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
+
+const useVideoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function getRenderedVideoRect(element: HTMLVideoElement) {
   const bounds = element.getBoundingClientRect();
@@ -35,13 +37,18 @@ function isPointInsideRect(x: number, y: number, rect: DOMRect) {
 }
 
 export function VideoFullscreenPlayer({
+  isOpen,
   onClose,
-  video
+  video,
+  videoElementRef
 }: {
+  isOpen: boolean;
   onClose: () => void;
   video: ProjectVideo;
+  videoElementRef?: RefObject<HTMLVideoElement | null>;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = videoElementRef ?? localVideoRef;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const closeBubbleRef = useRef<HTMLSpanElement | null>(null);
   const cloudRef = useRef<HTMLSpanElement | null>(null);
@@ -52,7 +59,7 @@ export function VideoFullscreenPlayer({
   const auraRef = useRef({ x: 0, y: 0 });
   const [isClosing, setIsClosing] = useState(false);
   const [isDimmed, setIsDimmed] = useState(false);
-  const [isMuted, setIsMuted] = useState(video.mutedDefault ?? true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
@@ -66,7 +73,7 @@ export function VideoFullscreenPlayer({
     window.setTimeout(onClose, supportsReducedMotion() ? 0 : 460);
   }, [isClosing, onClose]);
 
-  const togglePlay = useCallback(() => {
+  function togglePlay() {
     const element = videoRef.current;
     if (!element) return;
     if (element.paused) {
@@ -74,32 +81,29 @@ export function VideoFullscreenPlayer({
     } else {
       element.pause();
     }
-  }, []);
+  }
 
-  const toggleMute = useCallback(() => {
+  function toggleMute() {
     const element = videoRef.current;
     if (!element) return;
     element.muted = !element.muted;
     setIsMuted(element.muted);
-  }, []);
+  }
 
   useEffect(() => {
+    if (!isOpen) return;
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = originalOverflow;
     };
-  }, []);
+  }, [isOpen]);
 
-  useEffect(() => {
+  useVideoLayoutEffect(() => {
     const element = videoRef.current;
     if (!element) return;
 
-    element.muted = video.mutedDefault ?? true;
-    const playPromise = element.play();
-    if (playPromise) {
-      playPromise.catch(() => setIsPlaying(false));
-    }
+    element.muted = false;
 
     const syncState = () => {
       setIsPlaying(!element.paused);
@@ -127,7 +131,7 @@ export function VideoFullscreenPlayer({
       element.removeEventListener("loadedmetadata", syncDuration);
       element.removeEventListener("timeupdate", syncTime);
     };
-  }, [video.mutedDefault, video.src]);
+  }, [video.src]);
 
   const updateFrameSize = useCallback(() => {
     const stage = stageRef.current;
@@ -152,6 +156,8 @@ export function VideoFullscreenPlayer({
   }, [updateFrameSize]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -160,20 +166,28 @@ export function VideoFullscreenPlayer({
       }
       if (event.code === "Space") {
         event.preventDefault();
-        togglePlay();
+        const element = videoRef.current;
+        if (element?.paused) {
+          void element.play();
+        } else {
+          element?.pause();
+        }
       }
       if (event.key.toLowerCase() === "m") {
         event.preventDefault();
-        toggleMute();
+        const element = videoRef.current;
+        if (!element) return;
+        element.muted = !element.muted;
+        setIsMuted(element.muted);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [closePlayer, toggleMute, togglePlay]);
+  }, [closePlayer, isOpen, videoRef]);
 
   useEffect(() => {
-    if (supportsReducedMotion()) return;
+    if (!isOpen || supportsReducedMotion()) return;
 
     const tick = () => {
       const target = targetRef.current;
@@ -197,7 +211,7 @@ export function VideoFullscreenPlayer({
     return () => {
       if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [isOpen]);
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     const element = videoRef.current;
@@ -235,7 +249,9 @@ export function VideoFullscreenPlayer({
   return (
     <div
       aria-label="Fullscreen video player"
+      aria-hidden={!isOpen}
       className={["video-player-overlay", isClosing ? "is-closing" : "", isDimmed ? "is-idle" : ""].filter(Boolean).join(" ")}
+      hidden={!isOpen}
       onClick={handleOverlayClick}
       onPointerLeave={handlePointerLeave}
       onPointerMove={handlePointerMove}
@@ -266,6 +282,7 @@ export function VideoFullscreenPlayer({
             muted={isMuted}
             playsInline
             poster={video.poster}
+            preload="auto"
             ref={videoRef}
             src={video.src}
           />

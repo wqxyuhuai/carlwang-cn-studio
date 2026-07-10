@@ -932,6 +932,24 @@ function publishProjectContent(slug) {
   console.log(`[publish-checkpoint] project ${slug} done`);
 }
 
+function generateProjectVideoPosters(slug) {
+  if (!slug) throw new Error("Cannot generate video posters without a project slug");
+  console.log(`[poster-checkpoint] project ${slug} start`);
+  const result = spawnSync(process.execPath, [
+    "scripts/generate-video-posters.mjs",
+    "--skip-publish",
+    `--slug=${slug}`
+  ], {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "inherit"
+  });
+  if (result.status !== 0) {
+    throw new Error(`video poster generation failed for ${slug}`);
+  }
+  console.log(`[poster-checkpoint] project ${slug} done`);
+}
+
 function shouldProcessPending(page) {
   const status = syncStatusValue(page);
   return status === WAITING_SYNC_STATUS || status === WAITING_UPDATE_STATUS;
@@ -1137,7 +1155,9 @@ async function runTable(tableKey, options = {}) {
         tableKey === "projects" &&
         stats.failedMedia === 0
       ) {
-        publishProjectContent(slug || itemFolder);
+        const projectSlug = slug || itemFolder;
+        publishProjectContent(projectSlug);
+        generateProjectVideoPosters(projectSlug);
       }
 
       const statusUpdate = stats.failedMedia === 0 ? syncStatusUpdate(page.properties) : null;

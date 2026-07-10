@@ -129,7 +129,7 @@ function fallbackSections(): PublicSection[] {
       subtitleEn: "A designer working across digital interfaces, brand visuals, motion content and spatial experiences.",
       subtitleCn: "",
       bodyEn: [
-        "I鈥檓 a designer who enjoys working between different forms of visual expression 鈥?from websites and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
+        "I’m a designer who enjoys working between different forms of visual expression — from websites and interfaces to brand systems, motion graphics and spatial experiences. I like moving across different mediums, because each project brings a different way to organize information, shape atmosphere and build a visual language.",
         "My work often starts with structure: understanding what needs to be communicated, how people will see it, and what kind of feeling the design should leave behind. From there, I focus on layout, rhythm, details and interaction, trying to make the final result feel clear, refined and purposeful.",
         "I'm interested in design that is not only visually attractive, but also useful and memorable. Whether it is a website, a visual system, a video or a spatial presentation, I hope the work can make ideas easier to understand, while still keeping a sense of atmosphere, emotion and personality."
       ].join("\n\n"),
