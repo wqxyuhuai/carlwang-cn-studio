@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { RevealMedia } from "@/components/common/RevealMedia";
+import { NotionImageLightbox } from "@/components/notion/notion-image-lightbox";
 import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
 import type { NotionBlock, RichTextSpan } from "@/lib/types";
 
@@ -74,6 +75,14 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
           <RichText spans={block.text} />
         </p>
       );
+    case "spacer":
+      return (
+        <div
+          aria-hidden="true"
+          className="notion-spacer"
+          style={{ blockSize: `${Math.min(8, Math.max(1, block.size)) * 1.25}rem` }}
+        />
+      );
     case "heading_1":
       return (
         <h2 className="display-type notion-rich-text">
@@ -124,9 +133,13 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
     case "image":
       return (
         <figure className="notion-media">
-          <RevealMedia className="notion-media-frame" index={index}>
-            <Image alt={block.media.alt} height={block.media.height || 1000} src={block.media.src} width={block.media.width || 1600} />
-          </RevealMedia>
+          <NotionImageLightbox
+            alt={block.media.alt}
+            height={block.media.height || 1000}
+            index={index}
+            src={block.media.src}
+            width={block.media.width || 1600}
+          />
           {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
         </figure>
       );
@@ -137,7 +150,7 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
             video={{
               duration: block.media.duration,
               mutedDefault: block.media.mutedDefault,
-              poster: block.media.poster || fallbackVideoPoster,
+              poster: block.media.poster,
               spriteColumns: block.media.spriteColumns,
               spriteFrameCount: block.media.spriteFrameCount,
               spriteRows: block.media.spriteRows,

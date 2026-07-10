@@ -1,14 +1,13 @@
 import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { RevealMedia } from "@/components/common/RevealMedia";
 import { NotionRenderer } from "@/components/notion/notion-renderer";
 import { WorkDetailClose } from "@/components/works/work-detail-close";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
+import { WorkDetailPagerLink } from "@/components/works/work-detail-pager-link";
 import { WorkDetailScrollTop } from "@/components/works/work-detail-scroll-top";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/public-content";
-import { workDetailHrefWithReturn, workReturnHrefParam } from "@/lib/work-detail-return";
 import { workPublishedLabel } from "@/lib/work-metrics";
 import type { MediaItem, Tool, Work } from "@/lib/types";
 
@@ -42,11 +41,11 @@ function DetailImage({ media, className = "", priority = false, revealIndex = 0 
   );
 }
 
-function PagerItem({ direction, returnHref, revealIndex, work }: { direction: "previous" | "next"; returnHref?: string; revealIndex: number; work: Work }) {
+function PagerItem({ direction, revealIndex, work }: { direction: "previous" | "next"; revealIndex: number; work: Work }) {
   const isNext = direction === "next";
 
   return (
-    <Link className={`pw-detail-pager-item ${isNext ? "is-next" : ""}`} href={workDetailHrefWithReturn(`/works/${work.slug}`, returnHref)}>
+    <WorkDetailPagerLink className={`pw-detail-pager-item ${isNext ? "is-next" : ""}`} href={`/works/${work.slug}`}>
       <span className="pw-detail-pager-label">
         {!isNext ? <span className="pw-detail-arrow is-left" aria-hidden="true" /> : null}
         <span>{isNext ? "Next" : "Previous"}</span>
@@ -57,7 +56,7 @@ function PagerItem({ direction, returnHref, revealIndex, work }: { direction: "p
           <Image alt={work.cover.alt || work.title} height={100} src={work.cover.src} width={100} />
         </RevealMedia>
       </span>
-    </Link>
+    </WorkDetailPagerLink>
   );
 }
 
@@ -69,6 +68,8 @@ const fallbackToolIcons: Record<string, string> = {
   photoshop: "/figma/pw2-tool-ps.svg"
 };
 
+const darkThemeInvertedToolIcons = new Set(["rhino"]);
+
 function toolKey(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
@@ -79,15 +80,11 @@ function toolIconFor(name: string, tools: Tool[]) {
 }
 
 export default async function WorkDetailPage({
-  params,
-  searchParams
+  params
 }: {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
-  const query = searchParams ? await searchParams : {};
-  const returnHref = typeof query[workReturnHrefParam] === "string" ? query[workReturnHrefParam] : undefined;
   const result = await getWorkBySlug(slug);
   if (!result) notFound();
 
@@ -96,7 +93,7 @@ export default async function WorkDetailPage({
   const fallbackGallery = Array.from(new Map([work.cover, ...gallery].filter((item) => item.type === "image").map((item) => [item.src, item])).values());
   const hasBodyContent = work.content.length > 0;
   const visibleTools = work.tools
-    .map((tool) => ({ icon: toolIconFor(tool, content.tools), name: tool }))
+    .map((tool) => ({ icon: toolIconFor(tool, content.tools), inverted: darkThemeInvertedToolIcons.has(toolKey(tool)), name: tool }))
     .filter((tool) => tool.icon);
 
   return (
@@ -119,7 +116,7 @@ export default async function WorkDetailPage({
               <div className="pw-detail-tools-title">Tools</div>
               <ul className="pw-detail-tool-list">
                 {visibleTools.map((tool) => (
-                  <li className="pw-detail-tool" key={tool.name} title={tool.name}>
+                  <li className={`pw-detail-tool${tool.inverted ? " is-dark-inverted" : ""}`} key={tool.name} title={tool.name}>
                     <Image alt={tool.name} height={24} src={tool.icon} width={24} />
                   </li>
                 ))}
@@ -129,8 +126,8 @@ export default async function WorkDetailPage({
         </div>
 
         <nav className="pw-detail-pager" aria-label="Adjacent works">
-          {previous ? <PagerItem direction="previous" returnHref={returnHref} revealIndex={1} work={previous} /> : null}
-          {next ? <PagerItem direction="next" returnHref={returnHref} revealIndex={2} work={next} /> : null}
+          {previous ? <PagerItem direction="previous" revealIndex={1} work={previous} /> : null}
+          {next ? <PagerItem direction="next" revealIndex={2} work={next} /> : null}
         </nav>
       </aside>
 

@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid revalidate secret." }, { status: 401 });
   }
 
-  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");
+  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
   revalidatePath("/", "layout");
   revalidatePath("/works", "page");
   revalidatePath("/works/[slug]", "page");

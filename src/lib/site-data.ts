@@ -355,7 +355,7 @@ function normalizeNotionBlock(value: unknown): NotionBlock | null {
 async function readJsonUrl(url: string) {
   if (!url) return null;
   try {
-    const response = await fetch(url, { cache: "force-cache", next: { tags: [PUBLIC_CONTENT_CACHE_TAG] } });
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(String(response.status));
     return await response.json();
   } catch {
@@ -363,7 +363,7 @@ async function readJsonUrl(url: string) {
   }
 }
 
-const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v1"], {
+const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v2"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 
@@ -457,7 +457,7 @@ function mergeAliyunProjectBody(work: Work, projectsBySlug: Map<string, Work>, p
   return {
     ...work,
     gallery: hasUsefulGallery || project.gallery.length === 0 ? work.gallery : project.gallery,
-    content: hasContent || project.content.length === 0 ? work.content : project.content
+    content: work.contentUrl || hasContent || project.content.length === 0 ? work.content : project.content
   };
 }
 
@@ -734,7 +734,7 @@ function normalizeProjectData(value: unknown): StudioData | null {
 
 export async function getStudioData(): Promise<StudioData> {
   try {
-    const response = await fetch(CONTENT_URL, { cache: "force-cache", next: { tags: [PUBLIC_CONTENT_CACHE_TAG] } });
+    const response = await fetch(CONTENT_URL, { cache: "no-store" });
     if (!response.ok) throw new Error(`OSS responded ${response.status}`);
     const json = (await response.json()) as unknown;
 

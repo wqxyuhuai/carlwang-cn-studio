@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -63,6 +63,7 @@ export function WorksBrowser({
 }) {
   const router = useRouter();
   const prefetchedDetailHrefs = useRef(new Set<string>());
+  const pendingDetailHrefRef = useRef<string | null>(null);
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
@@ -135,6 +136,37 @@ export function WorksBrowser({
     router.prefetch(href);
   }
 
+  function shouldUseNativeLink(event: MouseEvent<HTMLAnchorElement> | PointerEvent<HTMLAnchorElement>) {
+    return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  }
+
+  function beginWorkNavigation(slug: string) {
+    const href = workDetailHref(slug);
+    if (pendingDetailHrefRef.current === href) return;
+
+    pendingDetailHrefRef.current = href;
+    rememberCurrentWorkReturnHref();
+    prefetchWorkDetail(slug);
+    router.push(href);
+  }
+
+  function handleWorkPointerDown(event: PointerEvent<HTMLAnchorElement>, slug: string) {
+    if (event.pointerType !== "mouse" || shouldUseNativeLink(event)) return;
+
+    event.preventDefault();
+    beginWorkNavigation(slug);
+  }
+
+  function handleWorkClick(event: MouseEvent<HTMLAnchorElement>, slug: string) {
+    if (shouldUseNativeLink(event)) {
+      rememberCurrentWorkReturnHref();
+      return;
+    }
+
+    event.preventDefault();
+    beginWorkNavigation(slug);
+  }
+
   const homeTitleStyle = basePath === "/" ? ({ insetBlockEnd: "clamp(5.5rem, 14vh, 9rem)" } as CSSProperties) : undefined;
 
   function gridCardEntryStyle(index: number) {
@@ -197,8 +229,9 @@ export function WorksBrowser({
                       className="pw-works-grid-card"
                       href={workDetailHref(work.slug)}
                       key={work.id}
-                      onClick={rememberCurrentWorkReturnHref}
+                      onClick={(event) => handleWorkClick(event, work.slug)}
                       onFocus={() => prefetchWorkDetail(work.slug)}
+                      onPointerDown={(event) => handleWorkPointerDown(event, work.slug)}
                       onPointerEnter={() => prefetchWorkDetail(work.slug)}
                       prefetch={false}
                       style={gridCardEntryStyle(index)}
@@ -207,6 +240,11 @@ export function WorksBrowser({
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
                           <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
+                          {work.featured ? (
+                            <span aria-label="Featured work" className="pw-works-featured-mark" role="img">
+                              <Image alt="" height={15} src="/figma/pw2-featured-star.svg" width={16} />
+                            </span>
+                          ) : null}
                         </span>
                         <span className="pw-works-grid-card-face pw-works-grid-card-back">
                         <span
@@ -237,8 +275,9 @@ export function WorksBrowser({
                   className="pw-list-row"
                   href={workDetailHref(work.slug)}
                   key={work.id}
-                  onClick={rememberCurrentWorkReturnHref}
+                  onClick={(event) => handleWorkClick(event, work.slug)}
                   onFocus={() => prefetchWorkDetail(work.slug)}
+                  onPointerDown={(event) => handleWorkPointerDown(event, work.slug)}
                   onPointerEnter={() => prefetchWorkDetail(work.slug)}
                   prefetch={false}
                 >

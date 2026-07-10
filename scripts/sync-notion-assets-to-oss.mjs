@@ -28,6 +28,7 @@ const LOCAL_PATH_PROPERTY_NAMES = [
   "Local Assets"
 ];
 const GENERIC_LOCAL_MATCH_STEMS = new Set(["asset", "image", "video", "file", "pdf", "media"]);
+const BODY_FALLBACK_EXCLUDED_STEMS = new Set(["cover", "poster", "thumbnail"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "svg", "avif"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v"]);
 const DOCUMENT_EXTENSIONS = new Set(["pdf"]);
@@ -402,6 +403,7 @@ function scanLocalAssetFolder(folderPath) {
         size = 0;
       }
       files.push({
+        depth: path.relative(resolvedFolder, fullPath).split(path.sep).length - 1,
         fullPath,
         name: entry.name,
         extension,
@@ -412,7 +414,7 @@ function scanLocalAssetFolder(folderPath) {
     }
   }
 
-  files.sort((a, b) => naturalCompare(a.fullPath, b.fullPath));
+  files.sort((a, b) => a.depth - b.depth || naturalCompare(a.fullPath, b.fullPath));
   const byKind = new Map();
   const byStem = new Map();
   for (const file of files) {
@@ -460,8 +462,22 @@ function candidateStemsFromMedia(media, blockId) {
     }
     const stem = normalizeFileStem(source);
     if (stem && !GENERIC_LOCAL_MATCH_STEMS.has(stem) && !stems.includes(stem)) stems.push(stem);
+    const parts = stem.split("-");
+    for (let start = 1; start < parts.length; start += 1) {
+      const suffix = parts.slice(start).join("-");
+      if (suffix && !GENERIC_LOCAL_MATCH_STEMS.has(suffix) && !stems.includes(suffix)) stems.push(suffix);
+    }
   }
   return stems;
+}
+
+function markLocalVariantsUsed(localIndex, file) {
+  if (!localIndex || !file) return;
+  const baseStem = normalizeFileStem(file.name).replace(/-(compressed|optimized)$/i, "");
+  for (const candidate of localIndex.byKind.get(file.kind) || []) {
+    const candidateStem = normalizeFileStem(candidate.name).replace(/-(compressed|optimized)$/i, "");
+    if (candidateStem === baseStem) localIndex.used.add(candidate.fullPath);
+  }
 }
 
 function matchLocalAsset(localIndex, media, blockId, mediaKind, sequenceByKind) {
@@ -470,17 +486,28 @@ function matchLocalAsset(localIndex, media, blockId, mediaKind, sequenceByKind) 
     const candidates = localIndex.byStem.get(stem) || [];
     const match = candidates.find((file) => file.kind === mediaKind && !localIndex.used.has(file.fullPath));
     if (match) {
-      localIndex.used.add(match.fullPath);
+      markLocalVariantsUsed(localIndex, match);
       return { file: match, strategy: `name:${stem}` };
     }
   }
 
   const candidates = localIndex.byKind.get(mediaKind) || [];
   const sequence = sequenceByKind[mediaKind] || 0;
-  const match = candidates.find((file) => !localIndex.used.has(file.fullPath));
+  const match = candidates.find((file) => !localIndex.used.has(file.fullPath) && !BODY_FALLBACK_EXCLUDED_STEMS.has(file.stem))
+    || candidates.find((file) => !localIndex.used.has(file.fullPath));
   if (!match) return null;
-  localIndex.used.add(match.fullPath);
+  markLocalVariantsUsed(localIndex, match);
   return { file: match, strategy: `order:${sequence + 1}` };
+}
+
+async function ossObjectExists(client, objectKey) {
+  if (!objectKey) return false;
+  try {
+    await withTimeout(client.head(objectKey), `oss head ${objectKey}`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function downloadAsset(url, label = "asset") {
@@ -558,7 +585,11 @@ async function uploadBufferToOss(client, manifest, asset, objectBasePath, origin
   const sha256 = sha256Buffer(buffer);
   const existing = manifest.bySha256[sha256];
   const existingManifestObjectKey = existing?.url ? objectKeyFromOssUrl(existing.url) : "";
-  if (existing?.url && isOssUrl(existing.url) && (!options.rehomeOss || existingManifestObjectKey.startsWith(`${objectBasePath}/`))) {
+  const canReuseExisting = existing?.url
+    && isOssUrl(existing.url)
+    && (!options.rehomeOss || existingManifestObjectKey.startsWith(`${objectBasePath}/`))
+    && await ossObjectExists(client, existingManifestObjectKey);
+  if (canReuseExisting) {
     const reusedUrl = options.optimizeOnUpload && existing.optimizedUrl ? existing.optimizedUrl : existing.url;
     const reusedObjectKey = options.optimizeOnUpload && existing.optimizedObjectKey
       ? existing.optimizedObjectKey
@@ -571,6 +602,9 @@ async function uploadBufferToOss(client, manifest, asset, objectBasePath, origin
       originalObjectKey: existing.objectKey || objectKeyFromOssUrl(existing.url),
       sha256
     };
+  }
+  if (existingManifestObjectKey) {
+    console.log(`[manifest] missing object ${existingManifestObjectKey}; replacing stale asset record`);
   }
 
   const extension = extensionFromMime(contentType) || extensionFromName(originalName) || "bin";
@@ -731,10 +765,16 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
       const objectBasePath = ossPath(tableFolder, itemFolder, "notion-page-body");
       const mediaKind = mediaKindFromBlockType(media.blockType);
       console.log(`[body] ${itemLabel} media #${stats.seen} ${media.blockType}`);
-      if (isOssUrl(media.url) && (!options.rehomeOss || objectKeyFromOssUrl(media.url).startsWith(`${objectBasePath}/`))) {
+      const existingObjectKey = objectKeyFromOssUrl(media.url);
+      const isExpectedOssObject = isOssUrl(media.url) && (!options.rehomeOss || existingObjectKey.startsWith(`${objectBasePath}/`));
+      if (isExpectedOssObject && await ossObjectExists(client, existingObjectKey)) {
+        matchLocalAsset(options.localAssetIndex, media, block.id, mediaKind, localSequenceByKind);
         stats.skipped += 1;
         console.log(`[body] ${itemLabel} media #${stats.seen} skipped`);
       } else {
+        if (isExpectedOssObject) {
+          console.log(`[body] ${itemLabel} media #${stats.seen} missing OSS object; attempting recovery`);
+        }
         const localMatch = matchLocalAsset(options.localAssetIndex, media, block.id, mediaKind, localSequenceByKind);
         if (localMatch) {
           console.log(`[local] matched ${itemLabel} media #${stats.seen} ${localMatch.strategy} -> ${localMatch.file.fullPath}`);
@@ -743,6 +783,10 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
           if (!dryRun) {
             const uploaded = localMatch
               ? await uploadLocalFileToOss(client, manifest, localMatch.file, objectBasePath, options)
+              : existingObjectKey
+                ? (() => {
+                    throw new Error("missing OSS object has no local recovery source");
+                  })()
               : await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
             const nextPayload = {
               external: { url: uploaded.url },

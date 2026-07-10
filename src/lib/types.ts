@@ -29,6 +29,7 @@ export type RichTextSpan = {
 
 export type NotionBlock =
   | { type: "paragraph"; text: RichTextSpan[] }
+  | { type: "spacer"; size: number }
   | { type: "heading_1" | "heading_2" | "heading_3"; text: RichTextSpan[] }
   | { type: "bulleted_list" | "numbered_list"; items: RichTextSpan[][] }
   | { type: "quote" | "callout"; text: RichTextSpan[] }

@@ -256,6 +256,9 @@
 }
 
 .project-video-mobile-play {
+  background: rgb(5 7 12 / 72%);
+  border: 1px solid rgb(244 245 239 / 34%);
+  box-shadow: 0 0.25rem 1rem rgb(0 0 0 / 24%);
   inset-block-end: 0.75rem;
   inset-inline-start: 0.75rem;
   opacity: 0;
@@ -265,6 +268,15 @@
     background-color 220ms ease,
     opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 5;
+}
+
+.project-video-mobile-play .video-cursor-glass-effect {
+  display: none;
+}
+
+.project-video-mobile-play .video-cursor-bubble-text {
+  color: var(--figma-white);
+  mix-blend-mode: normal;
 }
 
 .project-video-card.is-preview-ready .project-video-mobile-play {
@@ -284,7 +296,7 @@
   --video-theme-paper: var(--color-bg);
   --video-theme-line: var(--color-line);
   --video-control-clearance: clamp(6.5rem, 12vh, 8.5rem);
-  --video-player-radius: clamp(0.875rem, 1.1vw, 1.5rem);
+  --video-player-radius: var(--radius-fullscreen-media);
   --video-stage-inset: clamp(1.5rem, 4vh, 3.5rem);
   align-items: center;
   animation: video-overlay-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;

@@ -368,13 +368,22 @@ async function blocksToContent(notion, blocks, missingOss, projectTitle) {
     if (!converted) continue;
 
     const previous = content[content.length - 1];
+    if (converted.type === "paragraph" && converted.text.length === 0) {
+      if (previous?.type === "spacer") {
+        previous.size += 1;
+      } else {
+        content.push({ type: "spacer", size: 1 });
+      }
+      continue;
+    }
+
     if (
       previous &&
       converted.type === previous.type &&
       (converted.type === "bulleted_list" || converted.type === "numbered_list")
     ) {
       previous.items.push(...converted.items);
-    } else if (converted.type !== "paragraph" || converted.text.length > 0) {
+    } else {
       content.push(converted);
     }
   }

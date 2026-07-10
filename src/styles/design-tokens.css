@@ -170,6 +170,7 @@
   --figma-pad-mobile: 2rem;
   --radius-none: 0;
   --radius-site-sm: 0.5rem;
+  --radius-fullscreen-media: clamp(0.875rem, 1.1vw, 1.5rem);
 
   --motion-fast: 120ms;
   --motion-base: 240ms;
