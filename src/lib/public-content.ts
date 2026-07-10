@@ -246,7 +246,6 @@ async function buildPublicContent(): Promise<PublicContent> {
 }
 
 const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v12"], {
-  revalidate: 60,
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 

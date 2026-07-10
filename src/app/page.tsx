@@ -8,6 +8,9 @@ import { getPublicContent } from "@/lib/public-content";
 const fallbackPreviewImage = "/figma/pw2-work-image.png";
 const contactEmailHref = "mailto:wqxyuhuai@163.com";
 
+export const dynamic = "force-static";
+export const revalidate = false;
+
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPublicContent();
   return {
