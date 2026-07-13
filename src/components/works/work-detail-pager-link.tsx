@@ -35,7 +35,7 @@ export function WorkDetailPagerLink({
     event.preventDefault();
     const returnHref = resolveCurrentReturnHref();
     if (returnHref) rememberWorkReturnHref(returnHref);
-    router.push(workDetailHrefWithReturn(href, returnHref));
+    router.replace(workDetailHrefWithReturn(href, returnHref), { scroll: false });
   }
 
   return (

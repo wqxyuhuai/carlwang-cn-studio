@@ -6,7 +6,7 @@ import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
 import * as THREE from "three";
 import type { Work } from "@/lib/types";
-import { currentWorkSurfaceHref, rememberWorkReturnHref, workDetailHrefWithReturn } from "@/lib/work-detail-return";
+import { currentWorkSurfaceHref, rememberWorkNavigation, workDetailHrefWithReturn } from "@/lib/work-detail-return";
 
 type CanvasImage = {
   src: string;
@@ -42,8 +42,8 @@ const fallbackImages: CanvasImage[] = [
 
 const INFINITE_CHUNK_SIZE = 68;
 const INFINITE_RENDER_DISTANCE = 1;
-const INFINITE_FADE_MARGIN = 1;
 const INFINITE_ENTRY_CAMERA_Z = 132;
+const INFINITE_COMPACT_ENTRY_CAMERA_Z = 92;
 const INFINITE_INITIAL_CAMERA_Z = 52;
 const INFINITE_MAX_VELOCITY = 1.9;
 const INFINITE_VELOCITY_LERP = 0.16;
@@ -54,6 +54,10 @@ const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
 const INFINITE_COMPACT_ENTRY_BOOST = 0.15;
 const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
+const INFINITE_MOBILE_TEXTURE_LIMIT = 6;
+const INFINITE_DESKTOP_TEXTURE_LIMIT = 10;
+const INFINITE_RADIUS_MASK_SIZE = 128;
+const INFINITE_RADIUS_NOMINAL_CARD_SIZE = 192;
 
 export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
 const featuredCanvasReadyKey = "cw-featured-canvas-ready";
@@ -76,7 +80,7 @@ function useFeaturedCanvasCompactMode() {
 }
 
 const INFINITE_CHUNK_OFFSETS = (() => {
-  const maxDistance = INFINITE_RENDER_DISTANCE + INFINITE_FADE_MARGIN;
+  const maxDistance = INFINITE_RENDER_DISTANCE;
   const offsets: Array<[number, number, number]> = [];
 
   for (let dx = -maxDistance; dx <= maxDistance; dx += 1) {
@@ -116,6 +120,50 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function readCssLengthInPixels(propertyName: string, fallback: number) {
+  if (typeof window === "undefined") return fallback;
+
+  const rawValue = window.getComputedStyle(document.documentElement).getPropertyValue(propertyName).trim();
+  const numericValue = Number.parseFloat(rawValue);
+  if (!Number.isFinite(numericValue)) return fallback;
+
+  if (rawValue.endsWith("rem")) {
+    const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+    return numericValue * (Number.isFinite(rootFontSize) ? rootFontSize : 16);
+  }
+
+  return numericValue;
+}
+
+function createRoundedAlphaMask(radiusPixels: number) {
+  const size = INFINITE_RADIUS_MASK_SIZE;
+  const radius = clampNumber((radiusPixels / INFINITE_RADIUS_NOMINAL_CARD_SIZE) * size, 1, size / 4);
+  const half = size / 2;
+  const data = new Uint8Array(size * size * 4);
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const offsetX = Math.max(Math.abs(x + 0.5 - half) - (half - radius), 0);
+      const offsetY = Math.max(Math.abs(y + 0.5 - half) - (half - radius), 0);
+      const distance = Math.hypot(offsetX, offsetY) - radius;
+      const alpha = Math.round(clampNumber(0.5 - distance, 0, 1) * 255);
+      const index = (y * size + x) * 4;
+
+      data[index] = alpha;
+      data[index + 1] = alpha;
+      data[index + 2] = alpha;
+      data[index + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9999) * 10000;
   return value - Math.floor(value);
@@ -134,21 +182,21 @@ function hashKey(value: string) {
 
 function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean): InfinitePlaneData[] {
   const seed = hashKey(`${cx},${cy},${cz}`);
-  const count = compact ? 3 : mediaCount >= 23 ? 8 : 7;
+  const count = compact ? 7 : mediaCount >= 8 ? 8 : 7;
 
   return Array.from({ length: count }, (_, index) => {
     const base = seed + index * 997;
     const random = (offset: number) => seededUnit(base + offset);
     const isCenterChunk = cx === 0 && cy === 0;
-    const centerFiller = !compact && isCenterChunk && index < 4;
+    const centerFiller = isCenterChunk && index < (compact ? 5 : 4);
     const edgeSweep = !compact && index === count - 1 && random(8) > 0.56;
     const size = centerFiller
-      ? 2.6 + random(4) * 3.8
-      : ((compact ? 3.2 : 4.6) + random(4) * (compact ? 4.2 : 6.4)) * (edgeSweep ? 1.52 : 1);
+      ? (compact ? 4.4 : 2.6) + random(4) * (compact ? 4.6 : 3.8)
+      : ((compact ? 4 : 4.6) + random(4) * (compact ? 4.8 : 6.4)) * (edgeSweep ? 1.52 : 1);
     const ringAngle = random(0) * Math.PI * 2;
     const centerAngle = (index / 4) * Math.PI * 2 + (random(12) - 0.5) * 0.72;
-    const centerRadius = 12 + random(13) * 19;
-    const ringRadius = (compact ? 18 : 22) + random(1) * (compact ? 24 : 38);
+    const centerRadius = (compact ? 8 : 12) + random(13) * (compact ? 14 : 19);
+    const ringRadius = (compact ? 15 : 22) + random(1) * (compact ? 20 : 38);
     const edgeSide = random(9) > 0.5 ? 1 : -1;
     const localX = isCenterChunk
       ? centerFiller
@@ -188,14 +236,20 @@ function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: num
 function InfiniteCanvasPlane({
   cameraGridRef,
   canvasImage,
+  compact,
+  onIntent,
   onOpen,
   plane,
+  roundedMask,
   texture
 }: {
   cameraGridRef: RefObject<InfiniteCameraGridState>;
   canvasImage: CanvasImage;
+  compact: boolean;
+  onIntent: (href: string) => void;
   onOpen: (href: string) => void;
   plane: InfinitePlaneData;
+  roundedMask: THREE.Texture;
   texture: THREE.Texture;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -218,9 +272,11 @@ function InfiniteCanvasPlane({
     const chunkFade =
       chunkDistance <= INFINITE_RENDER_DISTANCE
         ? 1
-        : clampNumber(1 - (chunkDistance - INFINITE_RENDER_DISTANCE) / Math.max(INFINITE_FADE_MARGIN, 0.0001), 0, 1);
+        : 0;
     const depthDistance = Math.abs(plane.position[2] - cameraGrid.camZ);
-    const depthFade = depthDistance < 62 ? 1 : clampNumber(1 - (depthDistance - 62) / 68, 0, 1);
+    const fullOpacityDepth = compact ? 78 : 62;
+    const depthFadeRange = compact ? 82 : 68;
+    const depthFade = depthDistance < fullOpacityDepth ? 1 : clampNumber(1 - (depthDistance - fullOpacityDepth) / depthFadeRange, 0, 1);
     const targetOpacity = chunkFade * depthFade * depthFade;
 
     opacityRef.current = targetOpacity < 0.01 && opacityRef.current < 0.01 ? 0 : THREE.MathUtils.lerp(opacityRef.current, targetOpacity, 0.18);
@@ -241,9 +297,20 @@ function InfiniteCanvasPlane({
         if (event.delta > 6) return;
         onOpen(canvasImage.href);
       }}
+      onPointerDown={() => onIntent(canvasImage.href)}
+      onPointerOver={() => onIntent(canvasImage.href)}
       visible={false}
     >
-      <meshBasicMaterial ref={materialRef} map={texture} transparent opacity={0} side={THREE.DoubleSide} toneMapped={false} />
+      <meshBasicMaterial
+        ref={materialRef}
+        alphaMap={roundedMask}
+        alphaTest={0.015}
+        map={texture}
+        transparent
+        opacity={0}
+        side={THREE.DoubleSide}
+        toneMapped={false}
+      />
     </mesh>
   );
 }
@@ -255,7 +322,9 @@ function InfiniteCanvasField({
   isActive,
   playEntry,
   onReady,
+  onIntent,
   onOpen,
+  roundedMask,
   scale,
   textures
 }: {
@@ -265,12 +334,14 @@ function InfiniteCanvasField({
   isActive: boolean;
   playEntry: boolean;
   onReady: () => void;
+  onIntent: (href: string) => void;
   onOpen: (href: string) => void;
+  roundedMask: THREE.Texture;
   scale: number;
   textures: THREE.Texture[];
 }) {
-  const { camera, gl } = useThree();
-  const initialCameraZ = playEntry ? INFINITE_ENTRY_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z;
+  const { camera, gl, invalidate } = useThree();
+  const initialCameraZ = playEntry ? (compact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : INFINITE_INITIAL_CAMERA_Z;
   const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: initialCameraZ });
   const readySentRef = useRef(false);
   const introProgressRef = useRef(playEntry ? 0 : 1);
@@ -295,6 +366,7 @@ function InfiniteCanvasField({
       event.preventDefault();
       controller.isDragging = true;
       controller.lastMouse = { x: event.clientX, y: event.clientY };
+      invalidate();
     };
 
     const handlePointerMove = (event: globalThis.PointerEvent) => {
@@ -304,23 +376,28 @@ function InfiniteCanvasField({
       controller.targetVelocity.x -= (event.clientX - controller.lastMouse.x) * 0.018 * zoomFactor;
       controller.targetVelocity.y += (event.clientY - controller.lastMouse.y) * 0.018 * zoomFactor;
       controller.lastMouse = { x: event.clientX, y: event.clientY };
+      invalidate();
     };
 
     const stopDrag = () => {
       controller.isDragging = false;
+      invalidate();
     };
 
     const handleWheel = (event: globalThis.WheelEvent) => {
       event.preventDefault();
       controller.scrollAccum += event.deltaY * 0.0038;
+      invalidate();
     };
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       controller.keys.add(event.key.toLowerCase());
+      invalidate();
     };
 
     const handleKeyUp = (event: globalThis.KeyboardEvent) => {
       controller.keys.delete(event.key.toLowerCase());
+      invalidate();
     };
 
     canvas.addEventListener("pointerdown", handlePointerDown);
@@ -340,7 +417,29 @@ function InfiniteCanvasField({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [gl]);
+  }, [gl, invalidate]);
+
+  useEffect(() => {
+    if (!isActive || prefersReducedMotion || (!autoFlightEnabled && !playEntry)) return;
+
+    const frameInterval = 1000 / (compact ? 20 : 30);
+    const entryDeadline = window.performance.now() + (INFINITE_ENTRY_SECONDS + 1) * 1000;
+    let animationFrame = 0;
+    let previousFrameTime = 0;
+
+    const scheduleFrame = (time: number) => {
+      if (!autoFlightEnabled && time >= entryDeadline) return;
+
+      if (time - previousFrameTime >= frameInterval) {
+        previousFrameTime = time;
+        invalidate();
+      }
+      animationFrame = window.requestAnimationFrame(scheduleFrame);
+    };
+
+    animationFrame = window.requestAnimationFrame(scheduleFrame);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [autoFlightEnabled, compact, invalidate, isActive, playEntry, prefersReducedMotion]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -437,9 +536,12 @@ function InfiniteCanvasField({
         <InfiniteCanvasPlane
           cameraGridRef={cameraGridRef}
           canvasImage={images[plane.mediaIndex % images.length]}
+          compact={compact}
           key={plane.id}
+          onIntent={onIntent}
           onOpen={onOpen}
           plane={plane}
+          roundedMask={roundedMask}
           texture={textures[plane.mediaIndex % textures.length]}
         />
       ))}
@@ -454,7 +556,9 @@ function InfiniteCanvasWebGL({
   isActive,
   playEntry,
   onReady,
+  onIntent,
   onOpen,
+  radiusPixels,
   scale
 }: {
   autoFlightEnabled: boolean;
@@ -463,18 +567,26 @@ function InfiniteCanvasWebGL({
   isActive: boolean;
   playEntry: boolean;
   onReady: () => void;
+  onIntent: (href: string) => void;
   onOpen: (href: string) => void;
+  radiusPixels: number;
   scale: number;
 }) {
   const imageSources = useMemo(() => images.map((image) => image.src), [images]);
   const textures = useLoader(THREE.TextureLoader, imageSources);
+  const roundedMask = useMemo(() => createRoundedAlphaMask(radiusPixels), [radiusPixels]);
 
-  textures.forEach((texture) => {
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 6;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-  });
+  useEffect(() => () => roundedMask.dispose(), [roundedMask]);
+  useEffect(() => {
+    textures.forEach((texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = compact ? 1 : 2;
+      texture.generateMipmaps = !compact;
+      texture.minFilter = compact ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+    });
+  }, [compact, textures]);
 
   return (
     <InfiniteCanvasField
@@ -484,16 +596,19 @@ function InfiniteCanvasWebGL({
       isActive={isActive}
       playEntry={playEntry}
       onReady={onReady}
+      onIntent={onIntent}
       onOpen={onOpen}
+      roundedMask={roundedMask}
       scale={scale}
       textures={textures}
     />
   );
 }
 
-function repeatImages(images: CanvasImage[], count: number) {
+function selectCanvasImages(images: CanvasImage[], limit: number) {
   const source = images.length > 0 ? images : fallbackImages;
-  return Array.from({ length: count }, (_, index) => source[index % source.length]);
+  const uniqueImages = Array.from(new Map(source.map((image) => [image.src, image])).values());
+  return uniqueImages.slice(0, limit);
 }
 
 export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
@@ -502,14 +617,27 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const isCompact = useFeaturedCanvasCompactMode();
   const [playEntry, setPlayEntry] = useState(() => (featuredActive ? shouldPlayFeaturedEntry() : false));
   const entryResolvedRef = useRef(featuredActive);
+  const [hasMountedCanvas, setHasMountedCanvas] = useState(featuredActive);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
+  const siteRadiusPixels = useMemo(() => readCssLengthInPixels("--radius-site-sm", 8), []);
+  const prefetchedHrefsRef = useRef(new Set<string>());
   const markCanvasReady = useCallback(() => {
     setIsCanvasReady(true);
     window.sessionStorage.setItem(featuredCanvasReadyKey, "1");
   }, []);
+  const detailHref = useCallback((href: string) => {
+    const returnHref = currentWorkSurfaceHref("#works");
+    return workDetailHrefWithReturn(href, returnHref);
+  }, []);
+  const prefetchWork = useCallback((href: string) => {
+    const targetHref = detailHref(href);
+    if (prefetchedHrefsRef.current.has(targetHref)) return;
+    prefetchedHrefsRef.current.add(targetHref);
+    router.prefetch(targetHref);
+  }, [detailHref, router]);
   const openWork = useCallback((href: string) => {
     const returnHref = currentWorkSurfaceHref("#works");
-    rememberWorkReturnHref(returnHref);
+    rememberWorkNavigation(returnHref);
     router.push(workDetailHrefWithReturn(href, returnHref));
   }, [router]);
 
@@ -525,7 +653,10 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
         })),
     [works]
   );
-  const canvasImages = repeatImages(images, isCompact ? 12 : 24);
+  const canvasImages = useMemo(
+    () => selectCanvasImages(images, isCompact ? INFINITE_MOBILE_TEXTURE_LIMIT : INFINITE_DESKTOP_TEXTURE_LIMIT),
+    [images, isCompact]
+  );
 
   useEffect(() => {
     if (!featuredActive || entryResolvedRef.current) return;
@@ -533,6 +664,13 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
     entryResolvedRef.current = true;
     setPlayEntry(shouldPlayFeaturedEntry());
   }, [featuredActive]);
+
+  useEffect(() => {
+    if (!featuredActive || hasMountedCanvas) return;
+
+    const frame = window.requestAnimationFrame(() => setHasMountedCanvas(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [featuredActive, hasMountedCanvas]);
 
   useEffect(() => {
     if (window.sessionStorage.getItem(featuredCanvasReadyKey) !== "1") return;
@@ -548,16 +686,23 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
           <span className="cw-featured-canvas-loader-bar" />
         </span>
       </div>
+      {hasMountedCanvas ? (
       <Canvas
         key={playEntry ? "entry" : "direct"}
         className="notion-rb-infinite-canvas-webgl"
-        camera={{ position: [0, 0, playEntry ? INFINITE_ENTRY_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z], fov: 46, near: 1, far: 230 }}
-        dpr={[1, 1.5]}
+        camera={{
+          position: [0, 0, playEntry ? (isCompact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : INFINITE_INITIAL_CAMERA_Z],
+          fov: 46,
+          near: 1,
+          far: 230
+        }}
+        dpr={isCompact ? 1 : [1, 1.25]}
         flat
-        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false }}
+        frameloop="demand"
+        gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: false }}
       >
         <color attach="background" args={["#10130f"]} />
-        <fog attach="fog" args={["#10130f", 76, 178]} />
+        <fog attach="fog" args={["#10130f", isCompact ? 92 : 76, isCompact ? 194 : 178]} />
         <Suspense fallback={null}>
           <InfiniteCanvasWebGL
             autoFlightEnabled={autoFlightEnabled}
@@ -566,11 +711,14 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
             isActive={featuredActive}
             playEntry={playEntry}
             onReady={markCanvasReady}
+            onIntent={prefetchWork}
             onOpen={openWork}
+            radiusPixels={siteRadiusPixels}
             scale={1}
           />
         </Suspense>
       </Canvas>
+      ) : null}
     </section>
   );
 }

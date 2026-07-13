@@ -1,5 +1,6 @@
 export const workReturnHrefKey = "cw-work-return-href";
 export const lastWorksHrefKey = "cw-last-works-href";
+export const workHistoryReturnHrefKey = "cw-work-history-return-href";
 export const workReturnHrefParam = "from";
 
 function clientOrigin() {
@@ -72,4 +73,23 @@ export function rememberWorkReturnHref(href = currentWorkSurfaceHref()) {
 
   window.sessionStorage.setItem(workReturnHrefKey, validHref);
   rememberLastWorksHref(validHref);
+}
+
+export function rememberWorkNavigation(href = currentWorkSurfaceHref()) {
+  if (typeof window === "undefined") return;
+
+  const validHref = validWorkReturnHref(href);
+  if (!validHref) return;
+
+  rememberWorkReturnHref(validHref);
+  window.sessionStorage.setItem(workHistoryReturnHrefKey, validHref);
+}
+
+export function consumeWorkHistoryReturn(href: string) {
+  if (typeof window === "undefined") return false;
+
+  const expectedHref = validWorkReturnHref(href);
+  const historyHref = validWorkReturnHref(window.sessionStorage.getItem(workHistoryReturnHrefKey));
+  window.sessionStorage.removeItem(workHistoryReturnHrefKey);
+  return Boolean(expectedHref && historyHref === expectedHref);
 }

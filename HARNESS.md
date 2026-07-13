@@ -30,7 +30,7 @@ Every modification should verify:
 4. About page `/about` opens normally.
 5. Contact and footer links are clickable.
 6. Works filtering and grid/list mode switching work.
-7. Detail close button and Escape return to the source page, including `/?view=grid#works-index`.
+7. Detail close button and Escape return to the exact source page, including Grid, List and Featured entry points on desktop and mobile.
 8. Detail previous/next links preserve the original return page.
 9. Text selection is white background with black text.
 10. Browser console has no obvious runtime errors.
@@ -44,7 +44,7 @@ Before release, verify:
 1. Opening a work detail page does not trigger repeated `site-content.json` refetches on every navigation.
 2. Work detail body JSON loaded through `contentUrl` is cached and reused.
 3. Closing a detail page returns to the works list without a noticeable cold navigation pause.
-4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches only the intended route.
+4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches the intended desktop route and coarse-pointer devices idle-prefetch only the first four visible works.
 5. `/api/works/[slug]/view` increments the displayed count but does not invalidate the full public content cache on every D1-backed view.
 6. Multimedia requests use browser/server cache headers where supported and do not reload unchanged OSS assets unnecessarily.
 
@@ -60,6 +60,7 @@ Before release, verify the real content path:
 6. Tool icons and social links tolerate missing optional assets.
 7. Unsupported Notion page-body blocks are skipped safely.
 8. `/api/revalidate` refreshes public caches when called with the revalidation secret.
+9. Published dates render as Today, Yesterday, days, months or years according to elapsed UTC calendar days.
 
 ## Visual Protection
 
@@ -92,6 +93,7 @@ Check these after each stage:
 - Links are clickable and not covered by pinned motion layers.
 - Responsive widths: 1440, 1280, 1024, 768, 430 and 390 px.
 - Keyboard focus, reduced motion behavior and no obvious console errors.
+- Warm Featured/Index switches reuse the mounted Featured canvas without showing the first-load screen again.
 
 ## Route Checklist
 

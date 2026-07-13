@@ -150,7 +150,7 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
             video={{
               duration: block.media.duration,
               mutedDefault: block.media.mutedDefault,
-              poster: block.media.poster,
+              poster: block.media.poster || fallbackVideoPoster,
               spriteColumns: block.media.spriteColumns,
               spriteFrameCount: block.media.spriteFrameCount,
               spriteRows: block.media.spriteRows,

@@ -8,7 +8,13 @@ import { useRouter } from "next/navigation";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
-import { lastWorksHrefKey, rememberLastWorksHref, rememberWorkReturnHref, workDetailHrefWithReturn } from "@/lib/work-detail-return";
+import {
+  lastWorksHrefKey,
+  rememberLastWorksHref,
+  rememberWorkNavigation,
+  rememberWorkReturnHref,
+  workDetailHrefWithReturn
+} from "@/lib/work-detail-return";
 import { metricLabel, workPublishedLabel } from "@/lib/work-metrics";
 
 type ViewMode = "grid" | "list";
@@ -148,9 +154,13 @@ export function WorksBrowser({
     replaceBrowserHref(filter, nextMode);
   }
 
-  function rememberCurrentWorkReturnHref() {
+  function rememberCurrentWorkReturnHref(markHistoryEntry = true) {
     const returnHref = browserHref(filter, mode);
-    rememberWorkReturnHref(returnHref);
+    if (markHistoryEntry) {
+      rememberWorkNavigation(returnHref);
+    } else {
+      rememberWorkReturnHref(returnHref);
+    }
     rememberBrowserHref(filter, mode);
   }
 
@@ -165,8 +175,35 @@ export function WorksBrowser({
     router.prefetch(href);
   }
 
+  useEffect(() => {
+    if (!window.matchMedia("(hover: none), (pointer: coarse)").matches) return;
+
+    const params = new URLSearchParams();
+    if (filter.kind !== "all") params.set(filter.kind, filter.value);
+    params.set("view", mode);
+    const query = params.toString();
+    const returnHref = `${basePath}${query ? `?${query}` : ""}${basePath === "/" ? "#works-index" : ""}`;
+    const hrefs = filteredWorks
+      .slice(0, 4)
+      .map((work) => workDetailHrefWithReturn(`/works/${work.slug}`, returnHref))
+      .filter((href) => !prefetchedDetailHrefs.current.has(href));
+
+    const timer = window.setTimeout(() => {
+      hrefs.forEach((href) => {
+        prefetchedDetailHrefs.current.add(href);
+        router.prefetch(href);
+      });
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [basePath, filter, filteredWorks, mode, router]);
+
   function shouldUseNativeLink(event: MouseEvent<HTMLAnchorElement> | PointerEvent<HTMLAnchorElement>) {
     return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  }
+
+  function usesCoarsePointer() {
+    return typeof window !== "undefined" && window.matchMedia("(hover: none), (pointer: coarse)").matches;
   }
 
   function beginWorkNavigation(slug: string) {
@@ -188,6 +225,11 @@ export function WorksBrowser({
 
   function handleWorkClick(event: MouseEvent<HTMLAnchorElement>, slug: string) {
     if (shouldUseNativeLink(event)) {
+      rememberCurrentWorkReturnHref(false);
+      return;
+    }
+
+    if (usesCoarsePointer()) {
       rememberCurrentWorkReturnHref();
       return;
     }

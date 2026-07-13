@@ -80,7 +80,8 @@ Rules:
 
 - Counts are cumulative across browsers and devices.
 - Successful D1 increments must not revalidate the full public content cache on every view.
-- If D1 is unavailable, the route can fall back to updating the public OSS index JSON and then revalidate public caches.
+- If D1 is unavailable, the route can fall back to updating the public OSS index JSON without invalidating every public page.
+- The current detail page applies the returned count immediately; later public-content cache refreshes pick up the OSS fallback value.
 
 ## Contact Flow
 

@@ -42,6 +42,8 @@ npm run upload
 npm run deploy
 ```
 
+GitHub Actions builds the OpenNext bundle and runs `wrangler deploy` directly. This keeps deployment independent from OpenNext's optional KV bulk prefill; the `NEXT_INC_CACHE_KV` and `NEXT_TAG_CACHE_KV` bindings are populated by runtime traffic. Manual `npm run deploy` remains available for an authenticated local release.
+
 ## Runtime Data
 
 - `src/lib/public-content.ts` is the public page data layer.
@@ -49,6 +51,7 @@ npm run deploy
 - Public content is cached with the `public-content` tag and a short TTL.
 - Work detail page bodies are cached by `contentUrl` to avoid refetching project multimedia metadata on every navigation.
 - Work view counts use the `WORK_METRICS_DB` D1 binding and fall back to OSS JSON only when D1 is unavailable.
+- View-count writes never invalidate the full public content cache; the detail page applies the API response immediately.
 - `/api/revalidate` refreshes public content caches with `REVALIDATE_SECRET`.
 
 The current OSS object path still contains `uploads/admin/...` for backward compatibility with already published content. It is only an OSS folder name now, not an active admin route.

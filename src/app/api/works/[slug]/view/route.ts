@@ -1,6 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/cache-tags";
 import { getOssConfig, hasOssConfig, ossPublicUrl, putJsonToOss } from "@/lib/oss";
 import { getPublicContent } from "@/lib/public-content";
 import { incrementWorkViewCount } from "@/lib/work-view-counts";
@@ -61,10 +59,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     target.viewCount = viewCount;
     await putJsonToOss(contentKey, content);
   }
-
-  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");
-  revalidatePath("/works", "page");
-  revalidatePath(`/works/${slug}`, "page");
 
   return NextResponse.json({ ok: true, slug, viewCount });
 }

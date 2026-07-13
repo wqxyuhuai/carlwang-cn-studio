@@ -26,7 +26,6 @@ export function ProjectVideoCard({
   const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const [isHovering, setIsHovering] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [isPrepared, setIsPrepared] = useState(false);
   const previewKey = `${video.src}|${video.poster || ""}`;
   const [posterReadyKey, setPosterReadyKey] = useState<string | null>(null);
   const [videoReadyKey, setVideoReadyKey] = useState<string | null>(null);
@@ -100,16 +99,13 @@ export function ProjectVideoCard({
     const element = fullscreenVideoRef.current;
     if (!element) return;
     element.muted = false;
-    void element.play();
+    void element.play().catch(() => {
+      // The player remains open with visible controls so playback can be retried.
+    });
   }
 
   function openFullscreenVideo() {
     flushSync(() => setIsOpen(true));
-    playFullscreenVideo();
-  }
-
-  function prepareFullscreenVideo() {
-    flushSync(() => setIsPrepared(true));
     playFullscreenVideo();
   }
 
@@ -122,9 +118,7 @@ export function ProjectVideoCard({
             .filter(Boolean)
             .join(" ")}
           onClick={openFullscreenVideo}
-          onFocus={() => flushSync(() => setIsPrepared(true))}
           onPointerEnter={(event) => {
-            setIsPrepared(true);
             setIsHovering(true);
             handlePointerMove(event);
             syncCurrentToTarget();
@@ -133,7 +127,6 @@ export function ProjectVideoCard({
             setIsHovering(false);
             resetTarget();
           }}
-          onPointerDown={prepareFullscreenVideo}
           onPointerMove={handlePointerMove}
           onMouseEnter={(event) => {
             setIsHovering(true);
@@ -170,17 +163,18 @@ export function ProjectVideoCard({
                 src={video.poster}
               />
             ) : null}
-            <video
-              aria-hidden="true"
-              muted
-              onCanPlay={() => setVideoReadyKey(previewKey)}
-              onError={() => setVideoReadyKey(previewKey)}
-              onLoadedData={() => setVideoReadyKey(previewKey)}
-              playsInline
-              poster={video.poster}
-              preload="metadata"
-              src={video.src}
-            />
+            {!hasPoster ? (
+              <video
+                aria-hidden="true"
+                muted
+                onCanPlay={() => setVideoReadyKey(previewKey)}
+                onError={() => setVideoReadyKey(previewKey)}
+                onLoadedData={() => setVideoReadyKey(previewKey)}
+                playsInline
+                preload="metadata"
+                src={video.src}
+              />
+            ) : null}
             <span aria-hidden="true" className="project-video-card-loader">
               <span className="project-video-card-loader-track" />
             </span>
@@ -191,17 +185,14 @@ export function ProjectVideoCard({
           </span>
         </button>
       </RevealMedia>
-      {isPrepared ? (
-        <VideoFullscreenPlayer
-          isOpen={isOpen}
-          onClose={() => {
-            setIsOpen(false);
-            setIsPrepared(false);
-          }}
-          video={video}
-          videoElementRef={fullscreenVideoRef}
-        />
-      ) : null}
+      <VideoFullscreenPlayer
+        isOpen={isOpen}
+        onClose={() => {
+          setIsOpen(false);
+        }}
+        video={video}
+        videoElementRef={fullscreenVideoRef}
+      />
     </>
   );
 }

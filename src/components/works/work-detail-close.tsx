@@ -1,10 +1,18 @@
 "use client";
 
 import type { MouseEvent, PointerEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LiquidGlassFilter, useLiquidGlassSurface } from "@/components/liquid-glass-surface";
-import { lastWorksHrefKey, rememberLastWorksHref, validWorkReturnHref, workReturnHrefKey, workReturnHrefParam } from "@/lib/work-detail-return";
+import {
+  consumeWorkHistoryReturn,
+  isWorkDetailHref,
+  lastWorksHrefKey,
+  rememberWorkReturnHref,
+  validWorkReturnHref,
+  workReturnHrefKey,
+  workReturnHrefParam
+} from "@/lib/work-detail-return";
 
 function resolveCloseHref(fallbackHref: string) {
   const paramReturnHref = validWorkReturnHref(new URLSearchParams(window.location.search).get(workReturnHrefParam));
@@ -18,22 +26,51 @@ function resolveCloseHref(fallbackHref: string) {
   return paramReturnHref || storedReturnHref || referrerHref || lastWorksHref || fallbackHref;
 }
 
+function primeReturnSurface(closeHref: string) {
+  const target = new URL(closeHref, window.location.origin);
+  const isIndex = target.hash === "#works-index" || target.hash === "#works-list";
+  document.documentElement.dataset.workTab = isIndex ? "list" : "featured";
+  rememberWorkReturnHref(closeHref);
+}
+
 export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { fallbackHref?: string }) {
   const router = useRouter();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const canReturnThroughHistoryRef = useRef(false);
+  const closeHrefRef = useRef<string | null>(null);
+  const fallbackTimerRef = useRef<number | null>(null);
   const pendingCloseRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
   const closeGlass = useLiquidGlassSurface(closeButtonRef);
+
+  useLayoutEffect(() => {
+    const closeHref = resolveCloseHref(fallbackHref);
+    closeHrefRef.current = closeHref;
+    canReturnThroughHistoryRef.current = consumeWorkHistoryReturn(closeHref);
+    primeReturnSurface(closeHref);
+  }, [fallbackHref]);
 
   const closeDetail = useCallback(() => {
     if (pendingCloseRef.current) return;
 
     pendingCloseRef.current = true;
     setIsClosing(true);
-    const closeHref = resolveCloseHref(fallbackHref);
-    rememberLastWorksHref(closeHref);
-    window.sessionStorage.removeItem(workReturnHrefKey);
-    router.replace(closeHref);
+    const closeHref = closeHrefRef.current || resolveCloseHref(fallbackHref);
+    primeReturnSurface(closeHref);
+    const canReturnThroughHistory = canReturnThroughHistoryRef.current;
+    canReturnThroughHistoryRef.current = false;
+    if (canReturnThroughHistory) {
+      window.history.back();
+    } else {
+      router.replace(closeHref, { scroll: false });
+    }
+
+    fallbackTimerRef.current = window.setTimeout(() => {
+      const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (isWorkDetailHref(currentHref) || validWorkReturnHref(currentHref) !== validWorkReturnHref(closeHref)) {
+        window.location.replace(closeHref);
+      }
+    }, 900);
   }, [fallbackHref, router]);
 
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
@@ -61,6 +98,13 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
   useEffect(() => {
     router.prefetch(resolveCloseHref(fallbackHref));
   }, [fallbackHref, router]);
+
+  useEffect(
+    () => () => {
+      if (fallbackTimerRef.current !== null) window.clearTimeout(fallbackTimerRef.current);
+    },
+    []
+  );
 
   return (
     <button

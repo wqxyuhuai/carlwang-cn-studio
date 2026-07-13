@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 const CACHE_MAX_AGE_SECONDS = 31_536_000;
 const DISK_CACHE_DIR = ".media-cache/oss";
 const RANGE_RUNTIME_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+const OPEN_ENDED_RANGE_CHUNK_BYTES = 2 * 1024 * 1024;
 
 type CachedMedia = {
   body: Uint8Array;
@@ -72,6 +73,45 @@ function runtimeRangeCacheKey(url: string, rangeHeader: string) {
   const cacheUrl = new URL(url);
   cacheUrl.searchParams.set("__range", rangeHeader);
   return new Request(cacheUrl.toString(), { method: "GET" });
+}
+
+function boundedRangeHeader(rangeHeader: string | null) {
+  if (!rangeHeader) return null;
+
+  const match = rangeHeader.match(/^bytes=(\d+)-$/);
+  if (!match) return rangeHeader;
+
+  const start = Number(match[1]);
+  if (!Number.isFinite(start) || start < 0) return rangeHeader;
+
+  return `bytes=${start}-${start + OPEN_ENDED_RANGE_CHUNK_BYTES - 1}`;
+}
+
+function contentTypeFromUrl(sourceUrl: URL, fallback: string) {
+  const pathname = sourceUrl.pathname.toLowerCase();
+  if (pathname.endsWith(".mp4")) return "video/mp4";
+  if (pathname.endsWith(".webm")) return "video/webm";
+  return fallback || "application/octet-stream";
+}
+
+function streamedUpstreamResponse(upstream: Response, sourceUrl: URL) {
+  const headers = new Headers();
+  headers.set("Content-Type", contentTypeFromUrl(sourceUrl, upstream.headers.get("content-type")?.split(";")[0] || ""));
+  headers.set("Content-Disposition", "inline");
+  headers.set("Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
+  headers.set("CDN-Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
+  headers.set("Cloudflare-CDN-Cache-Control", `public, max-age=${CACHE_MAX_AGE_SECONDS}, immutable`);
+  headers.set("X-Media-Cache", "stream-miss");
+
+  for (const name of ["accept-ranges", "content-length", "content-range"] as const) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers
+  });
 }
 
 function parseByteRange(rangeHeader: string | null, size: number): ByteRange | null {
@@ -238,6 +278,7 @@ export async function GET(request: NextRequest) {
   }
 
   const rangeHeader = request.headers.get("range");
+  const upstreamRangeHeader = boundedRangeHeader(rangeHeader);
   const hasRange = Boolean(rangeHeader);
   const runtimeCache = await getRuntimeCache();
   const fullCacheKey = runtimeCacheKey(request.url);
@@ -276,11 +317,15 @@ export async function GET(request: NextRequest) {
   }
 
   const upstream = await fetch(sourceUrl, {
-    headers: hasRange ? { Range: rangeHeader || "" } : undefined
+    headers: upstreamRangeHeader ? { Range: upstreamRangeHeader } : undefined
   });
 
   if (!upstream.ok && upstream.status !== 206) {
     return new Response(await upstream.text().catch(() => "Media fetch failed."), { status: upstream.status });
+  }
+
+  if (hasRange && upstream.status === 206 && upstream.body) {
+    return streamedUpstreamResponse(upstream, sourceUrl);
   }
 
   const body = await upstream.arrayBuffer();

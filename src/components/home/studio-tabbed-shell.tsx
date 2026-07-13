@@ -73,7 +73,7 @@ export function StudioTabbedShell({
   featured: ReactNode;
   list: ReactNode;
 }) {
-  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>(tabsFromHash);
+  const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>({ mainTab: "works", workTab: "featured" });
   const [isLocationSynced, setIsLocationSynced] = useState(false);
   const [isAutoFlightEnabled, setIsAutoFlightEnabled] = useState(true);
   const [isLogoShaking, setIsLogoShaking] = useState(false);
@@ -87,8 +87,8 @@ export function StudioTabbedShell({
   const bottomNavGlass = useBottomNavGlassSurface(bottomNavRef);
   const autoFlightButtonGlass = useBottomNavGlassSurface(autoFlightButtonRef);
   const featuredCanvasMotion = useMemo(
-    () => ({ autoFlightEnabled: isAutoFlightEnabled, featuredActive: mainTab === "works" && workTab === "featured" }),
-    [isAutoFlightEnabled, mainTab, workTab]
+    () => ({ autoFlightEnabled: isAutoFlightEnabled, featuredActive: isLocationSynced && mainTab === "works" && workTab === "featured" }),
+    [isAutoFlightEnabled, isLocationSynced, mainTab, workTab]
   );
 
   useLocationLayoutEffect(() => {

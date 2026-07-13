@@ -61,6 +61,7 @@ export function VideoFullscreenPlayer({
   const [isDimmed, setIsDimmed] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "error">("loading");
   const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -69,9 +70,13 @@ export function VideoFullscreenPlayer({
 
   const closePlayer = useCallback(() => {
     if (isClosing) return;
+    videoRef.current?.pause();
     setIsClosing(true);
-    window.setTimeout(onClose, supportsReducedMotion() ? 0 : 460);
-  }, [isClosing, onClose]);
+    window.setTimeout(() => {
+      onClose();
+      setIsClosing(false);
+    }, supportsReducedMotion() ? 0 : 460);
+  }, [isClosing, onClose, videoRef]);
 
   function togglePlay() {
     const element = videoRef.current;
@@ -100,6 +105,7 @@ export function VideoFullscreenPlayer({
   }, [isOpen]);
 
   useVideoLayoutEffect(() => {
+    if (!isOpen) return;
     const element = videoRef.current;
     if (!element) return;
 
@@ -123,6 +129,9 @@ export function VideoFullscreenPlayer({
     element.addEventListener("pause", syncState);
     element.addEventListener("loadedmetadata", syncDuration);
     element.addEventListener("timeupdate", syncTime);
+    void element.play().catch(() => {
+      // The persistent play control remains available if autoplay is blocked.
+    });
 
     return () => {
       element.pause();
@@ -131,7 +140,7 @@ export function VideoFullscreenPlayer({
       element.removeEventListener("loadedmetadata", syncDuration);
       element.removeEventListener("timeupdate", syncTime);
     };
-  }, [video.src]);
+  }, [isOpen, video.src, videoRef]);
 
   const updateFrameSize = useCallback(() => {
     const stage = stageRef.current;
@@ -265,27 +274,47 @@ export function VideoFullscreenPlayer({
       </span>
       <div className="video-player-stage" ref={stageRef}>
         <div
-          className="video-player-video-frame"
+          className={["video-player-video-frame", `is-${mediaStatus}`].join(" ")}
           style={
             frameSize
               ? ({
                   blockSize: `${frameSize.height}px`,
                   inlineSize: `${frameSize.width}px`,
-                  "--video-aspect-ratio": `${aspectRatio}`
+                  "--video-aspect-ratio": `${aspectRatio}`,
+                  "--video-player-poster": video.poster ? `url("${video.poster}")` : "none"
                 } as CSSProperties)
-              : ({ "--video-aspect-ratio": `${aspectRatio}` } as CSSProperties)
+              : ({
+                  "--video-aspect-ratio": `${aspectRatio}`,
+                  "--video-player-poster": video.poster ? `url("${video.poster}")` : "none"
+                } as CSSProperties)
           }
         >
           <video
             className="video-player-video"
             controls={false}
             muted={isMuted}
+            onCanPlay={() => setMediaStatus("ready")}
+            onError={() => setMediaStatus("error")}
+            onLoadedData={() => setMediaStatus("ready")}
+            onLoadStart={() => setMediaStatus("loading")}
+            onPlaying={() => setMediaStatus("ready")}
+            onStalled={() => setMediaStatus("loading")}
+            onWaiting={() => setMediaStatus("loading")}
             playsInline
             poster={video.poster}
-            preload="auto"
+            preload={isOpen ? "metadata" : "none"}
             ref={videoRef}
             src={video.src}
           />
+          <span aria-live="polite" className="video-player-loading-state">
+            {mediaStatus === "error" ? (
+              <span className="video-player-error-message">Video unavailable. Select play to retry.</span>
+            ) : (
+              <span aria-hidden="true" className="video-player-loading-track">
+                <span />
+              </span>
+            )}
+          </span>
         </div>
       </div>
       <VideoControls
