@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent, RefObject } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { VideoControls } from "./VideoControls";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
@@ -47,14 +47,16 @@ function isPointInsideRect(x: number, y: number, rect: DOMRect) {
 
 export function VideoFullscreenPlayer({
   isOpen,
+  mediaRef,
   onClose,
   video
 }: {
   isOpen: boolean;
+  mediaRef: RefObject<HTMLVideoElement | null>;
   onClose: () => void;
   video: ProjectVideo;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = mediaRef;
   const stageRef = useRef<HTMLDivElement | null>(null);
   const closeBubbleRef = useRef<HTMLSpanElement | null>(null);
   const cloudRef = useRef<HTMLSpanElement | null>(null);
@@ -96,7 +98,6 @@ export function VideoFullscreenPlayer({
         element.currentTime = 0;
         setCurrentTime(0);
       }
-      element.muted = false;
       setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA ? "ready" : "loading");
       void element.play().catch((error) => {
         recordPlaybackError(element, error);
@@ -166,17 +167,14 @@ export function VideoFullscreenPlayer({
     element.addEventListener("ended", resetAfterPlayback);
     element.addEventListener("loadedmetadata", syncDuration);
     element.addEventListener("timeupdate", syncTime);
-    setMediaStatus("loading");
+    setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "loading");
     setIsMuted(false);
     delete element.dataset.playbackError;
     if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
       element.currentTime = 0;
       setCurrentTime(0);
     }
-    void element.play().catch((error) => {
-      recordPlaybackError(element, error);
-      setMediaStatus(isPlaybackPolicyError(error) && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "error");
-    });
+    if (element.readyState < HTMLMediaElement.HAVE_METADATA) element.load();
     return () => {
       element.removeEventListener("play", syncState);
       element.removeEventListener("pause", syncState);

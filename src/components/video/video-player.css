@@ -403,6 +403,13 @@
   opacity: 0;
 }
 
+.video-player-video-frame.is-ready:not(.has-started)::before {
+  filter: none;
+  inset: 0;
+  opacity: 1;
+  transform: none;
+}
+
 .video-player-video {
   block-size: 100%;
   display: block;

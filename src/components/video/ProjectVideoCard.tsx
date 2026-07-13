@@ -20,6 +20,7 @@ export function ProjectVideoCard({
 }) {
   const bubbleRef = useRef<HTMLSpanElement | null>(null);
   const cardRef = useRef<HTMLButtonElement | null>(null);
+  const playerVideoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const targetRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
@@ -106,6 +107,15 @@ export function ProjectVideoCard({
 
   function openFullscreenVideo() {
     flushSync(() => setIsOpen(true));
+    const element = playerVideoRef.current;
+    if (!element) return;
+    if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
+      element.currentTime = 0;
+    }
+    element.muted = false;
+    void element.play().catch(() => {
+      // The visible player remains ready for an explicit play click if browser policy blocks the initial request.
+    });
   }
 
   return (
@@ -186,6 +196,7 @@ export function ProjectVideoCard({
       </RevealMedia>
       <VideoFullscreenPlayer
         isOpen={isOpen}
+        mediaRef={playerVideoRef}
         onClose={() => {
           setIsOpen(false);
         }}
