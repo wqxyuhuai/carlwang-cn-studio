@@ -3,6 +3,13 @@
   "name": "carlwang-cn-studio",
   "account_id": "bb840ab4e8fba0abc7676e55d7df2439",
   "main": ".open-next/worker.js",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "studio.carlwang.cn",
+      "custom_domain": true
+    }
+  ],
   "compatibility_date": "2026-06-25",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -20,8 +27,19 @@
       "migrations_dir": "migrations"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "db1406f1de2848a49f13a8bb1c2dbe40"
+    },
+    {
+      "binding": "NEXT_TAG_CACHE_KV",
+      "id": "db1406f1de2848a49f13a8bb1c2dbe40"
+    }
+  ],
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "head_sampling_rate": 1
   },
   "vars": {
     "NEXT_PUBLIC_CONTENT_URL": "https://carlwang-cn-studio.oss-cn-shanghai.aliyuncs.com/uploads/admin/site-content.json"
