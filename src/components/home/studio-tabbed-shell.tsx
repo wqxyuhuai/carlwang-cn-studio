@@ -357,7 +357,7 @@ export function StudioTabbedShell({
       <div className="cw-bottom-blur" aria-hidden="true" style={{ blockSize: bottomBlurBlockSize }}>
         <GradualBlur
           curve="ease-in"
-          divCount={30}
+          divCount={8}
           exponential={false}
           heightRem={9}
           opacity={1}

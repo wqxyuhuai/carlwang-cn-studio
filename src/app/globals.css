@@ -2814,7 +2814,6 @@ html .custom-cursor {
 
 .pw-category-list .pw-category-row {
   animation: works-left-entry 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  will-change: transform, opacity;
 }
 
 .pw-category-list .pw-category-row:nth-child(1) {
@@ -2987,19 +2986,23 @@ html .custom-cursor {
 }
 
 .pw-works-grid-card {
-  animation: works-card-shutter-entry 780ms cubic-bezier(0.16, 0.86, 0.24, 1) both;
-  animation-delay: var(--works-card-entry-delay, 180ms);
   aspect-ratio: 1;
   background: transparent;
   border-radius: var(--radius-site-sm);
-  contain: layout paint;
+  contain: layout paint style;
   contain-intrinsic-size: 18rem;
+  content-visibility: auto;
   overflow: hidden;
   display: block;
   perspective: 1000px;
   position: relative;
   transform-origin: left center;
   transform-style: preserve-3d;
+}
+
+.pw-works-grid-card.is-entry-card {
+  animation: works-card-shutter-entry 560ms cubic-bezier(0.16, 0.86, 0.24, 1) both;
+  animation-delay: var(--works-card-entry-delay, 120ms);
 }
 
 .pw-works-featured-mark {
@@ -3042,9 +3045,8 @@ html .custom-cursor {
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  will-change: transform;
   transition:
-    transform 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform 720ms cubic-bezier(0.16, 1, 0.3, 1);
   transform: rotateY(0deg);
 }
 
@@ -3101,7 +3103,7 @@ html .custom-cursor {
   object-fit: cover;
   object-position: center;
   transform: scale(1.12);
-  filter: blur(16px) saturate(1) brightness(0.98) contrast(1.02);
+  filter: none;
 }
 
 .pw-works-grid-card-back-content {
@@ -3168,6 +3170,14 @@ html .custom-cursor {
 .pw-works-grid-card:hover .pw-works-grid-card-inner,
 .pw-works-grid-card:focus-visible .pw-works-grid-card-inner {
   transform: rotateY(180deg);
+  will-change: transform;
+}
+
+.pw-works-grid-card:hover .pw-works-grid-card-back-layer img,
+.pw-works-grid-card:hover .pw-works-grid-card-back-image,
+.pw-works-grid-card:focus-visible .pw-works-grid-card-back-layer img,
+.pw-works-grid-card:focus-visible .pw-works-grid-card-back-image {
+  filter: blur(12px) saturate(1) brightness(0.98) contrast(1.02);
 }
 
 .pw-list-image img {

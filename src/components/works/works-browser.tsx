@@ -113,6 +113,17 @@ export function WorksBrowser({
     const worksRight = worksRightRef.current;
     if (!page || !worksRight) return;
     const scrollTarget = worksRight;
+    let pendingWheelDelta = 0;
+    let wheelFrame: number | null = null;
+
+    function applyForwardedWheel() {
+      wheelFrame = null;
+      if (pendingWheelDelta === 0) return;
+
+      const maxScrollTop = scrollTarget.scrollHeight - scrollTarget.clientHeight;
+      scrollTarget.scrollTop = Math.max(0, Math.min(maxScrollTop, scrollTarget.scrollTop + pendingWheelDelta));
+      pendingWheelDelta = 0;
+    }
 
     function forwardWheelToWorks(event: WheelEvent) {
       if (event.ctrlKey || scrollTarget.contains(event.target as Node)) return;
@@ -123,16 +134,17 @@ export function WorksBrowser({
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
           ? event.deltaY * scrollTarget.clientHeight
           : event.deltaY;
-      const maxScrollTop = scrollTarget.scrollHeight - scrollTarget.clientHeight;
-      const nextScrollTop = Math.max(0, Math.min(maxScrollTop, scrollTarget.scrollTop + delta));
-
-      if (nextScrollTop === scrollTarget.scrollTop) return;
-      event.preventDefault();
-      scrollTarget.scrollTop = nextScrollTop;
+      pendingWheelDelta += delta;
+      if (wheelFrame === null) {
+        wheelFrame = window.requestAnimationFrame(applyForwardedWheel);
+      }
     }
 
-    page.addEventListener("wheel", forwardWheelToWorks, { passive: false });
-    return () => page.removeEventListener("wheel", forwardWheelToWorks);
+    page.addEventListener("wheel", forwardWheelToWorks, { passive: true });
+    return () => {
+      page.removeEventListener("wheel", forwardWheelToWorks);
+      if (wheelFrame !== null) window.cancelAnimationFrame(wheelFrame);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -351,7 +363,7 @@ export function WorksBrowser({
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
                     <Link
-                      className="pw-works-grid-card"
+                      className={`pw-works-grid-card${index < 9 ? " is-entry-card" : ""}`}
                       href={workDetailHref(work.slug)}
                       key={work.id}
                       onClick={(event) => handleWorkClick(event, work.slug)}
@@ -359,7 +371,7 @@ export function WorksBrowser({
                       onPointerDown={(event) => handleWorkPointerDown(event, work.slug)}
                       onPointerEnter={() => prefetchWorkDetail(work.slug)}
                       prefetch={false}
-                      style={gridCardEntryStyle(index)}
+                      style={index < 9 ? gridCardEntryStyle(index) : undefined}
                       title={work.intro}
                     >
                       <span className="pw-works-grid-card-inner">

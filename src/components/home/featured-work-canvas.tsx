@@ -46,8 +46,9 @@ const INFINITE_ENTRY_CAMERA_Z = 96;
 const INFINITE_COMPACT_ENTRY_CAMERA_Z = 78;
 const INFINITE_INITIAL_CAMERA_Z = 52;
 const INFINITE_MAX_VELOCITY = 1.9;
-const INFINITE_VELOCITY_LERP = 0.16;
-const INFINITE_VELOCITY_DECAY = 0.9;
+const INFINITE_VELOCITY_LERP = 0.22;
+const INFINITE_VELOCITY_DECAY = 0.86;
+const INFINITE_WHEEL_BOOST = 0.0054;
 const INFINITE_ENTRY_SECONDS = 1.8;
 const INFINITE_ENTRY_BOOST = 0.085;
 const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
@@ -259,6 +260,7 @@ function InfiniteCanvasPlane({
   const opacityRef = useRef(0);
   const hoverTargetRef = useRef(0);
   const hoverProgressRef = useRef(0);
+  const appliedHoverProgressRef = useRef(0);
   const image = texture.image as { width?: number; height?: number } | undefined;
   const aspect = image?.width && image?.height ? image.width / image.height : 1;
   const baseScaleX = plane.size * aspect;
@@ -290,12 +292,19 @@ function InfiniteCanvasPlane({
 
     const hoverProgress = hoverProgressRef.current;
     const hoverScale = 1 + hoverProgress * 0.055;
-    material.opacity = THREE.MathUtils.lerp(opacityRef.current, 1, hoverProgress);
-    material.color.setScalar(1);
-    material.depthWrite = material.opacity > 0.98;
-    mesh.position.z = plane.position[2] + hoverProgress * 0.7;
-    mesh.scale.set(baseScaleX * hoverScale, baseScaleY * hoverScale, 1);
-    mesh.visible = opacityRef.current > 0.012;
+    const nextOpacity = THREE.MathUtils.lerp(opacityRef.current, 1, hoverProgress);
+    const nextDepthWrite = nextOpacity > 0.98;
+    const nextVisible = opacityRef.current > 0.012;
+
+    if (Math.abs(material.opacity - nextOpacity) > 0.002) material.opacity = nextOpacity;
+    if (material.depthWrite !== nextDepthWrite) material.depthWrite = nextDepthWrite;
+    if (mesh.visible !== nextVisible) mesh.visible = nextVisible;
+
+    if (Math.abs(appliedHoverProgressRef.current - hoverProgress) > 0.002) {
+      appliedHoverProgressRef.current = hoverProgress;
+      mesh.position.z = plane.position[2] + hoverProgress * 0.7;
+      mesh.scale.set(baseScaleX * hoverScale, baseScaleY * hoverScale, 1);
+    }
 
     if (Math.abs(hoverTargetRef.current - hoverProgress) > 0.002) invalidate();
   });
@@ -412,7 +421,7 @@ function InfiniteCanvasField({
 
     const handleWheel = (event: globalThis.WheelEvent) => {
       event.preventDefault();
-      controller.scrollAccum += event.deltaY * 0.0038;
+      controller.scrollAccum += event.deltaY * INFINITE_WHEEL_BOOST;
       invalidate();
     };
 
