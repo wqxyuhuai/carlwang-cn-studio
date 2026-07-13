@@ -175,29 +175,6 @@ export function WorksBrowser({
     router.prefetch(href);
   }
 
-  useEffect(() => {
-    if (!window.matchMedia("(hover: none), (pointer: coarse)").matches) return;
-
-    const params = new URLSearchParams();
-    if (filter.kind !== "all") params.set(filter.kind, filter.value);
-    params.set("view", mode);
-    const query = params.toString();
-    const returnHref = `${basePath}${query ? `?${query}` : ""}${basePath === "/" ? "#works-index" : ""}`;
-    const hrefs = filteredWorks
-      .slice(0, 4)
-      .map((work) => workDetailHrefWithReturn(`/works/${work.slug}`, returnHref))
-      .filter((href) => !prefetchedDetailHrefs.current.has(href));
-
-    const timer = window.setTimeout(() => {
-      hrefs.forEach((href) => {
-        prefetchedDetailHrefs.current.add(href);
-        router.prefetch(href);
-      });
-    }, 400);
-
-    return () => window.clearTimeout(timer);
-  }, [basePath, filter, filteredWorks, mode, router]);
-
   function shouldUseNativeLink(event: MouseEvent<HTMLAnchorElement> | PointerEvent<HTMLAnchorElement>) {
     return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
   }
@@ -217,7 +194,11 @@ export function WorksBrowser({
   }
 
   function handleWorkPointerDown(event: PointerEvent<HTMLAnchorElement>, slug: string) {
-    if (event.pointerType !== "mouse" || shouldUseNativeLink(event)) return;
+    if (shouldUseNativeLink(event)) return;
+    if (event.pointerType !== "mouse") {
+      prefetchWorkDetail(slug);
+      return;
+    }
 
     event.preventDefault();
     beginWorkNavigation(slug);

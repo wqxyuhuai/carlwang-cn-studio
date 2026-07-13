@@ -502,8 +502,10 @@ export function StudioTabbedShell({
         <button
           aria-label={isAutoFlightEnabled ? "Pause featured canvas auto flight" : "Play featured canvas auto flight"}
           aria-pressed={isAutoFlightEnabled}
-          className={`cw-featured-autoflight-toggle ${
-            autoFlightButtonGlass.supportsSvgFilter ? "cw-featured-autoflight-toggle--svg" : "cw-featured-autoflight-toggle--fallback"
+          className={`cw-liquid-glass-control cw-featured-autoflight-toggle ${
+            autoFlightButtonGlass.supportsSvgFilter
+              ? "cw-liquid-glass-control--svg cw-featured-autoflight-toggle--svg"
+              : "cw-liquid-glass-control--fallback cw-featured-autoflight-toggle--fallback"
           }`}
           onClick={() => setIsAutoFlightEnabled((current) => !current)}
           ref={autoFlightButtonRef}

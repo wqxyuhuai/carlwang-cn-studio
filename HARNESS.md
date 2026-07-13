@@ -44,7 +44,7 @@ Before release, verify:
 1. Opening a work detail page does not trigger repeated `site-content.json` refetches on every navigation.
 2. Work detail body JSON loaded through `contentUrl` is cached and reused.
 3. Closing a detail page returns to the works list without a noticeable cold navigation pause.
-4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches the intended desktop route and coarse-pointer devices idle-prefetch only the first four visible works.
+4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches the intended desktop route and coarse-pointer devices prefetch only the pressed target.
 5. `/api/works/[slug]/view` increments the displayed count but does not invalidate the full public content cache on every D1-backed view.
 6. Multimedia requests use browser/server cache headers where supported and do not reload unchanged OSS assets unnecessarily.
 

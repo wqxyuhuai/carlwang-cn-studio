@@ -110,7 +110,11 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     <button
       aria-label="Close work detail"
       aria-disabled={isClosing}
-      className={`pw-detail-close ${closeGlass.supportsSvgFilter ? "pw-detail-close--svg" : "pw-detail-close--fallback"}${isClosing ? " is-closing" : ""}`}
+      className={`cw-liquid-glass-control pw-detail-close ${
+        closeGlass.supportsSvgFilter
+          ? "cw-liquid-glass-control--svg pw-detail-close--svg"
+          : "cw-liquid-glass-control--fallback pw-detail-close--fallback"
+      }${isClosing ? " is-closing" : ""}`}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       ref={closeButtonRef}

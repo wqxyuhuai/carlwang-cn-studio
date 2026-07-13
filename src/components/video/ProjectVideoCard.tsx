@@ -52,6 +52,15 @@ export function ProjectVideoCard({
   );
 
   useEffect(() => {
+    if (!isHovering) {
+      currentRef.current = { ...targetRef.current };
+      if (bubbleRef.current) {
+        bubbleRef.current.style.setProperty("--video-play-x", `${targetRef.current.x}px`);
+        bubbleRef.current.style.setProperty("--video-play-y", `${targetRef.current.y}px`);
+      }
+      return;
+    }
+
     const tick = () => {
       const target = targetRef.current;
       const current = currentRef.current;
@@ -66,9 +75,10 @@ export function ProjectVideoCard({
 
     rafRef.current = window.requestAnimationFrame(tick);
     return () => {
-      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     };
-  }, []);
+  }, [isHovering]);
 
   function updateTarget(clientX: number, clientY: number) {
     const card = cardRef.current;
