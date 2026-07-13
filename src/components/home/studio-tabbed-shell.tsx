@@ -15,12 +15,13 @@ const useLocationLayoutEffect = typeof window === "undefined" ? useEffect : useL
 function tabsFromHash(): { mainTab: MainTab; workTab: WorkTab } {
   if (typeof window === "undefined") return { mainTab: "works", workTab: "featured" };
 
+  if (window.location.hash.startsWith("#works-index") || window.location.hash.startsWith("#works-list")) {
+    return { mainTab: "works", workTab: "list" };
+  }
+
   switch (window.location.hash) {
     case "#about":
       return { mainTab: "about", workTab: "featured" };
-    case "#works-index":
-    case "#works-list":
-      return { mainTab: "works", workTab: "list" };
     default:
       return { mainTab: "works", workTab: "featured" };
   }
@@ -46,13 +47,13 @@ function rememberWorksHref(href = normalizedCurrentHref()) {
 
 function lastIndexHref() {
   const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
-  if (remembered?.includes("#works-index")) return remembered.replace("#works-list", "#works-index");
+  if (remembered?.includes("#works-index")) return normalizeWorksHref(remembered);
   return "/?view=grid#works-index";
 }
 
 function lastWorksHref() {
   const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
-  if (remembered && isWorksHref(remembered)) return remembered.replace("#works-list", "#works-index");
+  if (remembered && isWorksHref(remembered)) return normalizeWorksHref(remembered);
   return "/#works";
 }
 
@@ -93,11 +94,16 @@ export function StudioTabbedShell({
 
   useLocationLayoutEffect(() => {
     function syncTabsFromHash() {
+      const currentHref = normalizedCurrentHref();
+      const normalizedHref = normalizeWorksHref(currentHref);
+      if (normalizedHref !== currentHref) {
+        window.history.replaceState(null, "", normalizedHref);
+      }
       const nextTabs = tabsFromHash();
       setTabs(nextTabs);
       syncDocumentWorkTab(nextTabs.workTab);
       if (window.location.hash === "#works-list") {
-        window.history.replaceState(null, "", "#works-index");
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#works-index`);
       }
       if (isWorksHref(normalizedCurrentHref())) {
         rememberWorksHref();

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, MouseEvent, PointerEvent, RefObject } from "react";
+import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { VideoControls } from "./VideoControls";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
@@ -10,6 +10,15 @@ function supportsReducedMotion() {
 }
 
 const useVideoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+function recordPlaybackError(element: HTMLVideoElement, error: unknown) {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  element.dataset.playbackError = message;
+}
+
+function isPlaybackPolicyError(error: unknown) {
+  return error instanceof DOMException && error.name === "NotAllowedError";
+}
 
 function getRenderedVideoRect(element: HTMLVideoElement) {
   const bounds = element.getBoundingClientRect();
@@ -39,16 +48,13 @@ function isPointInsideRect(x: number, y: number, rect: DOMRect) {
 export function VideoFullscreenPlayer({
   isOpen,
   onClose,
-  video,
-  videoElementRef
+  video
 }: {
   isOpen: boolean;
   onClose: () => void;
   video: ProjectVideo;
-  videoElementRef?: RefObject<HTMLVideoElement | null>;
 }) {
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const videoRef = videoElementRef ?? localVideoRef;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const closeBubbleRef = useRef<HTMLSpanElement | null>(null);
   const cloudRef = useRef<HTMLSpanElement | null>(null);
@@ -61,6 +67,7 @@ export function VideoFullscreenPlayer({
   const [isDimmed, setIsDimmed] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
   const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "error">("loading");
   const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
@@ -72,6 +79,10 @@ export function VideoFullscreenPlayer({
     if (isClosing) return;
     setIsClosing(true);
     window.setTimeout(() => {
+      setHasStartedPlayback(false);
+      setIsPlaying(false);
+      setMediaStatus("loading");
+      setCurrentTime(0);
       onClose();
       setIsClosing(false);
     }, supportsReducedMotion() ? 0 : 460);
@@ -81,7 +92,16 @@ export function VideoFullscreenPlayer({
     const element = videoRef.current;
     if (!element) return;
     if (element.paused) {
-      void element.play();
+      if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
+        element.currentTime = 0;
+        setCurrentTime(0);
+      }
+      element.muted = false;
+      setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA ? "ready" : "loading");
+      void element.play().catch((error) => {
+        recordPlaybackError(element, error);
+        setMediaStatus(isPlaybackPolicyError(error) && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "error");
+      });
     } else {
       element.pause();
     }
@@ -104,6 +124,11 @@ export function VideoFullscreenPlayer({
   }, [isOpen]);
 
   useEffect(() => {
+    if (isOpen) return;
+    videoRef.current?.pause();
+  }, [isOpen, video.src, videoRef]);
+
+  useEffect(() => {
     if (isClosing) videoRef.current?.pause();
   }, [isClosing, videoRef]);
 
@@ -113,6 +138,7 @@ export function VideoFullscreenPlayer({
     if (!element) return;
 
     element.muted = false;
+    element.preload = "auto";
 
     const syncState = () => {
       setIsPlaying(!element.paused);
@@ -127,19 +153,34 @@ export function VideoFullscreenPlayer({
         setAspectRatio(element.videoWidth / element.videoHeight);
       }
     };
+    const resetAfterPlayback = () => {
+      element.currentTime = 0;
+      setCurrentTime(0);
+      setIsPlaying(false);
+      setHasStartedPlayback(false);
+      setMediaStatus("ready");
+    };
 
     element.addEventListener("play", syncState);
     element.addEventListener("pause", syncState);
+    element.addEventListener("ended", resetAfterPlayback);
     element.addEventListener("loadedmetadata", syncDuration);
     element.addEventListener("timeupdate", syncTime);
-    void element.play().catch(() => {
-      // The persistent play control remains available if autoplay is blocked.
+    setMediaStatus("loading");
+    setIsMuted(false);
+    delete element.dataset.playbackError;
+    if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
+      element.currentTime = 0;
+      setCurrentTime(0);
+    }
+    void element.play().catch((error) => {
+      recordPlaybackError(element, error);
+      setMediaStatus(isPlaybackPolicyError(error) && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "error");
     });
-
     return () => {
-      element.pause();
       element.removeEventListener("play", syncState);
       element.removeEventListener("pause", syncState);
+      element.removeEventListener("ended", resetAfterPlayback);
       element.removeEventListener("loadedmetadata", syncDuration);
       element.removeEventListener("timeupdate", syncTime);
     };
@@ -162,10 +203,15 @@ export function VideoFullscreenPlayer({
   }, [aspectRatio]);
 
   useEffect(() => {
-    updateFrameSize();
+    if (!isOpen) return;
+
+    const frame = window.requestAnimationFrame(updateFrameSize);
     window.addEventListener("resize", updateFrameSize);
-    return () => window.removeEventListener("resize", updateFrameSize);
-  }, [updateFrameSize]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateFrameSize);
+    };
+  }, [isOpen, updateFrameSize]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -277,7 +323,7 @@ export function VideoFullscreenPlayer({
       </span>
       <div className="video-player-stage" ref={stageRef}>
         <div
-          className={["video-player-video-frame", `is-${mediaStatus}`].join(" ")}
+          className={["video-player-video-frame", `is-${mediaStatus}`, hasStartedPlayback ? "has-started" : ""].filter(Boolean).join(" ")}
           style={
             frameSize
               ? ({
@@ -300,7 +346,10 @@ export function VideoFullscreenPlayer({
             onError={() => setMediaStatus("error")}
             onLoadedData={() => setMediaStatus("ready")}
             onLoadStart={() => setMediaStatus("loading")}
-            onPlaying={() => setMediaStatus("ready")}
+            onPlaying={() => {
+              setHasStartedPlayback(true);
+              setMediaStatus("ready");
+            }}
             onStalled={() => setMediaStatus("loading")}
             onWaiting={() => setMediaStatus("loading")}
             playsInline

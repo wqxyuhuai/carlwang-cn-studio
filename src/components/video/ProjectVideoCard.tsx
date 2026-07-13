@@ -20,7 +20,6 @@ export function ProjectVideoCard({
 }) {
   const bubbleRef = useRef<HTMLSpanElement | null>(null);
   const cardRef = useRef<HTMLButtonElement | null>(null);
-  const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const targetRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
   const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
@@ -105,18 +104,8 @@ export function ProjectVideoCard({
     updateTarget(event.clientX, event.clientY);
   }
 
-  function playFullscreenVideo() {
-    const element = fullscreenVideoRef.current;
-    if (!element) return;
-    element.muted = false;
-    void element.play().catch(() => {
-      // The player remains open with visible controls so playback can be retried.
-    });
-  }
-
   function openFullscreenVideo() {
     flushSync(() => setIsOpen(true));
-    playFullscreenVideo();
   }
 
   return (
@@ -201,7 +190,6 @@ export function ProjectVideoCard({
           setIsOpen(false);
         }}
         video={video}
-        videoElementRef={fullscreenVideoRef}
       />
     </>
   );

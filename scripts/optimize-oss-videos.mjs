@@ -388,7 +388,8 @@ async function main() {
     audioBitrate: argValue("audio-bitrate") || "96k",
     noAudio: hasArg("no-audio"),
     minSavingRatio: Number(argValue("min-saving-ratio") || 0.03),
-    limit: Number(argValue("limit") || 0)
+    limit: Number(argValue("limit") || 0),
+    slug: argValue("slug").trim()
   };
 
   const client = createOssClient();
@@ -417,7 +418,9 @@ async function main() {
   const refs = [
     ...siteRefs.filter((ref) => !isProjectContentUrl(ref.url)),
     ...projectDocs.flatMap((document) => document.refs)
-  ].filter((ref) => looksLikeVideoObjectKey(ref.objectKey));
+  ]
+    .filter((ref) => looksLikeVideoObjectKey(ref.objectKey))
+    .filter((ref) => !options.slug || ref.objectKey.includes(`/studio-projects/${options.slug}/`));
 
   console.log(`[video] refs=${refs.length} dryRun=${options.dryRun} max=${options.maxWidth}x${options.maxHeight} crf=${options.crf} preset=${options.preset}`);
   const cache = new Map();

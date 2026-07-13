@@ -42,16 +42,16 @@ const fallbackImages: CanvasImage[] = [
 
 const INFINITE_CHUNK_SIZE = 68;
 const INFINITE_RENDER_DISTANCE = 1;
-const INFINITE_ENTRY_CAMERA_Z = 132;
-const INFINITE_COMPACT_ENTRY_CAMERA_Z = 92;
+const INFINITE_ENTRY_CAMERA_Z = 96;
+const INFINITE_COMPACT_ENTRY_CAMERA_Z = 78;
 const INFINITE_INITIAL_CAMERA_Z = 52;
 const INFINITE_MAX_VELOCITY = 1.9;
 const INFINITE_VELOCITY_LERP = 0.16;
 const INFINITE_VELOCITY_DECAY = 0.9;
-const INFINITE_ENTRY_SECONDS = 4.2;
-const INFINITE_ENTRY_BOOST = 0.1;
+const INFINITE_ENTRY_SECONDS = 1.8;
+const INFINITE_ENTRY_BOOST = 0.085;
 const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
-const INFINITE_COMPACT_ENTRY_BOOST = 0.15;
+const INFINITE_COMPACT_ENTRY_BOOST = 0.08;
 const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
 const INFINITE_MOBILE_TEXTURE_LIMIT = 6;
@@ -79,22 +79,23 @@ function useFeaturedCanvasCompactMode() {
   return isCompact;
 }
 
-const INFINITE_CHUNK_OFFSETS = (() => {
-  const maxDistance = INFINITE_RENDER_DISTANCE;
-  const offsets: Array<[number, number, number]> = [];
-
-  for (let dx = -maxDistance; dx <= maxDistance; dx += 1) {
-    for (let dy = -maxDistance; dy <= maxDistance; dy += 1) {
-      for (let dz = -maxDistance; dz <= maxDistance; dz += 1) {
-        if (Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) <= maxDistance) {
-          offsets.push([dx, dy, dz]);
-        }
-      }
-    }
-  }
-
-  return offsets;
-})();
+const INFINITE_CHUNK_OFFSETS: Array<[number, number, number]> = [
+  [0, 0, 0],
+  [0, 0, -1],
+  [0, 0, 1],
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0],
+  [1, 1, 0],
+  [1, -1, 0],
+  [-1, 1, 0],
+  [-1, -1, 0],
+  [1, 0, -1],
+  [-1, 0, -1],
+  [0, 1, -1],
+  [0, -1, -1]
+];
 
 const INFINITE_COMPACT_CHUNK_OFFSETS: Array<[number, number, number]> = [
   [0, 0, 0],
@@ -182,7 +183,7 @@ function hashKey(value: string) {
 
 function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean): InfinitePlaneData[] {
   const seed = hashKey(`${cx},${cy},${cz}`);
-  const count = compact ? 7 : mediaCount >= 8 ? 8 : 7;
+  const count = compact ? 7 : 6;
 
   return Array.from({ length: count }, (_, index) => {
     const base = seed + index * 997;
@@ -252,11 +253,16 @@ function InfiniteCanvasPlane({
   roundedMask: THREE.Texture;
   texture: THREE.Texture;
 }) {
+  const { invalidate } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const opacityRef = useRef(0);
+  const hoverTargetRef = useRef(0);
+  const hoverProgressRef = useRef(0);
   const image = texture.image as { width?: number; height?: number } | undefined;
   const aspect = image?.width && image?.height ? image.width / image.height : 1;
+  const baseScaleX = plane.size * aspect;
+  const baseScaleY = plane.size;
 
   useFrame(() => {
     const mesh = meshRef.current;
@@ -280,9 +286,18 @@ function InfiniteCanvasPlane({
     const targetOpacity = chunkFade * depthFade * depthFade;
 
     opacityRef.current = targetOpacity < 0.01 && opacityRef.current < 0.01 ? 0 : THREE.MathUtils.lerp(opacityRef.current, targetOpacity, 0.18);
-    material.opacity = opacityRef.current;
-    material.depthWrite = opacityRef.current > 0.98;
+    hoverProgressRef.current = THREE.MathUtils.lerp(hoverProgressRef.current, hoverTargetRef.current, 0.2);
+
+    const hoverProgress = hoverProgressRef.current;
+    const hoverScale = 1 + hoverProgress * 0.055;
+    material.opacity = THREE.MathUtils.lerp(opacityRef.current, 1, hoverProgress);
+    material.color.setScalar(1);
+    material.depthWrite = material.opacity > 0.98;
+    mesh.position.z = plane.position[2] + hoverProgress * 0.7;
+    mesh.scale.set(baseScaleX * hoverScale, baseScaleY * hoverScale, 1);
     mesh.visible = opacityRef.current > 0.012;
+
+    if (Math.abs(hoverTargetRef.current - hoverProgress) > 0.002) invalidate();
   });
 
   return (
@@ -291,14 +306,24 @@ function InfiniteCanvasPlane({
       geometry={INFINITE_PLANE_GEOMETRY}
       position={plane.position}
       rotation={[0, 0, plane.rotation]}
-      scale={[plane.size * aspect, plane.size, 1]}
+      scale={[baseScaleX, baseScaleY, 1]}
       onClick={(event) => {
         event.stopPropagation();
         if (event.delta > 6) return;
         onOpen(canvasImage.href);
       }}
       onPointerDown={() => onIntent(canvasImage.href)}
-      onPointerOver={() => onIntent(canvasImage.href)}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        hoverTargetRef.current = 1;
+        onIntent(canvasImage.href);
+        invalidate();
+      }}
+      onPointerOut={(event) => {
+        event.stopPropagation();
+        hoverTargetRef.current = 0;
+        invalidate();
+      }}
       visible={false}
     >
       <meshBasicMaterial
@@ -306,6 +331,7 @@ function InfiniteCanvasPlane({
         alphaMap={roundedMask}
         alphaTest={0.015}
         map={texture}
+        fog={false}
         transparent
         opacity={0}
         side={THREE.DoubleSide}
@@ -422,7 +448,7 @@ function InfiniteCanvasField({
   useEffect(() => {
     if (!isActive || prefersReducedMotion || (!autoFlightEnabled && !playEntry)) return;
 
-    const frameInterval = 1000 / (compact ? 20 : 30);
+    const frameInterval = 1000 / (compact ? 30 : 45);
     const entryDeadline = window.performance.now() + (INFINITE_ENTRY_SECONDS + 1) * 1000;
     let animationFrame = 0;
     let previousFrameTime = 0;
@@ -572,21 +598,24 @@ function InfiniteCanvasWebGL({
   radiusPixels: number;
   scale: number;
 }) {
+  const { gl } = useThree();
   const imageSources = useMemo(() => images.map((image) => image.src), [images]);
   const textures = useLoader(THREE.TextureLoader, imageSources);
   const roundedMask = useMemo(() => createRoundedAlphaMask(radiusPixels), [radiusPixels]);
 
   useEffect(() => () => roundedMask.dispose(), [roundedMask]);
   useEffect(() => {
+    const maxAnisotropy = gl.capabilities.getMaxAnisotropy();
+
     textures.forEach((texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = compact ? 1 : 2;
+      texture.anisotropy = Math.min(maxAnisotropy, compact ? 2 : 4);
       texture.generateMipmaps = !compact;
       texture.minFilter = compact ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.needsUpdate = true;
     });
-  }, [compact, textures]);
+  }, [compact, gl, textures]);
 
   return (
     <InfiniteCanvasField
@@ -696,7 +725,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
           near: 1,
           far: 230
         }}
-        dpr={isCompact ? 1 : [1, 1.25]}
+        dpr={isCompact ? 1 : [1, 1.5]}
         flat
         frameloop="demand"
         gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: false }}

@@ -1,14 +1,29 @@
 export const workReturnHrefKey = "cw-work-return-href";
 export const lastWorksHrefKey = "cw-last-works-href";
-export const workHistoryReturnHrefKey = "cw-work-history-return-href";
+export const workReturnScrollKey = "cw-work-return-scroll";
 export const workReturnHrefParam = "from";
+
+type WorkReturnScroll = {
+  href: string;
+  panelTop: number;
+  surfaceTop: number;
+  windowTop: number;
+};
 
 function clientOrigin() {
   return typeof window === "undefined" ? "http://localhost" : window.location.origin;
 }
 
 export function normalizeWorksHref(href: string) {
-  return href.replace("#works-list", "#works-index");
+  const hashIndex = href.indexOf("#");
+  if (hashIndex < 0) return href;
+
+  const baseHref = href.slice(0, hashIndex);
+  const hash = href.slice(hashIndex + 1);
+  if (hash.startsWith("works-index") || hash.startsWith("works-list")) {
+    return `${baseHref}#works-index`;
+  }
+  return href;
 }
 
 export function isWorkDetailHref(href: string) {
@@ -76,20 +91,51 @@ export function rememberWorkReturnHref(href = currentWorkSurfaceHref()) {
 }
 
 export function rememberWorkNavigation(href = currentWorkSurfaceHref()) {
+  rememberWorkReturnHref(href);
+}
+
+export function rememberWorkReturnScroll(href: string, panelTop: number, surfaceTop: number, windowTop: number) {
   if (typeof window === "undefined") return;
 
   const validHref = validWorkReturnHref(href);
   if (!validHref) return;
 
-  rememberWorkReturnHref(validHref);
-  window.sessionStorage.setItem(workHistoryReturnHrefKey, validHref);
+  const scrollState: WorkReturnScroll = {
+    href: validHref,
+    panelTop: Math.max(0, panelTop),
+    surfaceTop: Math.max(0, surfaceTop),
+    windowTop: Math.max(0, windowTop)
+  };
+  window.sessionStorage.setItem(workReturnScrollKey, JSON.stringify(scrollState));
 }
 
-export function consumeWorkHistoryReturn(href: string) {
-  if (typeof window === "undefined") return false;
+export function readWorkReturnScroll(href: string) {
+  if (typeof window === "undefined") return null;
 
   const expectedHref = validWorkReturnHref(href);
-  const historyHref = validWorkReturnHref(window.sessionStorage.getItem(workHistoryReturnHrefKey));
-  window.sessionStorage.removeItem(workHistoryReturnHrefKey);
-  return Boolean(expectedHref && historyHref === expectedHref);
+  const storedValue = window.sessionStorage.getItem(workReturnScrollKey);
+  if (!expectedHref || !storedValue) return null;
+
+  try {
+    const scrollState = JSON.parse(storedValue) as Partial<WorkReturnScroll>;
+    const storedHref = validWorkReturnHref(typeof scrollState.href === "string" ? scrollState.href : null);
+    if (storedHref !== expectedHref) return null;
+
+    return {
+      panelTop: Number.isFinite(scrollState.panelTop) ? Math.max(0, Number(scrollState.panelTop)) : 0,
+      surfaceTop: Number.isFinite(scrollState.surfaceTop) ? Math.max(0, Number(scrollState.surfaceTop)) : 0,
+      windowTop: Number.isFinite(scrollState.windowTop) ? Math.max(0, Number(scrollState.windowTop)) : 0
+    };
+  } catch {
+    window.sessionStorage.removeItem(workReturnScrollKey);
+    return null;
+  }
+}
+
+export function consumeWorkReturnScroll(href: string) {
+  const scrollState = readWorkReturnScroll(href);
+  if (scrollState && typeof window !== "undefined") {
+    window.sessionStorage.removeItem(workReturnScrollKey);
+  }
+  return scrollState;
 }

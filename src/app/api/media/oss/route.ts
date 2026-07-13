@@ -84,6 +84,11 @@ function boundedRangeHeader(rangeHeader: string | null) {
   const start = Number(match[1]);
   if (!Number.isFinite(start) || start < 0) return rangeHeader;
 
+  // Only cap the initial probe. Browsers use later open-ended ranges to read
+  // MP4 metadata near EOF; inventing an end beyond the object size makes OSS
+  // fall back to a 200 full response and leaves the video at readyState 0.
+  if (start !== 0) return rangeHeader;
+
   return `bytes=${start}-${start + OPEN_ENDED_RANGE_CHUNK_BYTES - 1}`;
 }
 

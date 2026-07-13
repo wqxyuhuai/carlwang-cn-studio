@@ -3,16 +3,19 @@
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CascadeText } from "@/components/cascade-text";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
 import {
+  consumeWorkReturnScroll,
   lastWorksHrefKey,
   rememberLastWorksHref,
   rememberWorkNavigation,
   rememberWorkReturnHref,
+  rememberWorkReturnScroll,
+  readWorkReturnScroll,
   workDetailHrefWithReturn
 } from "@/lib/work-detail-return";
 import { metricLabel, workPublishedLabel } from "@/lib/work-metrics";
@@ -81,13 +84,23 @@ export function WorksBrowser({
   }, [filteredWorks, works]);
   const visibleTypes = useMemo(() => workTypes.filter((type) => type.filterVisible && type.status !== "Archived"), [workTypes]);
   const visibleTypedTypes = useMemo(() => visibleTypes.map((type) => ({ type, count: works.filter((work) => matchesType(work, type.slug)).length })).filter((entry) => entry.count > 0), [visibleTypes, works]);
+  const browserHref = useCallback((nextFilter: Filter, nextMode: ViewMode) => {
+    const params = new URLSearchParams();
+    if (nextFilter.kind !== "all") params.set(nextFilter.kind, nextFilter.value);
+    params.set("view", nextMode);
+    const query = params.toString();
+    const hash = basePath === "/" ? "#works-index" : "";
+    return `${basePath}${query ? `?${query}` : ""}${hash}`;
+  }, [basePath]);
 
   useEffect(() => {
     if (basePath !== "/") return;
 
     function syncFromLocation() {
-      setMode(initialModeFromLocation(initialMode));
-      setFilter(initialFilterFromLocation());
+      const nextMode = initialModeFromLocation(initialMode);
+      const nextFilter = initialFilterFromLocation();
+      setMode((current) => current === nextMode ? current : nextMode);
+      setFilter((current) => current.kind === nextFilter.kind && current.value === nextFilter.value ? current : nextFilter);
     }
 
     syncFromLocation();
@@ -122,14 +135,68 @@ export function WorksBrowser({
     return () => page.removeEventListener("wheel", forwardWheelToWorks);
   }, []);
 
-  function browserHref(nextFilter: Filter, nextMode: ViewMode) {
-    const params = new URLSearchParams();
-    if (nextFilter.kind !== "all") params.set(nextFilter.kind, nextFilter.value);
-    params.set("view", nextMode);
-    const query = params.toString();
-    const hash = basePath === "/" ? "#works-index" : "";
-    return `${basePath}${query ? `?${query}` : ""}${hash}`;
-  }
+  useLayoutEffect(() => {
+    const worksRight = worksRightRef.current;
+    const worksSurface = pageRef.current?.closest<HTMLElement>(".cw-work-view");
+    if (!worksRight) return;
+
+    const returnHref = browserHref(filter, mode);
+    const scrollState = readWorkReturnScroll(returnHref);
+    if (!scrollState) return;
+    pageRef.current?.classList.add("is-detail-return");
+    const scrollTarget = worksRight;
+    const savedScroll = scrollState;
+
+    let settledFrame: number | null = null;
+    let isCancelled = false;
+    const settledTimers: number[] = [];
+    const root = document.documentElement;
+    const previousScrollBehavior = root.style.scrollBehavior;
+    root.style.scrollBehavior = "auto";
+
+    function applyScrollPosition() {
+      const panelMax = Math.max(0, scrollTarget.scrollHeight - scrollTarget.clientHeight);
+      scrollTarget.scrollTop = Math.min(savedScroll.panelTop, panelMax);
+      if (worksSurface) {
+        const surfaceMax = Math.max(0, worksSurface.scrollHeight - worksSurface.clientHeight);
+        worksSurface.scrollTop = Math.min(savedScroll.surfaceTop, surfaceMax);
+      }
+      window.scrollTo(0, savedScroll.windowTop);
+    }
+
+    applyScrollPosition();
+    const firstFrame = window.requestAnimationFrame(() => {
+      applyScrollPosition();
+      settledFrame = window.requestAnimationFrame(() => {
+        applyScrollPosition();
+      });
+    });
+    const resizeObserver = new ResizeObserver(applyScrollPosition);
+    resizeObserver.observe(scrollTarget);
+    if (worksSurface) resizeObserver.observe(worksSurface);
+
+    [120, 360, 800].forEach((delay) => {
+      settledTimers.push(window.setTimeout(applyScrollPosition, delay));
+    });
+    settledTimers.push(window.setTimeout(() => {
+      applyScrollPosition();
+      resizeObserver.disconnect();
+      consumeWorkReturnScroll(returnHref);
+      root.style.scrollBehavior = previousScrollBehavior;
+    }, 1200));
+    void document.fonts?.ready.then(() => {
+      if (!isCancelled) applyScrollPosition();
+    });
+
+    return () => {
+      isCancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      if (settledFrame !== null) window.cancelAnimationFrame(settledFrame);
+      settledTimers.forEach((timer) => window.clearTimeout(timer));
+      resizeObserver.disconnect();
+      root.style.scrollBehavior = previousScrollBehavior;
+    };
+  }, [browserHref, filter, mode]);
 
   function rememberBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
     if (basePath !== "/") return;
@@ -156,6 +223,12 @@ export function WorksBrowser({
 
   function rememberCurrentWorkReturnHref(markHistoryEntry = true) {
     const returnHref = browserHref(filter, mode);
+    rememberWorkReturnScroll(
+      returnHref,
+      worksRightRef.current?.scrollTop ?? 0,
+      pageRef.current?.closest<HTMLElement>(".cw-work-view")?.scrollTop ?? 0,
+      window.scrollY || document.documentElement.scrollTop || 0
+    );
     if (markHistoryEntry) {
       rememberWorkNavigation(returnHref);
     } else {

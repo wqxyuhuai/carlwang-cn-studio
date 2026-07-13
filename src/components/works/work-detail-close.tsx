@@ -5,7 +5,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useRouter } from "next/navigation";
 import { LiquidGlassFilter, useLiquidGlassSurface } from "@/components/liquid-glass-surface";
 import {
-  consumeWorkHistoryReturn,
   isWorkDetailHref,
   lastWorksHrefKey,
   rememberWorkReturnHref,
@@ -36,7 +35,6 @@ function primeReturnSurface(closeHref: string) {
 export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { fallbackHref?: string }) {
   const router = useRouter();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const canReturnThroughHistoryRef = useRef(false);
   const closeHrefRef = useRef<string | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
   const pendingCloseRef = useRef(false);
@@ -46,7 +44,6 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
   useLayoutEffect(() => {
     const closeHref = resolveCloseHref(fallbackHref);
     closeHrefRef.current = closeHref;
-    canReturnThroughHistoryRef.current = consumeWorkHistoryReturn(closeHref);
     primeReturnSurface(closeHref);
   }, [fallbackHref]);
 
@@ -57,13 +54,7 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     setIsClosing(true);
     const closeHref = closeHrefRef.current || resolveCloseHref(fallbackHref);
     primeReturnSurface(closeHref);
-    const canReturnThroughHistory = canReturnThroughHistoryRef.current;
-    canReturnThroughHistoryRef.current = false;
-    if (canReturnThroughHistory) {
-      window.history.back();
-    } else {
-      router.replace(closeHref, { scroll: false });
-    }
+    router.replace(closeHref, { scroll: false });
 
     fallbackTimerRef.current = window.setTimeout(() => {
       const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -87,7 +78,7 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (document.querySelector(".video-player-overlay, .notion-image-lightbox")) return;
+      if (document.querySelector(".video-player-overlay:not([hidden]), .notion-image-lightbox.is-visible")) return;
       if (event.key === "Escape") closeDetail();
     }
 

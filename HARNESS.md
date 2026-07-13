@@ -30,12 +30,13 @@ Every modification should verify:
 4. About page `/about` opens normally.
 5. Contact and footer links are clickable.
 6. Works filtering and grid/list mode switching work.
-7. Detail close button and Escape return to the exact source page, including Grid, List and Featured entry points on desktop and mobile.
+7. Detail close button and Escape return to the exact source page, including Grid, List and Featured entry points on desktop and mobile; Grid/List also restore the exact nested list or mobile Index panel scroll position instead of returning to the top.
 8. Detail previous/next links preserve the original return page.
-9. Text selection is white background with black text.
-10. Browser console has no obvious runtime errors.
-11. TypeScript has no errors.
-12. Production build passes.
+9. Returning from a detail page skips the Index category/card staggered entry sequence and uses only the short whole-page fade; the staggered entry sequence still plays on the first Index visit.
+10. Text selection is white background with black text.
+11. Browser console has no obvious runtime errors.
+12. TypeScript has no errors.
+13. Production build passes.
 
 ## Performance Checks
 
@@ -47,6 +48,8 @@ Before release, verify:
 4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches the intended desktop route and coarse-pointer devices prefetch only the pressed target.
 5. `/api/works/[slug]/view` increments the displayed count but does not invalidate the full public content cache on every D1-backed view.
 6. Multimedia requests use browser/server cache headers where supported and do not reload unchanged OSS assets unnecessarily.
+7. Featured canvas first entry settles in about two seconds, warm Featured visits do not replay it, and desktop animation remains smooth without rendering the full 27-chunk cube.
+8. Featured canvas images use intent prefetch and transition to full source-image brightness on hover without triggering React state updates on pointer movement.
 
 ## Content Checks
 
@@ -94,6 +97,8 @@ Check these after each stage:
 - Responsive widths: 1440, 1280, 1024, 768, 430 and 390 px.
 - Keyboard focus, reduced motion behavior and no obvious console errors.
 - Warm Featured/Index switches reuse the mounted Featured canvas without showing the first-load screen again.
+- Featured canvas cards stay crisp at desktop DPR, visibly respond to hover and remain clickable while auto flight is running or paused.
+- The Featured auto-flight control sits beside the bottom navigation on desktop and above it on narrow mobile screens without overlap.
 
 ## Route Checklist
 

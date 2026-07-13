@@ -95,7 +95,7 @@ export function VideoScrubTimeline({
 
   useEffect(() => {
     let cancelled = false;
-    if (video.spriteSrc) return;
+    if (video.spriteSrc || video.poster) return;
 
     generateVideoThumbs(video.src, frameCount)
       .then((items) => {
