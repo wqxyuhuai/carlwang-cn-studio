@@ -70,13 +70,12 @@ export function VideoFullscreenPlayer({
 
   const closePlayer = useCallback(() => {
     if (isClosing) return;
-    videoRef.current?.pause();
     setIsClosing(true);
     window.setTimeout(() => {
       onClose();
       setIsClosing(false);
     }, supportsReducedMotion() ? 0 : 460);
-  }, [isClosing, onClose, videoRef]);
+  }, [isClosing, onClose]);
 
   function togglePlay() {
     const element = videoRef.current;
@@ -103,6 +102,10 @@ export function VideoFullscreenPlayer({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isClosing) videoRef.current?.pause();
+  }, [isClosing, videoRef]);
 
   useVideoLayoutEffect(() => {
     if (!isOpen) return;
