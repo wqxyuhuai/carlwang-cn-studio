@@ -6,7 +6,8 @@ import { NotionRenderer } from "@/components/notion/notion-renderer";
 import { WorkDetailClose } from "@/components/works/work-detail-close";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
 import { WorkDetailPagerLink } from "@/components/works/work-detail-pager-link";
-import { WorkDetailScrollTop } from "@/components/works/work-detail-scroll-top";
+import { WorkScrollTop } from "@/components/works/work-scroll-top";
+import { WorkDetailTools } from "@/components/works/work-detail-tools";
 import { getPublishedWorks, getWorkBySlug } from "@/lib/public-content";
 import { workPublishedLabel } from "@/lib/work-metrics";
 import type { MediaItem, Tool, Work } from "@/lib/types";
@@ -99,7 +100,7 @@ export default async function WorkDetailPage({
   return (
     <main className="pw-detail-page">
       <WorkDetailClose />
-      <WorkDetailScrollTop />
+      <WorkScrollTop />
       <aside className="pw-detail-left" aria-label="Work summary">
         <div className="pw-detail-summary">
           <DetailImage className="is-cover" media={work.cover} priority revealIndex={0} />
@@ -112,16 +113,7 @@ export default async function WorkDetailPage({
           />
 
           {visibleTools.length > 0 ? (
-            <div className="pw-detail-tools" aria-label="Tools">
-              <div className="pw-detail-tools-title">Tools</div>
-              <ul className="pw-detail-tool-list">
-                {visibleTools.map((tool) => (
-                  <li className={`pw-detail-tool${tool.inverted ? " is-dark-inverted" : ""}`} key={tool.name} title={tool.name}>
-                    <Image alt={tool.name} height={24} src={tool.icon} width={24} />
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <WorkDetailTools tools={visibleTools} />
           ) : null}
         </div>
 

@@ -42,7 +42,7 @@ npm run upload
 npm run deploy
 ```
 
-GitHub Actions builds the OpenNext bundle and runs `wrangler deploy` directly. This keeps deployment independent from OpenNext's optional KV bulk prefill; the `NEXT_INC_CACHE_KV` and `NEXT_TAG_CACHE_KV` bindings are populated by runtime traffic. Manual `npm run deploy` remains available for an authenticated local release.
+The default production release is a push to `main`. GitHub Actions then builds the OpenNext bundle and runs `wrangler deploy` automatically. This keeps deployment independent from OpenNext's optional KV bulk prefill; the `NEXT_INC_CACHE_KV` and `NEXT_TAG_CACHE_KV` bindings are populated by runtime traffic. Use manual `npm run deploy` only for an explicitly requested emergency release or when GitHub Actions is unavailable, then push the exact deployed source so GitHub remains the source of truth.
 
 ## Runtime Data
 
@@ -73,6 +73,7 @@ Do not expose Notion tokens or Aliyun AccessKeys through client code, logs, publ
 - `HARNESS.md` is the canonical validation checklist before publishing.
 - `docs/DATA_FLOW.md` documents Notion-to-OSS publishing, public reads, caching and metrics.
 - `docs/NOTION_SCHEMA.md` maps the Notion source fields.
+- `docs/UX_DECISIONS.md` records approved responsive, Works, detail-media and contact interaction decisions.
 - `docs/cleanup-notes.md` records cleanup decisions and deferred cleanup.
 
 ## Public Scope

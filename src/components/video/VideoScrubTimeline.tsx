@@ -17,7 +17,6 @@ function formatTime(value: number) {
 
 async function generateVideoThumbs(src: string, count: number) {
   const video = document.createElement("video");
-  video.src = src;
   video.crossOrigin = "anonymous";
   video.muted = true;
   video.playsInline = true;
@@ -33,6 +32,8 @@ async function generateVideoThumbs(src: string, count: number) {
       window.clearTimeout(timeout);
       reject(new Error("thumbnail metadata failed"));
     };
+    video.src = src;
+    video.load();
   });
 
   const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
@@ -71,19 +72,25 @@ async function generateVideoThumbs(src: string, count: number) {
 export function VideoScrubTimeline({
   currentTime,
   duration,
+  isActive,
   onSeek,
   video
 }: {
   currentTime: number;
   duration: number;
+  isActive: boolean;
   onSeek: (time: number) => void;
   video: ProjectVideo;
 }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
-  const [generatedThumbs, setGeneratedThumbs] = useState<{ items: string[]; src: string } | null>(null);
-  const frameCount = video.spriteFrameCount || 8;
+  const [generatedThumbs, setGeneratedThumbs] = useState<{ items: string[]; key: string } | null>(null);
+  const requestedFrameCount = Math.max(1, Math.trunc(video.spriteFrameCount || 8));
+  const spriteColumns = Math.max(1, Math.trunc(video.spriteColumns || requestedFrameCount));
+  const spriteRows = Math.max(1, Math.trunc(video.spriteRows || Math.ceil(requestedFrameCount / spriteColumns)));
+  const frameCount = video.spriteSrc ? Math.min(requestedFrameCount, spriteColumns * spriteRows) : requestedFrameCount;
+  const thumbnailKey = `${video.src}|${frameCount}`;
   const progress = duration > 0 ? clamp(currentTime / duration) : 0;
   const hoverProgress = hoverTime !== null && duration > 0 ? clamp(hoverTime / duration) : progress;
   const hoverTimeEdgeClass = hoverProgress < 0.08 ? "is-start" : hoverProgress > 0.92 ? "is-end" : "";
@@ -91,30 +98,37 @@ export function VideoScrubTimeline({
     () => (!video.spriteSrc && video.poster ? Array.from({ length: frameCount }, () => video.poster as string) : []),
     [frameCount, video.poster, video.spriteSrc]
   );
-  const thumbs = generatedThumbs?.src === video.src ? generatedThumbs.items : fallbackThumbs;
+  const thumbs = generatedThumbs?.key === thumbnailKey ? generatedThumbs.items : fallbackThumbs;
 
   useEffect(() => {
     let cancelled = false;
-    if (video.spriteSrc || video.poster) return;
+    if (!isActive || video.spriteSrc) return;
 
     generateVideoThumbs(video.src, frameCount)
       .then((items) => {
-        if (!cancelled && items.length > 0) setGeneratedThumbs({ items, src: video.src });
+        if (!cancelled && items.length > 0) setGeneratedThumbs({ items, key: thumbnailKey });
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, [frameCount, video.poster, video.spriteSrc, video.src]);
+  }, [frameCount, isActive, thumbnailKey, video.spriteSrc, video.src]);
 
-  const spriteStyle = useMemo(() => {
-    if (!video.spriteSrc) return undefined;
-    return {
-      backgroundImage: `url(${video.spriteSrc})`,
-      backgroundSize: `${video.spriteColumns || frameCount}00% ${video.spriteRows || 1}00%`
-    };
-  }, [frameCount, video.spriteColumns, video.spriteRows, video.spriteSrc]);
+  const spriteFrames = useMemo(() => {
+    if (!video.spriteSrc) return [];
+    return Array.from({ length: frameCount }, (_, index) => {
+      const column = index % spriteColumns;
+      const row = Math.floor(index / spriteColumns);
+      return {
+        backgroundImage: `url(${video.spriteSrc})`,
+        backgroundPosition: `${spriteColumns === 1 ? 0 : (column / (spriteColumns - 1)) * 100}% ${
+          spriteRows === 1 ? 0 : (row / (spriteRows - 1)) * 100
+        }%`,
+        backgroundSize: `${spriteColumns * 100}% ${spriteRows * 100}%`
+      } as CSSProperties;
+    });
+  }, [frameCount, spriteColumns, spriteRows, video.spriteSrc]);
 
   function timeFromClientX(clientX: number) {
     const rect = trackRef.current?.getBoundingClientRect();
@@ -166,7 +180,7 @@ export function VideoScrubTimeline({
     >
       <div className="video-scrub-strip">
         {video.spriteSrc ? (
-          <span className="video-scrub-sprite" style={spriteStyle} />
+          spriteFrames.map((style, index) => <span className="video-scrub-thumb is-sprite" key={index} style={style} />)
         ) : thumbs.length > 0 ? (
           thumbs.map((thumb, index) => <span className="video-scrub-thumb" key={`${thumb}-${index}`} style={{ backgroundImage: `url(${thumb})` }} />)
         ) : (

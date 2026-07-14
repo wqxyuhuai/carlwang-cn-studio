@@ -71,7 +71,7 @@ export function VideoFullscreenPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false);
   const [mediaStatus, setMediaStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [isPointerOnVideo, setIsPointerOnVideo] = useState(false);
+  const [isPointerInCloseArea, setIsPointerInCloseArea] = useState(false);
   const [duration, setDuration] = useState(video.duration || 0);
   const [currentTime, setCurrentTime] = useState(0);
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
@@ -99,10 +99,19 @@ export function VideoFullscreenPlayer({
         setCurrentTime(0);
       }
       setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA ? "ready" : "loading");
-      void element.play().catch((error) => {
-        recordPlaybackError(element, error);
-        setMediaStatus(isPlaybackPolicyError(error) && element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "error");
-      });
+      delete element.dataset.playbackError;
+      void element
+        .play()
+        .then(() => {
+          setIsMuted(element.muted);
+          setHasStartedPlayback(true);
+          setMediaStatus("ready");
+        })
+        .catch((error) => {
+          setIsMuted(element.muted);
+          recordPlaybackError(element, error);
+          setMediaStatus(isPlaybackPolicyError(error) && element.readyState >= HTMLMediaElement.HAVE_METADATA ? "ready" : "error");
+        });
     } else {
       element.pause();
     }
@@ -142,12 +151,25 @@ export function VideoFullscreenPlayer({
     element.preload = "auto";
 
     const syncState = () => {
-      setIsPlaying(!element.paused);
+      const nextIsPlaying = !element.paused;
+      setIsPlaying(nextIsPlaying);
       setIsMuted(element.muted);
       setCurrentTime(element.currentTime || 0);
       if (Number.isFinite(element.duration)) setDuration(element.duration);
+      if (nextIsPlaying) {
+        setHasStartedPlayback(true);
+        setMediaStatus("ready");
+      }
     };
-    const syncTime = () => setCurrentTime(element.currentTime || 0);
+    const syncVolume = () => setIsMuted(element.muted);
+    const syncTime = () => {
+      const nextTime = element.currentTime || 0;
+      setCurrentTime(nextTime);
+      if (nextTime > 0) {
+        setHasStartedPlayback(true);
+        setMediaStatus("ready");
+      }
+    };
     const syncDuration = () => {
       if (Number.isFinite(element.duration)) setDuration(element.duration);
       if (element.videoWidth > 0 && element.videoHeight > 0) {
@@ -167,7 +189,11 @@ export function VideoFullscreenPlayer({
     element.addEventListener("ended", resetAfterPlayback);
     element.addEventListener("loadedmetadata", syncDuration);
     element.addEventListener("timeupdate", syncTime);
-    setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA ? "ready" : "loading");
+    element.addEventListener("volumechange", syncVolume);
+    // Metadata is enough to offer an explicit play action. Waiting for
+    // `canplay` here deadlocks browsers that defer media range requests until
+    // the user starts playback.
+    setMediaStatus(element.readyState >= HTMLMediaElement.HAVE_METADATA ? "ready" : "loading");
     setIsMuted(false);
     delete element.dataset.playbackError;
     if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
@@ -181,6 +207,7 @@ export function VideoFullscreenPlayer({
       element.removeEventListener("ended", resetAfterPlayback);
       element.removeEventListener("loadedmetadata", syncDuration);
       element.removeEventListener("timeupdate", syncTime);
+      element.removeEventListener("volumechange", syncVolume);
     };
   }, [isOpen, video.src, videoRef]);
 
@@ -272,26 +299,30 @@ export function VideoFullscreenPlayer({
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     const element = videoRef.current;
     const nextIsPointerOnVideo = element ? isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element)) : false;
+    const isPointerOnControls = event.target instanceof Element && Boolean(event.target.closest(".video-controls"));
 
     targetRef.current = { x: event.clientX, y: event.clientY };
     if (bubbleRef.current.x === 0 && bubbleRef.current.y === 0) {
       bubbleRef.current = { x: event.clientX, y: event.clientY };
       auraRef.current = { x: event.clientX, y: event.clientY };
     }
-    setIsPointerOnVideo(nextIsPointerOnVideo);
+    setIsPointerInCloseArea(!nextIsPointerOnVideo && !isPointerOnControls);
     setIsDimmed(false);
     if (inactivityTimerRef.current) window.clearTimeout(inactivityTimerRef.current);
     inactivityTimerRef.current = window.setTimeout(() => setIsDimmed(true), 2000);
   }
 
   function handlePointerLeave() {
-    setIsPointerOnVideo(false);
+    setIsPointerInCloseArea(false);
   }
 
   function handleOverlayClick(event: MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
     const element = videoRef.current;
-    if (!element || !isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element))) return;
+    if (element && isPointInsideRect(event.clientX, event.clientY, getRenderedVideoRect(element))) {
+      togglePlay();
+      return;
+    }
     closePlayer();
   }
 
@@ -315,7 +346,7 @@ export function VideoFullscreenPlayer({
     >
       <span className="video-player-backdrop" style={{ backgroundImage: video.poster ? `url(${video.poster})` : undefined }} />
       <span className="video-player-cloud" ref={cloudRef} />
-      <span className={["video-cursor-bubble is-close", isPointerOnVideo && !isDimmed ? "is-visible" : ""].filter(Boolean).join(" ")} ref={closeBubbleRef}>
+      <span className={["video-cursor-bubble is-close", isPointerInCloseArea && !isDimmed ? "is-visible" : ""].filter(Boolean).join(" ")} ref={closeBubbleRef}>
         <span aria-hidden="true" className="video-cursor-glass-effect" />
         <span className="video-cursor-bubble-text">Close</span>
       </span>
@@ -343,9 +374,16 @@ export function VideoFullscreenPlayer({
             onCanPlay={() => setMediaStatus("ready")}
             onError={() => setMediaStatus("error")}
             onLoadedData={() => setMediaStatus("ready")}
+            onLoadedMetadata={() => setMediaStatus("ready")}
             onLoadStart={() => setMediaStatus("loading")}
+            onPlay={() => {
+              setHasStartedPlayback(true);
+              setIsPlaying(true);
+              setMediaStatus("ready");
+            }}
             onPlaying={() => {
               setHasStartedPlayback(true);
+              setIsPlaying(true);
               setMediaStatus("ready");
             }}
             onStalled={() => setMediaStatus("loading")}
@@ -356,6 +394,20 @@ export function VideoFullscreenPlayer({
             ref={videoRef}
             src={video.src}
           />
+          {!hasStartedPlayback ? (
+            <button
+              aria-label={`Play ${video.title || "project video"}`}
+              className={["video-player-start-button", mediaStatus === "loading" ? "is-loading" : ""].filter(Boolean).join(" ")}
+              onClick={(event) => {
+                event.stopPropagation();
+                togglePlay();
+              }}
+              type="button"
+            >
+              <span aria-hidden="true" className="video-player-start-icon" />
+              <span>Play</span>
+            </button>
+          ) : null}
           <span aria-live="polite" className="video-player-loading-state">
             {mediaStatus === "error" ? (
               <span className="video-player-error-message">Video unavailable. Select play to retry.</span>
@@ -370,6 +422,7 @@ export function VideoFullscreenPlayer({
       <VideoControls
         currentTime={currentTime}
         duration={duration}
+        isActive={isOpen}
         isDimmed={isDimmed}
         isMuted={isMuted}
         isPlaying={isPlaying}

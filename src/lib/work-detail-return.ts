@@ -2,6 +2,7 @@ export const workReturnHrefKey = "cw-work-return-href";
 export const lastWorksHrefKey = "cw-last-works-href";
 export const workReturnScrollKey = "cw-work-return-scroll";
 export const workReturnHrefParam = "from";
+const workNavigationEntryKey = "cw-work-navigation-entry";
 
 type WorkReturnScroll = {
   href: string;
@@ -64,6 +65,11 @@ export function currentWorkSurfaceHref(defaultHash = "#works") {
   return `${window.location.pathname}${window.location.search}${window.location.hash || defaultHash}`;
 }
 
+export function replaceCurrentHistoryHref(href: string) {
+  if (typeof window === "undefined") return;
+  window.history.replaceState(window.history.state, "", href);
+}
+
 export function rememberLastWorksHref(href: string) {
   if (typeof window === "undefined") return;
 
@@ -92,6 +98,39 @@ export function rememberWorkReturnHref(href = currentWorkSurfaceHref()) {
 
 export function rememberWorkNavigation(href = currentWorkSurfaceHref()) {
   rememberWorkReturnHref(href);
+
+  const validHref = validWorkReturnHref(href);
+  if (!validHref || typeof performance === "undefined") return;
+
+  window.sessionStorage.setItem(
+    workNavigationEntryKey,
+    JSON.stringify({ href: validHref, timeOrigin: performance.timeOrigin })
+  );
+}
+
+export function canReturnToWorkSurfaceWithHistory(href: string) {
+  if (typeof window === "undefined" || typeof performance === "undefined") return false;
+
+  const validHref = validWorkReturnHref(href);
+  const storedValue = window.sessionStorage.getItem(workNavigationEntryKey);
+  if (!validHref || !storedValue) return false;
+
+  try {
+    const entry = JSON.parse(storedValue) as { href?: unknown; timeOrigin?: unknown };
+    return (
+      validWorkReturnHref(typeof entry.href === "string" ? entry.href : null) === validHref &&
+      typeof entry.timeOrigin === "number" &&
+      entry.timeOrigin === performance.timeOrigin
+    );
+  } catch {
+    window.sessionStorage.removeItem(workNavigationEntryKey);
+    return false;
+  }
+}
+
+export function forgetWorkNavigationEntry() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(workNavigationEntryKey);
 }
 
 export function rememberWorkReturnScroll(href: string, panelTop: number, surfaceTop: number, windowTop: number) {

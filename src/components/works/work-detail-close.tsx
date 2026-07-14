@@ -5,7 +5,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { useRouter } from "next/navigation";
 import { LiquidGlassFilter, useLiquidGlassSurface } from "@/components/liquid-glass-surface";
 import {
-  isWorkDetailHref,
+  canReturnToWorkSurfaceWithHistory,
+  forgetWorkNavigationEntry,
   lastWorksHrefKey,
   rememberWorkReturnHref,
   validWorkReturnHref,
@@ -36,7 +37,6 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
   const router = useRouter();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeHrefRef = useRef<string | null>(null);
-  const fallbackTimerRef = useRef<number | null>(null);
   const pendingCloseRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
   const closeGlass = useLiquidGlassSurface(closeButtonRef);
@@ -45,7 +45,8 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     const closeHref = resolveCloseHref(fallbackHref);
     closeHrefRef.current = closeHref;
     primeReturnSurface(closeHref);
-  }, [fallbackHref]);
+    router.prefetch(closeHref);
+  }, [fallbackHref, router]);
 
   const closeDetail = useCallback(() => {
     if (pendingCloseRef.current) return;
@@ -54,14 +55,13 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     setIsClosing(true);
     const closeHref = closeHrefRef.current || resolveCloseHref(fallbackHref);
     primeReturnSurface(closeHref);
-    router.replace(closeHref, { scroll: false });
-
-    fallbackTimerRef.current = window.setTimeout(() => {
-      const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      if (isWorkDetailHref(currentHref) || validWorkReturnHref(currentHref) !== validWorkReturnHref(closeHref)) {
-        window.location.replace(closeHref);
-      }
-    }, 900);
+    const canUseHistory = canReturnToWorkSurfaceWithHistory(closeHref);
+    forgetWorkNavigationEntry();
+    if (canUseHistory) {
+      router.back();
+    } else {
+      router.replace(closeHref, { scroll: false });
+    }
   }, [fallbackHref, router]);
 
   function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
@@ -85,17 +85,6 @@ export function WorkDetailClose({ fallbackHref = "/?view=grid#works-index" }: { 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeDetail]);
-
-  useEffect(() => {
-    router.prefetch(resolveCloseHref(fallbackHref));
-  }, [fallbackHref, router]);
-
-  useEffect(
-    () => () => {
-      if (fallbackTimerRef.current !== null) window.clearTimeout(fallbackTimerRef.current);
-    },
-    []
-  );
 
   return (
     <button

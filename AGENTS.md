@@ -22,12 +22,22 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - Preserve reduced-motion fallbacks and avoid adding scroll or pointer listeners without cleanup.
 - Images used by public components must live under `public/` or come from the public content JSON / OSS URL.
 - Work detail exits are contextual: every public entry point to `/works/[slug]` must carry the current page URL in a `from` query parameter and mirror it into `cw-work-return-href`. The close button or Escape key must read `from` first, then stored state, and return to that source page instead of hard-coding Featured or `/#works`. Detail-to-detail pager links must preserve the original source page.
+- Works Index uses `#works-index` and `view=grid|list`; retain legacy `#works-list` only as a normalized compatibility input. Returning to Index must preserve its filter, view mode, and scroll position.
+- Works Index and work detail pages share the standard back-to-top control. The Index instance must appear only in Index, never Featured; it must scroll the correct page or nested panel, stay above bottom blur/navigation, reuse the bottom-navigation liquid-glass material, adapt its glyph and hover contrast to the backdrop, and preserve its fade/reduced-motion behavior.
+- On touch or coarse-pointer devices, work grid cards must open on the first tap without a flip or hover-delay state. Keep mobile mask, pause control, and bottom navigation clear of each other.
+- Fullscreen project video has distinct hit zones: clicking inside the rendered video toggles play/pause; moving over the backdrop outside the video shows `Close`, and clicking that backdrop closes only the fullscreen player. Playback controls are excluded from the close zone and must keep their existing behavior.
+- User-initiated fullscreen video opens with sound enabled. The mute button must reflect the media element's actual `muted` state, including asynchronous `volumechange` updates, rather than an assumed initial state.
+- A video scrub timeline must show real distributed video frames or correctly cropped sprite frames. A poster may be used only as a temporary fallback while frames load; do not repeat one poster as the finished timeline. Generate thumbnails only while the fullscreen player is active.
+- Inline project-video hover must ease into and out of its brightness/scale treatment. The Play affordance rests at the lower-left, follows the pointer with a soft inertial response, and eases back to rest after pointer leave; do not snap it on entry or exit. Preserve the reduced-motion fallback.
+- Keep ordinary work-detail body media unframed. Do not add a universal border around Notion media cards; when an individual dark or low-contrast asset cannot be distinguished from the page background, use only a localized, very subtle inner outline without changing the shared media rhythm.
+- The featured star is an unframed icon in the upper-right of a work card. Do not reintroduce a glass, border, shadow, or background container behind it.
 - Do not enable default viewport prefetch for every work card if it causes many detail pages to load at once. Prefer intent-based hover/focus prefetch.
 
 ## Data And Cache Rules
 
 - `src/lib/public-content.ts` is the public aggregation layer and owns the published works, work types, tools, socials and experience data consumed by pages.
 - `src/lib/site-data.ts` reads the public OSS index JSON and per-project `contentUrl` JSON. Keep per-project content fetches cacheable unless a task explicitly needs uncached debugging.
+- Cache only successfully fetched, valid per-project content JSON. A transient OSS error must not be converted into a long-lived cached `null` or empty body; failed reads should remain observable, safely fall back for that request, and be retried on a later request. When cache semantics change, invalidate or version the affected cache entries.
 - `src/lib/cache-tags.ts` owns cache tag constants. Public data revalidation should use `PUBLIC_CONTENT_CACHE_TAG`.
 - `src/lib/work-view-counts.ts` owns D1-backed work metrics. Do not invalidate the full public content cache for every successful D1 view increment.
 - `src/lib/oss.ts` contains minimal server-side OSS helpers used by public runtime fallbacks. Browser code must never receive Aliyun credentials.
@@ -39,6 +49,7 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - Notion is the editorial source, but public pages do not query Notion directly from client components.
 - Use `npm run content:sync-all` or the narrower `content:sync-*` scripts to sync Notion assets to OSS.
 - Use `npm run content:publish` after sync to write the public index JSON.
+- Project sync generates and persists selected video posters. Use `npm run content:update-all` for a complete refresh or `npm run content:update-projects` for project-only updates; do not use the first video frame as a public preview when a generated poster is available.
 - Use `/api/revalidate` with `REVALIDATE_SECRET` after publishing when immediate cache refresh is needed.
 - Keep Notion and OSS scripts server/local only. Do not move tokens, AccessKeys or publishing operations into client components.
 
@@ -55,6 +66,8 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - Do not introduce random component-level hex values for public pages unless they become named tokens.
 - The current radius system is intentionally square or near-square. Do not add rounded card systems to public pages casually.
 - Keep the local Bebas Neue and SF Pro font stack intact.
+- Keep fullscreen video inset and visibly rounded; its controls must not overlap the frame. Close and Escape return to the current detail page, not the works browser.
+- Detail Notion media layouts use a single horizontal/vertical media gap token. Preserve authored spacer blocks and body-copy spacing when adjusting it.
 
 ## Typography Rules
 
@@ -100,3 +113,10 @@ Do not casually change:
 - Manually verify `/`, `/works`, one `/works/[slug]`, `/about`, `/api/contact`, `/api/works/[slug]/view` and `/api/revalidate` where relevant.
 - Check the browser console for obvious errors.
 - Confirm desktop and mobile widths still preserve the approved static visual direction.
+
+## Deployment Rules
+
+- The default production release path is GitHub-driven: commit the validated source and push it to `main`; `.github/workflows/deploy.yml` then builds the OpenNext bundle and deploys it to Cloudflare Workers automatically.
+- Do not run `npm run deploy` as part of a normal release after pushing `main`, because that duplicates the GitHub Actions deployment.
+- Use local `npm run deploy` only for an explicitly requested emergency/manual release or when GitHub Actions is unavailable. Afterward, still commit and push the exact deployed source so GitHub remains the source of truth.
+- After pushing `main`, confirm that the `Deploy Cloudflare Worker` GitHub Actions run succeeds and verify the production domain. A successful Git push alone is not sufficient release verification.

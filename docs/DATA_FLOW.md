@@ -66,6 +66,25 @@ Rules:
 - Detail body JSON should remain cacheable to avoid repeated multimedia metadata fetches.
 - Every entry point must preserve the current return URL with `from`.
 - Close button and Escape use `from`, then session storage, then referrer, then fallback.
+- Return state records the active works surface, selected filter, Grid/List mode and nested scroll offsets. Restore it before consuming it so a detail exit does not reset Index to the top.
+- Detail-to-detail pager links preserve the same original return URL and state.
+
+## Media Delivery Flow
+
+```plain text
+public OSS media URL
+  -> /api/media/oss when proxying is needed
+  -> Worker runtime cache and range-response handling
+  -> browser and Cloudflare immutable cache headers
+  -> preview, lightbox or fullscreen player
+```
+
+Rules:
+
+- Keep range-request support for videos and large media.
+- Reuse cached media for warm navigation; do not add cache-busting query parameters to ordinary reads.
+- A view-count write is not a media or public-content cache invalidation event.
+- Public image deterrents improve casual protection only. OSS images remain browser-accessible public assets.
 
 ## View Count Flow
 

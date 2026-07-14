@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
-import { useLiquidGlassSurface as useBottomNavGlassSurface } from "@/components/liquid-glass-surface";
-import { lastWorksHrefKey, normalizeWorksHref, rememberLastWorksHref } from "@/lib/work-detail-return";
+import { LiquidGlassFilter, useLiquidGlassSurface as useBottomNavGlassSurface } from "@/components/liquid-glass-surface";
+import { lastWorksHrefKey, normalizeWorksHref, rememberLastWorksHref, replaceCurrentHistoryHref } from "@/lib/work-detail-return";
 
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
@@ -97,13 +97,13 @@ export function StudioTabbedShell({
       const currentHref = normalizedCurrentHref();
       const normalizedHref = normalizeWorksHref(currentHref);
       if (normalizedHref !== currentHref) {
-        window.history.replaceState(null, "", normalizedHref);
+        replaceCurrentHistoryHref(normalizedHref);
       }
       const nextTabs = tabsFromHash();
       setTabs(nextTabs);
       syncDocumentWorkTab(nextTabs.workTab);
       if (window.location.hash === "#works-list") {
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#works-index`);
+        replaceCurrentHistoryHref(`${window.location.pathname}${window.location.search}#works-index`);
       }
       if (isWorksHref(normalizedCurrentHref())) {
         rememberWorksHref();
@@ -156,7 +156,7 @@ export function StudioTabbedShell({
     if (nextTab === "about") {
       rememberWorksHref();
       setTabs((current) => ({ mainTab: "about", workTab: current.workTab }));
-      window.history.replaceState(null, "", "#about");
+      replaceCurrentHistoryHref("#about");
       return;
     }
 
@@ -164,7 +164,7 @@ export function StudioTabbedShell({
     const nextWorkTab = targetHref.includes("#works-index") ? "list" : "featured";
     setTabs({ mainTab: "works", workTab: nextWorkTab });
     syncDocumentWorkTab(nextWorkTab);
-    window.history.replaceState(null, "", targetHref);
+    replaceCurrentHistoryHref(targetHref);
     rememberWorksHref(targetHref);
     window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
   }
@@ -173,7 +173,7 @@ export function StudioTabbedShell({
     const targetHref = nextTab === "list" ? lastIndexHref() : "/#works";
     setTabs({ mainTab: "works", workTab: nextTab });
     syncDocumentWorkTab(nextTab);
-    window.history.replaceState(null, "", targetHref);
+    replaceCurrentHistoryHref(targetHref);
     rememberWorksHref(targetHref);
     window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
   }
@@ -508,10 +508,10 @@ export function StudioTabbedShell({
         <button
           aria-label={isAutoFlightEnabled ? "Pause featured canvas auto flight" : "Play featured canvas auto flight"}
           aria-pressed={isAutoFlightEnabled}
-          className={`cw-liquid-glass-control cw-featured-autoflight-toggle ${
+          className={`cw-featured-autoflight-toggle ${
             autoFlightButtonGlass.supportsSvgFilter
-              ? "cw-liquid-glass-control--svg cw-featured-autoflight-toggle--svg"
-              : "cw-liquid-glass-control--fallback cw-featured-autoflight-toggle--fallback"
+              ? "cw-bottom-glass-surface--svg"
+              : "cw-bottom-glass-surface--fallback"
           }`}
           onClick={() => setIsAutoFlightEnabled((current) => !current)}
           ref={autoFlightButtonRef}
@@ -519,80 +519,7 @@ export function StudioTabbedShell({
           title={isAutoFlightEnabled ? "Pause auto flight" : "Play auto flight"}
           type="button"
         >
-          <svg
-            className="cw-glass-filter"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            style={{ blockSize: "100%", height: "100%", inset: 0, inlineSize: "100%", opacity: 0, pointerEvents: "none", position: "absolute", width: "100%", zIndex: -1 }}
-          >
-            <defs>
-              <filter id={autoFlightButtonGlass.filterId} colorInterpolationFilters="sRGB" x="0%" y="0%" width="100%" height="100%">
-                <feImage
-                  href={autoFlightButtonGlass.displacementMap || undefined}
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  preserveAspectRatio="none"
-                  result="map"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispRed"
-                  scale="-180"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispRed"
-                  type="matrix"
-                  values="1 0 0 0 0
-                          0 0 0 0 0
-                          0 0 0 0 0
-                          0 0 0 1 0"
-                  result="red"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispGreen"
-                  scale="-170"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispGreen"
-                  type="matrix"
-                  values="0 0 0 0 0
-                          0 1 0 0 0
-                          0 0 0 0 0
-                          0 0 0 1 0"
-                  result="green"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="map"
-                  result="dispBlue"
-                  scale="-160"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-                <feColorMatrix
-                  in="dispBlue"
-                  type="matrix"
-                  values="0 0 0 0 0
-                          0 0 0 0 0
-                          0 0 1 0 0
-                          0 0 0 1 0"
-                  result="blue"
-                />
-                <feBlend in="red" in2="green" mode="screen" result="rg" />
-                <feBlend in="rg" in2="blue" mode="screen" result="output" />
-                <feGaussianBlur in="output" stdDeviation="0" />
-              </filter>
-            </defs>
-          </svg>
+          <LiquidGlassFilter surface={autoFlightButtonGlass} />
           <span className="cw-featured-autoflight-glyph" aria-hidden="true">
             {isAutoFlightEnabled ? (
               <span className="cw-featured-autoflight-pause" />

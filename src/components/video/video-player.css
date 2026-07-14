@@ -80,9 +80,9 @@
   opacity: 0;
   position: relative;
   transition:
-    filter 520ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 760ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 2;
 }
 
@@ -96,8 +96,9 @@
   opacity: 0;
   position: absolute;
   transition:
+    filter 760ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
+    transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 3;
 }
 
@@ -263,10 +264,11 @@
   inset-inline-start: 0.75rem;
   opacity: 0;
   position: absolute;
-  transform: translate3d(0, 0, 0);
+  transform: translate3d(var(--video-play-x, 0px), var(--video-play-y, 0px), 0);
   transition:
     background-color 220ms ease,
     opacity 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
   z-index: 5;
 }
 
@@ -281,13 +283,6 @@
 
 .project-video-card.is-preview-ready .project-video-mobile-play {
   opacity: 1;
-}
-
-.project-video-card.is-hovering .project-video-mobile-play {
-  inset-block-end: auto;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  transform: translate3d(var(--video-play-x, 1.25rem), var(--video-play-y, 1.25rem), 0) translate(-50%, -50%);
 }
 
 .video-player-overlay {
@@ -373,6 +368,7 @@
 .video-player-video-frame {
   aspect-ratio: var(--video-aspect-ratio, 16 / 9);
   background: #05070c;
+  border: 1px solid rgb(255 255 255 / 10%);
   border-radius: var(--video-player-radius);
   clip-path: inset(0 round var(--video-player-radius));
   inline-size: min(100%, calc(100vw - var(--video-stage-inset) * 2));
@@ -423,6 +419,41 @@
 
 .video-player-video-frame.has-started .video-player-video {
   opacity: 1;
+}
+
+.video-player-start-button {
+  align-items: center;
+  background: rgb(244 245 239 / 18%);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid rgb(244 245 239 / 28%);
+  border-radius: var(--radius-site-sm);
+  color: var(--figma-white);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 0.45rem;
+  inset: 50% auto auto 50%;
+  padding: 0.65rem 0.85rem;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  transition: background-color 220ms ease, border-color 220ms ease;
+  z-index: 4;
+}
+
+.video-player-start-button:hover,
+.video-player-start-button:focus-visible {
+  background: rgb(244 245 239 / 28%);
+  border-color: rgb(244 245 239 / 42%);
+}
+
+.video-player-start-icon {
+  block-size: 0.8rem;
+  clip-path: polygon(14% 4%, 96% 50%, 14% 96%);
+  background: currentColor;
+  border-radius: 2px;
+  display: block;
+  inline-size: 0.72rem;
 }
 
 .video-player-loading-state {
@@ -572,19 +603,12 @@
   touch-action: none;
 }
 
-.video-scrub-strip,
-.video-scrub-sprite {
+.video-scrub-strip {
   border-radius: inherit;
   display: flex;
   inset: 0;
   overflow: hidden;
   position: absolute;
-}
-
-.video-scrub-sprite {
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
 }
 
 .video-scrub-thumb {

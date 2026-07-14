@@ -8,6 +8,8 @@ import { VideoFullscreenPlayer } from "./VideoFullscreenPlayer";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
 
 const PLAY_BADGE_OFFSET = 20;
+const PLAY_BADGE_FOLLOW_RESPONSE = 0.085;
+const PLAY_BADGE_SETTLE_THRESHOLD = 0.1;
 
 export function ProjectVideoCard({
   className = "",
@@ -22,8 +24,8 @@ export function ProjectVideoCard({
   const cardRef = useRef<HTMLButtonElement | null>(null);
   const playerVideoRef = useRef<HTMLVideoElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const targetRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
-  const currentRef = useRef({ x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET });
+  const targetRef = useRef({ x: 0, y: 0 });
+  const currentRef = useRef({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const previewKey = `${video.src}|${video.poster || ""}`;
@@ -52,25 +54,31 @@ export function ProjectVideoCard({
   );
 
   useEffect(() => {
-    if (!isHovering) {
-      currentRef.current = { ...targetRef.current };
-      if (bubbleRef.current) {
-        bubbleRef.current.style.setProperty("--video-play-x", `${targetRef.current.x}px`);
-        bubbleRef.current.style.setProperty("--video-play-y", `${targetRef.current.y}px`);
-      }
-      return;
-    }
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const tick = () => {
       const target = targetRef.current;
       const current = currentRef.current;
-      current.x += (target.x - current.x) * 0.12;
-      current.y += (target.y - current.y) * 0.12;
+      const response = reduceMotion ? 1 : PLAY_BADGE_FOLLOW_RESPONSE;
+      const deltaX = target.x - current.x;
+      const deltaY = target.y - current.y;
+      current.x += deltaX * response;
+      current.y += deltaY * response;
+
+      if (Math.abs(deltaX) < PLAY_BADGE_SETTLE_THRESHOLD) current.x = target.x;
+      if (Math.abs(deltaY) < PLAY_BADGE_SETTLE_THRESHOLD) current.y = target.y;
+
       if (bubbleRef.current) {
         bubbleRef.current.style.setProperty("--video-play-x", `${current.x}px`);
         bubbleRef.current.style.setProperty("--video-play-y", `${current.y}px`);
       }
-      rafRef.current = window.requestAnimationFrame(tick);
+
+      const isSettled = current.x === target.x && current.y === target.y;
+      if (isHovering || !isSettled) {
+        rafRef.current = window.requestAnimationFrame(tick);
+      } else {
+        rafRef.current = null;
+      }
     };
 
     rafRef.current = window.requestAnimationFrame(tick);
@@ -82,19 +90,20 @@ export function ProjectVideoCard({
 
   function updateTarget(clientX: number, clientY: number) {
     const card = cardRef.current;
+    const bubble = bubbleRef.current;
     if (!card) return;
     const rect = card.getBoundingClientRect();
-    const x = Math.max(PLAY_BADGE_OFFSET, Math.min(clientX - rect.left, rect.width - PLAY_BADGE_OFFSET));
-    const y = Math.max(PLAY_BADGE_OFFSET, Math.min(clientY - rect.top, rect.height - PLAY_BADGE_OFFSET));
-    targetRef.current = { x, y };
+    const bubbleHalfWidth = Math.max(PLAY_BADGE_OFFSET, (bubble?.offsetWidth || 0) / 2);
+    const bubbleHalfHeight = Math.max(PLAY_BADGE_OFFSET, (bubble?.offsetHeight || 0) / 2);
+    const pointerX = Math.max(bubbleHalfWidth, Math.min(clientX - rect.left, rect.width - bubbleHalfWidth));
+    const pointerY = Math.max(bubbleHalfHeight, Math.min(clientY - rect.top, rect.height - bubbleHalfHeight));
+    const restCenterX = bubble ? bubble.offsetLeft + bubble.offsetWidth / 2 : PLAY_BADGE_OFFSET;
+    const restCenterY = bubble ? bubble.offsetTop + bubble.offsetHeight / 2 : rect.height - PLAY_BADGE_OFFSET;
+    targetRef.current = { x: pointerX - restCenterX, y: pointerY - restCenterY };
   }
 
   function resetTarget() {
-    targetRef.current = { x: PLAY_BADGE_OFFSET, y: PLAY_BADGE_OFFSET };
-  }
-
-  function syncCurrentToTarget() {
-    currentRef.current = { ...targetRef.current };
+    targetRef.current = { x: 0, y: 0 };
   }
 
   function handlePointerMove(event: PointerEvent<HTMLButtonElement>) {
@@ -112,6 +121,8 @@ export function ProjectVideoCard({
     if (element.ended || (Number.isFinite(element.duration) && element.currentTime >= element.duration - 0.05)) {
       element.currentTime = 0;
     }
+    // Opening the fullscreen player is a direct user gesture, so start with
+    // sound immediately and keep the visible controls in sync with the media.
     element.muted = false;
     void element.play().catch(() => {
       // The visible player remains ready for an explicit play click if browser policy blocks the initial request.
@@ -130,7 +141,6 @@ export function ProjectVideoCard({
           onPointerEnter={(event) => {
             setIsHovering(true);
             handlePointerMove(event);
-            syncCurrentToTarget();
           }}
           onPointerLeave={() => {
             setIsHovering(false);
@@ -140,7 +150,6 @@ export function ProjectVideoCard({
           onMouseEnter={(event) => {
             setIsHovering(true);
             handleMouseMove(event);
-            syncCurrentToTarget();
           }}
           onMouseLeave={() => {
             setIsHovering(false);

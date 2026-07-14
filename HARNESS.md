@@ -32,11 +32,15 @@ Every modification should verify:
 6. Works filtering and grid/list mode switching work.
 7. Detail close button and Escape return to the exact source page, including Grid, List and Featured entry points on desktop and mobile; Grid/List also restore the exact nested list or mobile Index panel scroll position instead of returning to the top.
 8. Detail previous/next links preserve the original return page.
-9. Returning from a detail page skips the Index category/card staggered entry sequence and uses only the short whole-page fade; the staggered entry sequence still plays on the first Index visit.
+9. Returning from a detail page skips the Index category/card staggered entry sequence and reveals the restored work view immediately; it must not add a separate work-view or loader fade. The staggered entry sequence still plays on the first Index visit.
 10. Text selection is white background with black text.
-11. Browser console has no obvious runtime errors.
-12. TypeScript has no errors.
-13. Production build passes.
+11. Warm Featured/Index switches retain the selected tab and do not flash or fade through consecutive black states, replay the Featured first-entry animation, or run separate work-view and loader opacity transitions.
+12. A Featured work shows the approved standalone star at the upper-right of both Grid and List thumbnails; non-featured works do not.
+13. Detail-body images open in the inset image lightbox and close on backdrop click or Escape. Check the dark blurred backdrop, fullscreen-media radius and 1px translucent outline.
+14. Fullscreen video starts with sound after deliberate user activation, while preview autoplay remains browser-policy safe.
+15. Browser console has no obvious runtime errors.
+16. TypeScript has no errors.
+17. Production build passes.
 
 ## Performance Checks
 
@@ -45,11 +49,15 @@ Before release, verify:
 1. Opening a work detail page does not trigger repeated `site-content.json` refetches on every navigation.
 2. Work detail body JSON loaded through `contentUrl` is cached and reused.
 3. Closing a detail page returns to the works list without a noticeable cold navigation pause.
-4. Work grid/list links do not prefetch every detail route at once; hover/focus prefetches the intended desktop route and coarse-pointer devices prefetch only the pressed target.
+4. Work cards do not prefetch every detail route at once. Featured may warm at most 2 desktop or 3 mobile detail routes after the canvas is ready; hover/focus/press intent handles other routes without changing first-tap mobile navigation.
 5. `/api/works/[slug]/view` increments the displayed count but does not invalidate the full public content cache on every D1-backed view.
 6. Multimedia requests use browser/server cache headers where supported and do not reload unchanged OSS assets unnecessarily.
 7. Featured canvas first entry settles in about two seconds, warm Featured visits do not replay it, and desktop animation remains smooth without rendering the full 27-chunk cube.
 8. Featured canvas images use intent prefetch and transition to full source-image brightness on hover without triggering React state updates on pointer movement.
+9. A standard mouse-wheel input adds one immediately visible Featured depth impulse and continues with a short decaying tail. The controller uses one velocity accumulator rather than a second target-velocity smoothing layer. Pause/play remains clear of the bottom navigation and work-card targets.
+10. Index forwards wheel input to its nested right-panel scroller with a passive, animation-frame-coalesced listener. Scrolling a populated grid/list must not have a noticeable input delay.
+11. Only the initial visible Index cards run the staggered entrance. Off-screen cards use containment/content visibility and idle card backs keep no active blur filter or permanent `will-change` layer.
+12. The bottom gradual-blur treatment remains visually continuous without stacking a large number of fixed backdrop-filter layers.
 
 ## Content Checks
 
@@ -64,6 +72,7 @@ Before release, verify the real content path:
 7. Unsupported Notion page-body blocks are skipped safely.
 8. `/api/revalidate` refreshes public caches when called with the revalidation secret.
 9. Published dates render as Today, Yesterday, days, months or years according to elapsed UTC calendar days.
+10. `featured: true` is optional metadata that drives the approved card star only; it must not hide or duplicate a published work.
 
 ## Visual Protection
 
@@ -74,6 +83,8 @@ Do not casually change:
 3. About page structure, direction list, experience rhythm and contact composition.
 4. Current font, color token, spacing and square-radius systems.
 5. Figma typography mapping in `AGENTS.md` and `docs/design-tokens.md`.
+6. Image lightbox and video fullscreen use `--radius-fullscreen-media`; fullscreen media is inset from the viewport rather than edge-to-edge.
+7. Image drag/touch-callout deterrents and white-background/black-text selection remain enabled. Treat these as casual-use protection, not DRM.
 
 ## Data Protection
 
@@ -96,9 +107,11 @@ Check these after each stage:
 - Links are clickable and not covered by pinned motion layers.
 - Responsive widths: 1440, 1280, 1024, 768, 430 and 390 px.
 - Keyboard focus, reduced motion behavior and no obvious console errors.
-- Warm Featured/Index switches reuse the mounted Featured canvas without showing the first-load screen again.
+- Warm Featured/Index switches reuse the mounted Featured canvas without showing the first-load screen again or playing two opacity/black transitions.
 - Featured canvas cards stay crisp at desktop DPR, visibly respond to hover and remain clickable while auto flight is running or paused.
 - The Featured auto-flight control sits beside the bottom navigation on desktop and above it on narrow mobile screens without overlap.
+- At 1024px and tablet widths, the Index layout preserves side and inter-column whitespace rather than becoming crowded.
+- At 390 and 430 px widths, Featured preserves visible whitespace and shows several distinct project covers rather than repeating one cover across the viewport; touch targets and bottom navigation remain clear.
 
 ## Route Checklist
 

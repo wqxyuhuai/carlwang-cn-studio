@@ -42,6 +42,7 @@ function SoundIcon() {
 export function VideoControls({
   currentTime,
   duration,
+  isActive,
   isDimmed,
   isMuted,
   isPlaying,
@@ -52,6 +53,7 @@ export function VideoControls({
 }: {
   currentTime: number;
   duration: number;
+  isActive: boolean;
   isDimmed: boolean;
   isMuted: boolean;
   isPlaying: boolean;
@@ -68,7 +70,7 @@ export function VideoControls({
       <button aria-label={isMuted ? "Unmute video" : "Mute video"} className="video-control-button" onClick={onToggleMute} type="button">
         {isMuted ? <MutedIcon /> : <SoundIcon />}
       </button>
-      <VideoScrubTimeline currentTime={currentTime} duration={duration} onSeek={onSeek} video={video} />
+      <VideoScrubTimeline currentTime={currentTime} duration={duration} isActive={isActive} onSeek={onSeek} video={video} />
     </div>
   );
 }

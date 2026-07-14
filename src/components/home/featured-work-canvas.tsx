@@ -31,6 +31,11 @@ type InfiniteCameraGridState = {
   camZ: number;
 };
 
+type FeaturedCanvasClientSettings = {
+  compact: boolean;
+  playEntry: boolean;
+};
+
 const fallbackImages: CanvasImage[] = [
   { src: "/field-media/a1-2.webp", alt: "Selected work preview", title: "Selected Work", href: "/works" },
   { src: "/figma/pw2-work-image.png", alt: "Selected work preview", title: "Selected Work", href: "/works" },
@@ -45,39 +50,45 @@ const INFINITE_RENDER_DISTANCE = 1;
 const INFINITE_ENTRY_CAMERA_Z = 96;
 const INFINITE_COMPACT_ENTRY_CAMERA_Z = 78;
 const INFINITE_INITIAL_CAMERA_Z = 52;
-const INFINITE_MAX_VELOCITY = 1.9;
-const INFINITE_VELOCITY_LERP = 0.22;
-const INFINITE_VELOCITY_DECAY = 0.86;
-const INFINITE_WHEEL_BOOST = 0.0054;
+const INFINITE_COMPACT_INITIAL_CAMERA_Z = 58;
+const INFINITE_MAX_VELOCITY = 4.4;
+const INFINITE_VELOCITY_DECAY = 0.89;
+const INFINITE_WHEEL_BOOST = 0.013;
 const INFINITE_ENTRY_SECONDS = 1.8;
 const INFINITE_ENTRY_BOOST = 0.085;
 const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
 const INFINITE_COMPACT_ENTRY_BOOST = 0.08;
 const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
-const INFINITE_MOBILE_TEXTURE_LIMIT = 6;
+const INFINITE_MOBILE_TEXTURE_LIMIT = 8;
 const INFINITE_DESKTOP_TEXTURE_LIMIT = 10;
 const INFINITE_RADIUS_MASK_SIZE = 128;
 const INFINITE_RADIUS_NOMINAL_CARD_SIZE = 192;
 
 export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
-const featuredCanvasReadyKey = "cw-featured-canvas-ready";
+const featuredEntryPlayedKey = "cw-featured-entry-played";
+const featuredPrefetchedHrefs = new Set<string>();
 
-function useFeaturedCanvasCompactMode() {
-  const [isCompact, setIsCompact] = useState(false);
+function useFeaturedCanvasClientSettings() {
+  const [settings, setSettings] = useState<FeaturedCanvasClientSettings | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const mediaQuery = window.matchMedia("(max-width: 760px), (pointer: coarse)");
-    const updateCompactMode = () => setIsCompact(mediaQuery.matches);
+    const updateCompactMode = () => {
+      setSettings((current) => ({
+        compact: mediaQuery.matches,
+        playEntry: current?.playEntry ?? shouldPlayFeaturedEntry()
+      }));
+    };
     updateCompactMode();
     mediaQuery.addEventListener("change", updateCompactMode);
 
     return () => mediaQuery.removeEventListener("change", updateCompactMode);
   }, []);
 
-  return isCompact;
+  return settings;
 }
 
 const INFINITE_CHUNK_OFFSETS: Array<[number, number, number]> = [
@@ -110,12 +121,7 @@ const INFINITE_COMPACT_CHUNK_OFFSETS: Array<[number, number, number]> = [
 
 function shouldPlayFeaturedEntry() {
   if (typeof window === "undefined") return true;
-
-  const storageKey = "cw-featured-entry-played";
-  if (window.sessionStorage.getItem(storageKey) === "1") return false;
-
-  window.sessionStorage.setItem(storageKey, "1");
-  return true;
+  return window.sessionStorage.getItem(featuredEntryPlayedKey) !== "1";
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -184,21 +190,22 @@ function hashKey(value: string) {
 
 function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean): InfinitePlaneData[] {
   const seed = hashKey(`${cx},${cy},${cz}`);
-  const count = compact ? 7 : 6;
+  const isCenterChunk = cx === 0 && cy === 0;
+  const count = compact ? 4 : 6;
+  const safeMediaCount = Math.max(mediaCount, 1);
 
   return Array.from({ length: count }, (_, index) => {
     const base = seed + index * 997;
     const random = (offset: number) => seededUnit(base + offset);
-    const isCenterChunk = cx === 0 && cy === 0;
-    const centerFiller = isCenterChunk && index < (compact ? 5 : 4);
+    const centerFiller = isCenterChunk && index < 4;
     const edgeSweep = !compact && index === count - 1 && random(8) > 0.56;
     const size = centerFiller
-      ? (compact ? 4.4 : 2.6) + random(4) * (compact ? 4.6 : 3.8)
-      : ((compact ? 4 : 4.6) + random(4) * (compact ? 4.8 : 6.4)) * (edgeSweep ? 1.52 : 1);
+      ? (compact ? 3.2 : 2.6) + random(4) * (compact ? 2.6 : 3.8)
+      : ((compact ? 3.6 : 4.6) + random(4) * (compact ? 3 : 6.4)) * (edgeSweep ? 1.52 : 1);
     const ringAngle = random(0) * Math.PI * 2;
     const centerAngle = (index / 4) * Math.PI * 2 + (random(12) - 0.5) * 0.72;
-    const centerRadius = (compact ? 8 : 12) + random(13) * (compact ? 14 : 19);
-    const ringRadius = (compact ? 15 : 22) + random(1) * (compact ? 20 : 38);
+    const centerRadius = (compact ? 6 : 12) + random(13) * (compact ? 12 : 19);
+    const ringRadius = (compact ? 12 : 22) + random(1) * (compact ? 18 : 38);
     const edgeSide = random(9) > 0.5 ? 1 : -1;
     const localX = isCenterChunk
       ? centerFiller
@@ -224,7 +231,7 @@ function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCo
       ],
       size,
       rotation: 0,
-      mediaIndex: Math.floor(random(5) * mediaCount) % mediaCount,
+      mediaIndex: Math.floor(random(5) * safeMediaCount) % safeMediaCount,
       chunk: [cx, cy, cz]
     };
   });
@@ -232,7 +239,11 @@ function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCo
 
 function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean) {
   const offsets = compact ? INFINITE_COMPACT_CHUNK_OFFSETS : INFINITE_CHUNK_OFFSETS;
-  return offsets.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
+  const planes = offsets.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
+  if (!compact || mediaCount < 2) return planes;
+
+  const mediaOffset = hashKey(`${cx},${cy},${cz},compact`) % mediaCount;
+  return planes.map((plane, index) => ({ ...plane, mediaIndex: (mediaOffset + index) % mediaCount }));
 }
 
 function InfiniteCanvasPlane({
@@ -282,10 +293,12 @@ function InfiniteCanvasPlane({
         ? 1
         : 0;
     const depthDistance = Math.abs(plane.position[2] - cameraGrid.camZ);
+    const forwardDepth = cameraGrid.camZ - plane.position[2];
     const fullOpacityDepth = compact ? 78 : 62;
     const depthFadeRange = compact ? 82 : 68;
     const depthFade = depthDistance < fullOpacityDepth ? 1 : clampNumber(1 - (depthDistance - fullOpacityDepth) / depthFadeRange, 0, 1);
-    const targetOpacity = chunkFade * depthFade * depthFade;
+    const nearFade = compact ? clampNumber((forwardDepth - 12) / 10, 0, 1) : 1;
+    const targetOpacity = chunkFade * depthFade * depthFade * nearFade;
 
     opacityRef.current = targetOpacity < 0.01 && opacityRef.current < 0.01 ? 0 : THREE.MathUtils.lerp(opacityRef.current, targetOpacity, 0.18);
     hoverProgressRef.current = THREE.MathUtils.lerp(hoverProgressRef.current, hoverTargetRef.current, 0.2);
@@ -376,16 +389,15 @@ function InfiniteCanvasField({
   textures: THREE.Texture[];
 }) {
   const { camera, gl, invalidate } = useThree();
-  const initialCameraZ = playEntry ? (compact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : INFINITE_INITIAL_CAMERA_Z;
+  const restingCameraZ = compact ? INFINITE_COMPACT_INITIAL_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z;
+  const initialCameraZ = playEntry ? (compact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : restingCameraZ;
   const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: initialCameraZ });
   const readySentRef = useRef(false);
   const introProgressRef = useRef(playEntry ? 0 : 1);
   const controllerRef = useRef({
     velocity: { x: 0, y: 0, z: 0 },
-    targetVelocity: { x: 0, y: 0, z: 0 },
     basePosition: { x: 0, y: 0, z: initialCameraZ },
     lastMouse: { x: 0, y: 0 },
-    scrollAccum: 0,
     isDragging: false,
     keys: new Set<string>(),
     lastChunkKey: ""
@@ -407,9 +419,9 @@ function InfiniteCanvasField({
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (!controller.isDragging) return;
 
-      const zoomFactor = clampNumber(Math.abs(controller.basePosition.z) / INFINITE_INITIAL_CAMERA_Z, 0.45, 1.8);
-      controller.targetVelocity.x -= (event.clientX - controller.lastMouse.x) * 0.018 * zoomFactor;
-      controller.targetVelocity.y += (event.clientY - controller.lastMouse.y) * 0.018 * zoomFactor;
+      const zoomFactor = clampNumber(Math.abs(controller.basePosition.z) / restingCameraZ, 0.45, 1.8);
+      controller.velocity.x -= (event.clientX - controller.lastMouse.x) * 0.018 * zoomFactor;
+      controller.velocity.y += (event.clientY - controller.lastMouse.y) * 0.018 * zoomFactor;
       controller.lastMouse = { x: event.clientX, y: event.clientY };
       invalidate();
     };
@@ -421,7 +433,13 @@ function InfiniteCanvasField({
 
     const handleWheel = (event: globalThis.WheelEvent) => {
       event.preventDefault();
-      controller.scrollAccum += event.deltaY * INFINITE_WHEEL_BOOST;
+      const wheelDelta =
+        event.deltaMode === globalThis.WheelEvent.DOM_DELTA_LINE
+          ? event.deltaY * 16
+          : event.deltaMode === globalThis.WheelEvent.DOM_DELTA_PAGE
+            ? event.deltaY * canvas.clientHeight
+            : event.deltaY;
+      controller.velocity.z += wheelDelta * INFINITE_WHEEL_BOOST;
       invalidate();
     };
 
@@ -452,7 +470,7 @@ function InfiniteCanvasField({
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [gl, invalidate]);
+  }, [gl, invalidate, restingCameraZ]);
 
   useEffect(() => {
     if (!isActive || prefersReducedMotion || (!autoFlightEnabled && !playEntry)) return;
@@ -491,30 +509,29 @@ function InfiniteCanvasField({
     if (!prefersReducedMotion) return;
 
     const controller = controllerRef.current;
-    controller.basePosition.z = INFINITE_INITIAL_CAMERA_Z;
-    controller.targetVelocity.z = 0;
+    controller.basePosition.z = restingCameraZ;
     controller.velocity.z = 0;
     introProgressRef.current = 1;
     camera.position.set(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z);
     camera.lookAt(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z - 80);
-  }, [camera, prefersReducedMotion]);
+  }, [camera, prefersReducedMotion, restingCameraZ]);
 
   useFrame((_, delta) => {
     if (!readySentRef.current) {
       readySentRef.current = true;
-      window.requestAnimationFrame(onReady);
+      onReady();
     }
 
     const controller = controllerRef.current;
     const keys = controller.keys;
     const keyboardSpeed = 0.08;
 
-    if (keys.has("w") || keys.has("arrowup")) controller.targetVelocity.z -= keyboardSpeed;
-    if (keys.has("s") || keys.has("arrowdown")) controller.targetVelocity.z += keyboardSpeed;
-    if (keys.has("a") || keys.has("arrowleft")) controller.targetVelocity.x -= keyboardSpeed;
-    if (keys.has("d") || keys.has("arrowright")) controller.targetVelocity.x += keyboardSpeed;
-    if (keys.has("q")) controller.targetVelocity.y -= keyboardSpeed;
-    if (keys.has("e")) controller.targetVelocity.y += keyboardSpeed;
+    if (keys.has("w") || keys.has("arrowup")) controller.velocity.z -= keyboardSpeed;
+    if (keys.has("s") || keys.has("arrowdown")) controller.velocity.z += keyboardSpeed;
+    if (keys.has("a") || keys.has("arrowleft")) controller.velocity.x -= keyboardSpeed;
+    if (keys.has("d") || keys.has("arrowright")) controller.velocity.x += keyboardSpeed;
+    if (keys.has("q")) controller.velocity.y -= keyboardSpeed;
+    if (keys.has("e")) controller.velocity.y += keyboardSpeed;
 
     if (!prefersReducedMotion) {
       const frameScale = Math.min(delta, 0.05) * 60;
@@ -524,22 +541,15 @@ function InfiniteCanvasField({
       if (isActive && introProgressRef.current < 1) {
         introProgressRef.current = Math.min(1, introProgressRef.current + delta / INFINITE_ENTRY_SECONDS);
         const easedProgress = THREE.MathUtils.smoothstep(introProgressRef.current, 0, 1);
-        controller.targetVelocity.z -= THREE.MathUtils.lerp(entryBoost, autoFlightBoost, easedProgress) * frameScale;
+        controller.velocity.z -= THREE.MathUtils.lerp(entryBoost, autoFlightBoost, easedProgress) * frameScale;
       } else if (isActive && autoFlightEnabled && !controller.isDragging) {
-        controller.targetVelocity.z -= autoFlightBoost * frameScale;
+        controller.velocity.z -= autoFlightBoost * frameScale;
       }
     }
 
-    controller.targetVelocity.z += controller.scrollAccum;
-    controller.scrollAccum *= 0.78;
-
-    controller.targetVelocity.x = clampNumber(controller.targetVelocity.x, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
-    controller.targetVelocity.y = clampNumber(controller.targetVelocity.y, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
-    controller.targetVelocity.z = clampNumber(controller.targetVelocity.z, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
-
-    controller.velocity.x = THREE.MathUtils.lerp(controller.velocity.x, controller.targetVelocity.x, INFINITE_VELOCITY_LERP);
-    controller.velocity.y = THREE.MathUtils.lerp(controller.velocity.y, controller.targetVelocity.y, INFINITE_VELOCITY_LERP);
-    controller.velocity.z = THREE.MathUtils.lerp(controller.velocity.z, controller.targetVelocity.z, INFINITE_VELOCITY_LERP);
+    controller.velocity.x = clampNumber(controller.velocity.x, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
+    controller.velocity.y = clampNumber(controller.velocity.y, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
+    controller.velocity.z = clampNumber(controller.velocity.z, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
 
     controller.basePosition.x += controller.velocity.x;
     controller.basePosition.y += controller.velocity.y;
@@ -548,9 +558,9 @@ function InfiniteCanvasField({
     camera.position.set(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z);
     camera.lookAt(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z - 80);
 
-    controller.targetVelocity.x *= INFINITE_VELOCITY_DECAY;
-    controller.targetVelocity.y *= INFINITE_VELOCITY_DECAY;
-    controller.targetVelocity.z *= INFINITE_VELOCITY_DECAY;
+    controller.velocity.x *= INFINITE_VELOCITY_DECAY;
+    controller.velocity.y *= INFINITE_VELOCITY_DECAY;
+    controller.velocity.z *= INFINITE_VELOCITY_DECAY;
 
     const cx = Math.floor(controller.basePosition.x / INFINITE_CHUNK_SIZE);
     const cy = Math.floor(controller.basePosition.y / INFINITE_CHUNK_SIZE);
@@ -563,6 +573,10 @@ function InfiniteCanvasField({
       controller.lastChunkKey = chunkKey;
       setPlanes(buildInfinitePlanes(cx, cy, cz, textures.length, compact));
     }
+
+    const momentum = Math.abs(controller.velocity.x) + Math.abs(controller.velocity.y) + Math.abs(controller.velocity.z);
+    if ((!isActive || !autoFlightEnabled) && momentum > 0.02) invalidate();
+    if (controller.isDragging || keys.size > 0) invalidate();
   });
 
   return (
@@ -652,16 +666,13 @@ function selectCanvasImages(images: CanvasImage[], limit: number) {
 export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const router = useRouter();
   const { autoFlightEnabled, featuredActive } = useContext(FeaturedCanvasMotionContext);
-  const isCompact = useFeaturedCanvasCompactMode();
-  const [playEntry, setPlayEntry] = useState(() => (featuredActive ? shouldPlayFeaturedEntry() : false));
-  const entryResolvedRef = useRef(featuredActive);
-  const [hasMountedCanvas, setHasMountedCanvas] = useState(featuredActive);
+  const clientSettings = useFeaturedCanvasClientSettings();
+  const isCompact = clientSettings?.compact ?? false;
+  const playEntry = clientSettings?.playEntry ?? false;
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const siteRadiusPixels = useMemo(() => readCssLengthInPixels("--radius-site-sm", 8), []);
-  const prefetchedHrefsRef = useRef(new Set<string>());
   const markCanvasReady = useCallback(() => {
     setIsCanvasReady(true);
-    window.sessionStorage.setItem(featuredCanvasReadyKey, "1");
   }, []);
   const detailHref = useCallback((href: string) => {
     const returnHref = currentWorkSurfaceHref("#works");
@@ -669,8 +680,8 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   }, []);
   const prefetchWork = useCallback((href: string) => {
     const targetHref = detailHref(href);
-    if (prefetchedHrefsRef.current.has(targetHref)) return;
-    prefetchedHrefsRef.current.add(targetHref);
+    if (featuredPrefetchedHrefs.has(targetHref)) return;
+    featuredPrefetchedHrefs.add(targetHref);
     router.prefetch(targetHref);
   }, [detailHref, router]);
   const openWork = useCallback((href: string) => {
@@ -697,25 +708,20 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   );
 
   useEffect(() => {
-    if (!featuredActive || entryResolvedRef.current) return;
-
-    entryResolvedRef.current = true;
-    setPlayEntry(shouldPlayFeaturedEntry());
-  }, [featuredActive]);
+    if (!featuredActive || !playEntry) return;
+    window.sessionStorage.setItem(featuredEntryPlayedKey, "1");
+  }, [featuredActive, playEntry]);
 
   useEffect(() => {
-    if (!featuredActive || hasMountedCanvas) return;
+    if (!isCanvasReady || !clientSettings) return;
 
-    const frame = window.requestAnimationFrame(() => setHasMountedCanvas(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, [featuredActive, hasMountedCanvas]);
+    const warmupImages = canvasImages.slice(0, isCompact ? 3 : 2);
+    const timeout = window.setTimeout(() => {
+      warmupImages.forEach((image) => prefetchWork(image.href));
+    }, isCompact ? 120 : 360);
 
-  useEffect(() => {
-    if (window.sessionStorage.getItem(featuredCanvasReadyKey) !== "1") return;
-
-    const frame = window.requestAnimationFrame(() => setIsCanvasReady(true));
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+    return () => window.clearTimeout(timeout);
+  }, [canvasImages, clientSettings, isCanvasReady, isCompact, prefetchWork]);
 
   return (
     <section className={`cw-featured-canvas notion-rb-infinite-canvas-stage ${isCanvasReady ? "is-canvas-ready" : ""}`} aria-label="Featured works">
@@ -724,12 +730,12 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
           <span className="cw-featured-canvas-loader-bar" />
         </span>
       </div>
-      {hasMountedCanvas ? (
+      {clientSettings ? (
       <Canvas
-        key={playEntry ? "entry" : "direct"}
+        key={`${isCompact ? "compact" : "desktop"}-${playEntry ? "entry" : "direct"}`}
         className="notion-rb-infinite-canvas-webgl"
         camera={{
-          position: [0, 0, playEntry ? (isCompact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : INFINITE_INITIAL_CAMERA_Z],
+          position: [0, 0, playEntry ? (isCompact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : (isCompact ? INFINITE_COMPACT_INITIAL_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z)],
           fov: 46,
           near: 1,
           far: 230

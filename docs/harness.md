@@ -16,7 +16,7 @@ The root `HARNESS.md` is the canonical project validation checklist. This file k
 - Colors come from Figma color tokens.
 - Fonts come from local files.
 - Spacing and motion come from `src/styles/design-tokens.css`.
-- Radius remains `0`.
+- Public cards remain square or near-square. Fullscreen media and lightboxes use the shared `--radius-fullscreen-media` token instead of an ad hoc radius.
 
 ## Content Harness
 
@@ -33,6 +33,12 @@ The root `HARNESS.md` is the canonical project validation checklist. This file k
 - Work view count increments do not force full public cache revalidation when D1 succeeds.
 - No front-end secret variables.
 - Reduced motion is respected.
+- Warm Featured/Index switches and detail returns do not replay first-load or Index staggered-entry animations.
+- One Featured wheel step moves immediately and continues with a short decaying inertial tail; it does not pass through a second target-velocity smoothing layer.
+- Featured/Index switches and detail-close returns do not play two work-view/loader opacity transitions or show two consecutive black states.
+- At `390 x 844` and `430 x 932`, Featured keeps visible whitespace and shows several distinct project covers rather than repeating one cover across the viewport.
+- Featured canvas media limits remain independent from detail-route prefetch limits; Index nested scrolling uses passive, frame-coalesced forwarding.
+- Detail image lightbox closes by backdrop click or Escape; fullscreen video starts with sound after deliberate activation.
 
 ## Phase 1 Screenshot Set
 

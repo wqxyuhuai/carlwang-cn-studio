@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CascadeText } from "@/components/cascade-text";
+import { WorkScrollTop } from "@/components/works/work-scroll-top";
 import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
 import {
@@ -16,6 +17,7 @@ import {
   rememberWorkReturnHref,
   rememberWorkReturnScroll,
   readWorkReturnScroll,
+  replaceCurrentHistoryHref,
   workDetailHrefWithReturn
 } from "@/lib/work-detail-return";
 import { metricLabel, workPublishedLabel } from "@/lib/work-metrics";
@@ -217,7 +219,7 @@ export function WorksBrowser({
 
   function replaceBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
     const nextHref = browserHref(nextFilter, nextMode);
-    window.history.replaceState(null, "", nextHref);
+    replaceCurrentHistoryHref(nextHref);
     if (basePath === "/") {
       rememberLastWorksHref(nextHref);
     }
@@ -445,6 +447,7 @@ export function WorksBrowser({
           )}
         </div>
       </div>
+      <WorkScrollTop targetRef={worksRightRef} placement="index" />
     </section>
   );
 }

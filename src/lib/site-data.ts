@@ -354,26 +354,27 @@ function normalizeNotionBlock(value: unknown): NotionBlock | null {
 
 async function readJsonUrl(url: string) {
   if (!url) return null;
-  try {
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(String(response.status));
-    return await response.json();
-  } catch {
-    return null;
-  }
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error(`Work content request failed with status ${response.status}`);
+  return await response.json();
 }
 
-const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v2"], {
+const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v3"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 
 export async function getWorkContent(work: Work): Promise<NotionBlock[]> {
   if (work.content.length > 0) return work.content;
   if (!work.contentUrl) return [];
-  const json = await readWorkContentJson(work.contentUrl);
-  if (!json || typeof json !== "object") return [];
-  const candidate = json as { blocks?: unknown; content?: unknown };
-  return normalizeNotionBlocks(candidate.blocks || candidate.content);
+  try {
+    const json = await readWorkContentJson(work.contentUrl);
+    if (!json || typeof json !== "object") return [];
+    const candidate = json as { blocks?: unknown; content?: unknown };
+    return normalizeNotionBlocks(candidate.blocks || candidate.content);
+  } catch (error) {
+    console.error(`[public-content] Failed to load work content for ${work.slug}`, error);
+    return [];
+  }
 }
 
 function richContentToBlocks(blocks: OssRichContentBlock[] | undefined, title: string): NotionBlock[] {
