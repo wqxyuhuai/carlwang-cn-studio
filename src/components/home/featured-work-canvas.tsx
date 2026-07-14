@@ -33,6 +33,7 @@ type InfiniteCameraGridState = {
 
 type FeaturedCanvasClientSettings = {
   compact: boolean;
+  mobile: boolean;
   playEntry: boolean;
 };
 
@@ -76,16 +77,22 @@ function useFeaturedCanvasClientSettings() {
     if (typeof window === "undefined") return;
 
     const mediaQuery = window.matchMedia("(max-width: 760px), (pointer: coarse)");
+    const mobileMediaQuery = window.matchMedia("(max-width: 760px)");
     const updateCompactMode = () => {
       setSettings((current) => ({
         compact: mediaQuery.matches,
+        mobile: mobileMediaQuery.matches,
         playEntry: current?.playEntry ?? shouldPlayFeaturedEntry()
       }));
     };
     updateCompactMode();
     mediaQuery.addEventListener("change", updateCompactMode);
+    mobileMediaQuery.addEventListener("change", updateCompactMode);
 
-    return () => mediaQuery.removeEventListener("change", updateCompactMode);
+    return () => {
+      mediaQuery.removeEventListener("change", updateCompactMode);
+      mobileMediaQuery.removeEventListener("change", updateCompactMode);
+    };
   }, []);
 
   return settings;
@@ -117,6 +124,12 @@ const INFINITE_COMPACT_CHUNK_OFFSETS: Array<[number, number, number]> = [
   [-1, 0, 0],
   [0, 1, 0],
   [0, -1, 0]
+];
+
+const INFINITE_MOBILE_CHUNK_OFFSETS: Array<[number, number, number]> = [
+  [0, 0, 0],
+  [0, 0, -1],
+  [0, 0, 1]
 ];
 
 function shouldPlayFeaturedEntry() {
@@ -237,10 +250,17 @@ function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCo
   });
 }
 
-function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean) {
-  const offsets = compact ? INFINITE_COMPACT_CHUNK_OFFSETS : INFINITE_CHUNK_OFFSETS;
+function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean, mobile: boolean) {
+  const offsets = mobile ? INFINITE_MOBILE_CHUNK_OFFSETS : compact ? INFINITE_COMPACT_CHUNK_OFFSETS : INFINITE_CHUNK_OFFSETS;
   const planes = offsets.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
   if (!compact || mediaCount < 2) return planes;
+
+  if (mobile) {
+    return planes.map((plane) => ({
+      ...plane,
+      mediaIndex: hashKey(`${plane.id},mobile-media`) % mediaCount
+    }));
+  }
 
   const mediaOffset = hashKey(`${cx},${cy},${cz},compact`) % mediaCount;
   return planes.map((plane, index) => ({ ...plane, mediaIndex: (mediaOffset + index) % mediaCount }));
@@ -368,6 +388,7 @@ function InfiniteCanvasField({
   compact,
   images,
   isActive,
+  mobile,
   playEntry,
   onReady,
   onIntent,
@@ -380,6 +401,7 @@ function InfiniteCanvasField({
   compact: boolean;
   images: CanvasImage[];
   isActive: boolean;
+  mobile: boolean;
   playEntry: boolean;
   onReady: () => void;
   onIntent: (href: string) => void;
@@ -391,19 +413,22 @@ function InfiniteCanvasField({
   const { camera, gl, invalidate } = useThree();
   const restingCameraZ = compact ? INFINITE_COMPACT_INITIAL_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z;
   const initialCameraZ = playEntry ? (compact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : restingCameraZ;
-  const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: 0, camZ: initialCameraZ });
+  const initialChunkZ = mobile ? Math.floor(initialCameraZ / INFINITE_CHUNK_SIZE) : 0;
+  const cameraGridRef = useRef<InfiniteCameraGridState>({ cx: 0, cy: 0, cz: initialChunkZ, camZ: initialCameraZ });
   const readySentRef = useRef(false);
   const introProgressRef = useRef(playEntry ? 0 : 1);
   const controllerRef = useRef({
     velocity: { x: 0, y: 0, z: 0 },
     basePosition: { x: 0, y: 0, z: initialCameraZ },
     lastMouse: { x: 0, y: 0 },
+    activePointers: new Map<number, { x: number; y: number }>(),
+    lastPinchDistance: null as number | null,
     isDragging: false,
     keys: new Set<string>(),
-    lastChunkKey: ""
+    lastChunkKey: mobile ? `0,0,${initialChunkZ}` : ""
   });
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [planes, setPlanes] = useState(() => buildInfinitePlanes(0, 0, 0, textures.length, compact));
+  const [planes, setPlanes] = useState(() => buildInfinitePlanes(0, 0, initialChunkZ, textures.length, compact, mobile));
 
   useEffect(() => {
     const canvas = gl.domElement;
@@ -412,12 +437,40 @@ function InfiniteCanvasField({
     const handlePointerDown = (event: globalThis.PointerEvent) => {
       event.preventDefault();
       controller.isDragging = true;
+
+      if (mobile) {
+        controller.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const pointers = Array.from(controller.activePointers.values());
+        controller.lastPinchDistance = pointers.length >= 2
+          ? Math.hypot(pointers[0].x - pointers[1].x, pointers[0].y - pointers[1].y)
+          : null;
+        invalidate();
+        return;
+      }
+
       controller.lastMouse = { x: event.clientX, y: event.clientY };
       invalidate();
     };
 
     const handlePointerMove = (event: globalThis.PointerEvent) => {
       if (!controller.isDragging) return;
+
+      if (mobile) {
+        if (!controller.activePointers.has(event.pointerId)) return;
+        controller.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        const pointers = Array.from(controller.activePointers.values());
+
+        if (pointers.length >= 2) {
+          const pinchDistance = Math.hypot(pointers[0].x - pointers[1].x, pointers[0].y - pointers[1].y);
+          if (controller.lastPinchDistance !== null) {
+            controller.velocity.z -= (pinchDistance - controller.lastPinchDistance) * 0.018;
+          }
+          controller.lastPinchDistance = pinchDistance;
+        }
+
+        invalidate();
+        return;
+      }
 
       const zoomFactor = clampNumber(Math.abs(controller.basePosition.z) / restingCameraZ, 0.45, 1.8);
       controller.velocity.x -= (event.clientX - controller.lastMouse.x) * 0.018 * zoomFactor;
@@ -426,7 +479,15 @@ function InfiniteCanvasField({
       invalidate();
     };
 
-    const stopDrag = () => {
+    const stopDrag = (event: globalThis.PointerEvent) => {
+      if (mobile) {
+        controller.activePointers.delete(event.pointerId);
+        controller.lastPinchDistance = null;
+        controller.isDragging = controller.activePointers.size > 0;
+        invalidate();
+        return;
+      }
+
       controller.isDragging = false;
       invalidate();
     };
@@ -456,6 +517,7 @@ function InfiniteCanvasField({
     canvas.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopDrag);
+    window.addEventListener("pointercancel", stopDrag);
     canvas.addEventListener("pointerleave", stopDrag);
     canvas.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("keydown", handleKeyDown);
@@ -465,17 +527,22 @@ function InfiniteCanvasField({
       canvas.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
       canvas.removeEventListener("pointerleave", stopDrag);
       canvas.removeEventListener("wheel", handleWheel);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [gl, invalidate, restingCameraZ]);
+  }, [gl, invalidate, mobile, restingCameraZ]);
 
   useEffect(() => {
     if (!isActive || prefersReducedMotion || (!autoFlightEnabled && !playEntry)) return;
 
-    const frameInterval = 1000 / (compact ? 30 : 45);
+    // Mobile uses the Canvas' native frame loop while auto flight is active.
+    // Driving demand rendering from a second RAF loop can queue frames unevenly
+    // on mobile Safari and show up as a regular hitch.
+    if (mobile) return;
+
     const entryDeadline = window.performance.now() + (INFINITE_ENTRY_SECONDS + 1) * 1000;
     let animationFrame = 0;
     let previousFrameTime = 0;
@@ -483,6 +550,7 @@ function InfiniteCanvasField({
     const scheduleFrame = (time: number) => {
       if (!autoFlightEnabled && time >= entryDeadline) return;
 
+      const frameInterval = 1000 / (compact ? 30 : 45);
       if (time - previousFrameTime >= frameInterval) {
         previousFrameTime = time;
         invalidate();
@@ -492,7 +560,7 @@ function InfiniteCanvasField({
 
     animationFrame = window.requestAnimationFrame(scheduleFrame);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [autoFlightEnabled, compact, invalidate, isActive, playEntry, prefersReducedMotion]);
+  }, [autoFlightEnabled, compact, invalidate, isActive, mobile, playEntry, prefersReducedMotion]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -528,10 +596,12 @@ function InfiniteCanvasField({
 
     if (keys.has("w") || keys.has("arrowup")) controller.velocity.z -= keyboardSpeed;
     if (keys.has("s") || keys.has("arrowdown")) controller.velocity.z += keyboardSpeed;
-    if (keys.has("a") || keys.has("arrowleft")) controller.velocity.x -= keyboardSpeed;
-    if (keys.has("d") || keys.has("arrowright")) controller.velocity.x += keyboardSpeed;
-    if (keys.has("q")) controller.velocity.y -= keyboardSpeed;
-    if (keys.has("e")) controller.velocity.y += keyboardSpeed;
+    if (!mobile) {
+      if (keys.has("a") || keys.has("arrowleft")) controller.velocity.x -= keyboardSpeed;
+      if (keys.has("d") || keys.has("arrowright")) controller.velocity.x += keyboardSpeed;
+      if (keys.has("q")) controller.velocity.y -= keyboardSpeed;
+      if (keys.has("e")) controller.velocity.y += keyboardSpeed;
+    }
 
     if (!prefersReducedMotion) {
       const frameScale = Math.min(delta, 0.05) * 60;
@@ -551,16 +621,18 @@ function InfiniteCanvasField({
     controller.velocity.y = clampNumber(controller.velocity.y, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
     controller.velocity.z = clampNumber(controller.velocity.z, -INFINITE_MAX_VELOCITY, INFINITE_MAX_VELOCITY);
 
-    controller.basePosition.x += controller.velocity.x;
-    controller.basePosition.y += controller.velocity.y;
-    controller.basePosition.z += controller.velocity.z;
+    const compactMotionStep = mobile ? Math.min(delta, 0.05) * 30 : 1;
+    controller.basePosition.x += controller.velocity.x * compactMotionStep;
+    controller.basePosition.y += controller.velocity.y * compactMotionStep;
+    controller.basePosition.z += controller.velocity.z * compactMotionStep;
 
     camera.position.set(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z);
     camera.lookAt(controller.basePosition.x, controller.basePosition.y, controller.basePosition.z - 80);
 
-    controller.velocity.x *= INFINITE_VELOCITY_DECAY;
-    controller.velocity.y *= INFINITE_VELOCITY_DECAY;
-    controller.velocity.z *= INFINITE_VELOCITY_DECAY;
+    const velocityDecay = mobile ? Math.pow(INFINITE_VELOCITY_DECAY, compactMotionStep) : INFINITE_VELOCITY_DECAY;
+    controller.velocity.x *= velocityDecay;
+    controller.velocity.y *= velocityDecay;
+    controller.velocity.z *= velocityDecay;
 
     const cx = Math.floor(controller.basePosition.x / INFINITE_CHUNK_SIZE);
     const cy = Math.floor(controller.basePosition.y / INFINITE_CHUNK_SIZE);
@@ -571,7 +643,7 @@ function InfiniteCanvasField({
 
     if (chunkKey !== controller.lastChunkKey) {
       controller.lastChunkKey = chunkKey;
-      setPlanes(buildInfinitePlanes(cx, cy, cz, textures.length, compact));
+      setPlanes(buildInfinitePlanes(cx, cy, cz, textures.length, compact, mobile));
     }
 
     const momentum = Math.abs(controller.velocity.x) + Math.abs(controller.velocity.y) + Math.abs(controller.velocity.z);
@@ -603,6 +675,7 @@ function InfiniteCanvasWebGL({
   compact,
   images,
   isActive,
+  mobile,
   playEntry,
   onReady,
   onIntent,
@@ -614,6 +687,7 @@ function InfiniteCanvasWebGL({
   compact: boolean;
   images: CanvasImage[];
   isActive: boolean;
+  mobile: boolean;
   playEntry: boolean;
   onReady: () => void;
   onIntent: (href: string) => void;
@@ -646,6 +720,7 @@ function InfiniteCanvasWebGL({
       compact={compact}
       images={images}
       isActive={isActive}
+      mobile={mobile}
       playEntry={playEntry}
       onReady={onReady}
       onIntent={onIntent}
@@ -668,6 +743,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
   const { autoFlightEnabled, featuredActive } = useContext(FeaturedCanvasMotionContext);
   const clientSettings = useFeaturedCanvasClientSettings();
   const isCompact = clientSettings?.compact ?? false;
+  const isMobile = clientSettings?.mobile ?? false;
   const playEntry = clientSettings?.playEntry ?? false;
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const siteRadiusPixels = useMemo(() => readCssLengthInPixels("--radius-site-sm", 8), []);
@@ -732,7 +808,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
       </div>
       {clientSettings ? (
       <Canvas
-        key={`${isCompact ? "compact" : "desktop"}-${playEntry ? "entry" : "direct"}`}
+        key={`${isMobile ? "mobile" : isCompact ? "compact" : "desktop"}-${playEntry ? "entry" : "direct"}`}
         className="notion-rb-infinite-canvas-webgl"
         camera={{
           position: [0, 0, playEntry ? (isCompact ? INFINITE_COMPACT_ENTRY_CAMERA_Z : INFINITE_ENTRY_CAMERA_Z) : (isCompact ? INFINITE_COMPACT_INITIAL_CAMERA_Z : INFINITE_INITIAL_CAMERA_Z)],
@@ -740,9 +816,9 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
           near: 1,
           far: 230
         }}
-        dpr={isCompact ? 1 : [1, 1.5]}
+        dpr={isMobile ? [1, 1.5] : isCompact ? 1 : [1, 1.5]}
         flat
-        frameloop="demand"
+        frameloop={isMobile && featuredActive && autoFlightEnabled ? "always" : "demand"}
         gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: false }}
       >
         <color attach="background" args={["#10130f"]} />
@@ -753,6 +829,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
             compact={isCompact}
             images={canvasImages}
             isActive={featuredActive}
+            mobile={isMobile}
             playEntry={playEntry}
             onReady={markCanvasReady}
             onIntent={prefetchWork}
