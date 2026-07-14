@@ -61,10 +61,11 @@ const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
 const INFINITE_COMPACT_ENTRY_BOOST = 0.08;
 const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
-const INFINITE_MOBILE_TEXTURE_LIMIT = 8;
+const INFINITE_MOBILE_TEXTURE_LIMIT = 6;
 const INFINITE_DESKTOP_TEXTURE_LIMIT = 10;
 const INFINITE_RADIUS_MASK_SIZE = 128;
 const INFINITE_RADIUS_NOMINAL_CARD_SIZE = 192;
+const INFINITE_MOBILE_NEAR_DEPTH = 12;
 
 export const FeaturedCanvasMotionContext = createContext({ autoFlightEnabled: true, featuredActive: true });
 const featuredEntryPlayedKey = "cw-featured-entry-played";
@@ -131,6 +132,7 @@ const INFINITE_MOBILE_CHUNK_OFFSETS: Array<[number, number, number]> = [
   [0, 0, -1],
   [0, 0, 1]
 ];
+const INFINITE_MOBILE_CORRIDOR_DEPTH = INFINITE_CHUNK_SIZE * INFINITE_MOBILE_CHUNK_OFFSETS.length;
 
 function shouldPlayFeaturedEntry() {
   if (typeof window === "undefined") return true;
@@ -139,6 +141,10 @@ function shouldPlayFeaturedEntry() {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function positiveModulo(value: number, divisor: number) {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 function readCssLengthInPixels(propertyName: string, fallback: number) {
@@ -270,6 +276,7 @@ function InfiniteCanvasPlane({
   cameraGridRef,
   canvasImage,
   compact,
+  mobile,
   onIntent,
   onOpen,
   plane,
@@ -279,6 +286,7 @@ function InfiniteCanvasPlane({
   cameraGridRef: RefObject<InfiniteCameraGridState>;
   canvasImage: CanvasImage;
   compact: boolean;
+  mobile: boolean;
   onIntent: (href: string) => void;
   onOpen: (href: string) => void;
   plane: InfinitePlaneData;
@@ -309,11 +317,18 @@ function InfiniteCanvasPlane({
       Math.abs(plane.chunk[2] - cameraGrid.cz)
     );
     const chunkFade =
-      chunkDistance <= INFINITE_RENDER_DISTANCE
+      mobile || chunkDistance <= INFINITE_RENDER_DISTANCE
         ? 1
         : 0;
-    const depthDistance = Math.abs(plane.position[2] - cameraGrid.camZ);
-    const forwardDepth = cameraGrid.camZ - plane.position[2];
+    const rawForwardDepth = cameraGrid.camZ - plane.position[2];
+    const forwardDepth = mobile
+      ? INFINITE_MOBILE_NEAR_DEPTH + positiveModulo(
+          rawForwardDepth - INFINITE_MOBILE_NEAR_DEPTH,
+          INFINITE_MOBILE_CORRIDOR_DEPTH
+        )
+      : rawForwardDepth;
+    const renderedZ = mobile ? cameraGrid.camZ - forwardDepth : plane.position[2];
+    const depthDistance = mobile ? forwardDepth : Math.abs(rawForwardDepth);
     const fullOpacityDepth = compact ? 78 : 62;
     const depthFadeRange = compact ? 82 : 68;
     const depthFade = depthDistance < fullOpacityDepth ? 1 : clampNumber(1 - (depthDistance - fullOpacityDepth) / depthFadeRange, 0, 1);
@@ -333,9 +348,13 @@ function InfiniteCanvasPlane({
     if (material.depthWrite !== nextDepthWrite) material.depthWrite = nextDepthWrite;
     if (mesh.visible !== nextVisible) mesh.visible = nextVisible;
 
+    if (mobile) {
+      mesh.position.z = renderedZ + hoverProgress * 0.7;
+    }
+
     if (Math.abs(appliedHoverProgressRef.current - hoverProgress) > 0.002) {
       appliedHoverProgressRef.current = hoverProgress;
-      mesh.position.z = plane.position[2] + hoverProgress * 0.7;
+      if (!mobile) mesh.position.z = renderedZ + hoverProgress * 0.7;
       mesh.scale.set(baseScaleX * hoverScale, baseScaleY * hoverScale, 1);
     }
 
@@ -641,7 +660,7 @@ function InfiniteCanvasField({
 
     cameraGridRef.current = { cx, cy, cz, camZ: controller.basePosition.z };
 
-    if (chunkKey !== controller.lastChunkKey) {
+    if (!mobile && chunkKey !== controller.lastChunkKey) {
       controller.lastChunkKey = chunkKey;
       setPlanes(buildInfinitePlanes(cx, cy, cz, textures.length, compact, mobile));
     }
@@ -658,6 +677,7 @@ function InfiniteCanvasField({
           cameraGridRef={cameraGridRef}
           canvasImage={images[plane.mediaIndex % images.length]}
           compact={compact}
+          mobile={mobile}
           key={plane.id}
           onIntent={onIntent}
           onOpen={onOpen}
@@ -706,13 +726,13 @@ function InfiniteCanvasWebGL({
 
     textures.forEach((texture) => {
       texture.colorSpace = THREE.SRGBColorSpace;
-      texture.anisotropy = Math.min(maxAnisotropy, compact ? 2 : 4);
-      texture.generateMipmaps = !compact;
-      texture.minFilter = compact ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
+      texture.anisotropy = Math.min(maxAnisotropy, mobile ? 4 : compact ? 2 : 4);
+      texture.generateMipmaps = mobile || !compact;
+      texture.minFilter = mobile || !compact ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.needsUpdate = true;
     });
-  }, [compact, gl, textures]);
+  }, [compact, gl, mobile, textures]);
 
   return (
     <InfiniteCanvasField
@@ -816,7 +836,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
           near: 1,
           far: 230
         }}
-        dpr={isMobile ? [1, 1.5] : isCompact ? 1 : [1, 1.5]}
+        dpr={isMobile ? [2, 3] : isCompact ? 1 : [1, 1.5]}
         flat
         frameloop={isMobile && featuredActive && autoFlightEnabled ? "always" : "demand"}
         gl={{ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: false, stencil: false }}

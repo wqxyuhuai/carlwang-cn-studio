@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { PointerEvent, ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
@@ -83,13 +83,15 @@ export function StudioTabbedShell({
   const workTabsRef = useRef<HTMLDivElement>(null);
   const bottomNavRef = useRef<HTMLElement>(null);
   const autoFlightButtonRef = useRef<HTMLButtonElement>(null);
+  const pointerActivatedMainTabRef = useRef<MainTab | null>(null);
   const logoShakeTimerRef = useRef<number | null>(null);
   const workTabsGlass = useBottomNavGlassSurface(workTabsRef);
   const bottomNavGlass = useBottomNavGlassSurface(bottomNavRef);
   const autoFlightButtonGlass = useBottomNavGlassSurface(autoFlightButtonRef);
+  const isFeaturedActive = isLocationSynced && mainTab === "works" && workTab === "featured";
   const featuredCanvasMotion = useMemo(
-    () => ({ autoFlightEnabled: isAutoFlightEnabled, featuredActive: isLocationSynced && mainTab === "works" && workTab === "featured" }),
-    [isAutoFlightEnabled, isLocationSynced, mainTab, workTab]
+    () => ({ autoFlightEnabled: isAutoFlightEnabled, featuredActive: isFeaturedActive }),
+    [isAutoFlightEnabled, isFeaturedActive]
   );
 
   useLocationLayoutEffect(() => {
@@ -153,6 +155,8 @@ export function StudioTabbedShell({
   }, [mainTab, workTab]);
 
   function selectMainTab(nextTab: MainTab) {
+    if (nextTab === mainTab) return;
+
     if (nextTab === "about") {
       rememberWorksHref();
       setTabs((current) => ({ mainTab: "about", workTab: current.workTab }));
@@ -167,6 +171,21 @@ export function StudioTabbedShell({
     replaceCurrentHistoryHref(targetHref);
     rememberWorksHref(targetHref);
     window.dispatchEvent(new CustomEvent("cw:works-browser-sync"));
+  }
+
+  function handleMainTabPointerDown(event: PointerEvent<HTMLButtonElement>, nextTab: MainTab) {
+    if (event.button !== 0 || event.pointerType === "mouse") return;
+    pointerActivatedMainTabRef.current = nextTab;
+    selectMainTab(nextTab);
+  }
+
+  function handleMainTabClick(nextTab: MainTab) {
+    if (pointerActivatedMainTabRef.current === nextTab) {
+      pointerActivatedMainTabRef.current = null;
+      return;
+    }
+
+    selectMainTab(nextTab);
   }
 
   function selectWorkTab(nextTab: WorkTab) {
@@ -193,7 +212,7 @@ export function StudioTabbedShell({
   return (
     <>
     <title>{viewTitle}</title>
-    <main className={`cw-studio-shell${isLocationSynced ? "" : " is-location-syncing"}`}>
+    <main className={`cw-studio-shell${isLocationSynced ? "" : " is-location-syncing"}${isFeaturedActive ? " is-featured-active" : ""}`}>
       {mainTab === "works" ? (
         <div className="cw-work-top-mask" aria-hidden="true" />
       ) : null}
@@ -460,7 +479,8 @@ export function StudioTabbedShell({
             aria-controls="cw-featured-panel"
             aria-selected={mainTab === "works"}
             className={mainTab === "works" ? "is-active" : undefined}
-            onClick={() => selectMainTab("works")}
+            onClick={() => handleMainTabClick("works")}
+            onPointerDown={(event) => handleMainTabPointerDown(event, "works")}
             role="tab"
             type="button"
           >
@@ -476,7 +496,8 @@ export function StudioTabbedShell({
             aria-selected={mainTab === "about"}
             className={mainTab === "about" ? "is-active" : undefined}
             id="cw-about-tab"
-            onClick={() => selectMainTab("about")}
+            onClick={() => handleMainTabClick("about")}
+            onPointerDown={(event) => handleMainTabPointerDown(event, "about")}
             role="tab"
             type="button"
           >

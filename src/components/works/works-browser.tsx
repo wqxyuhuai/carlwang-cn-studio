@@ -77,6 +77,7 @@ export function WorksBrowser({
   const prefetchedDetailHrefs = useRef(new Set<string>());
   const pendingDetailHrefRef = useRef<string | null>(null);
   const worksRightRef = useRef<HTMLDivElement>(null);
+  const [pendingDetailSlug, setPendingDetailSlug] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
   const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
@@ -266,15 +267,12 @@ export function WorksBrowser({
     return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
   }
 
-  function usesCoarsePointer() {
-    return typeof window !== "undefined" && window.matchMedia("(hover: none), (pointer: coarse)").matches;
-  }
-
   function beginWorkNavigation(slug: string) {
     const href = workDetailHref(slug);
     if (pendingDetailHrefRef.current === href) return;
 
     pendingDetailHrefRef.current = href;
+    setPendingDetailSlug(slug);
     rememberCurrentWorkReturnHref();
     prefetchWorkDetail(slug);
     router.push(href);
@@ -294,11 +292,6 @@ export function WorksBrowser({
   function handleWorkClick(event: MouseEvent<HTMLAnchorElement>, slug: string) {
     if (shouldUseNativeLink(event)) {
       rememberCurrentWorkReturnHref(false);
-      return;
-    }
-
-    if (usesCoarsePointer()) {
-      rememberCurrentWorkReturnHref();
       return;
     }
 
@@ -365,7 +358,8 @@ export function WorksBrowser({
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (
                     <Link
-                      className={`pw-works-grid-card${index < 9 ? " is-entry-card" : ""}`}
+                      aria-busy={pendingDetailSlug === work.slug}
+                      className={`pw-works-grid-card${index < 9 ? " is-entry-card" : ""}${pendingDetailSlug === work.slug ? " is-navigating" : ""}`}
                       href={workDetailHref(work.slug)}
                       key={work.id}
                       onClick={(event) => handleWorkClick(event, work.slug)}
@@ -403,6 +397,12 @@ export function WorksBrowser({
                             <strong>{work.title}</strong>
                             <span className="pw-works-grid-card-back-meta">{work.primaryType || work.category}</span>
                           </span>
+                          {work.featured ? (
+                            <span aria-hidden="true" className="pw-works-featured-mark">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- Fixed-size local SVG icon. */}
+                              <img alt="" aria-hidden="true" className="pw-works-featured-mark-icon" src="/figma/pw2-featured-star.svg" />
+                            </span>
+                          ) : null}
                         </span>
                       </span>
                     </Link>
@@ -412,7 +412,8 @@ export function WorksBrowser({
             <div className="pw-works-list">
               {filteredWorks.map((work) => (
                 <Link
-                  className="pw-list-row"
+                  aria-busy={pendingDetailSlug === work.slug}
+                  className={`pw-list-row${pendingDetailSlug === work.slug ? " is-navigating" : ""}`}
                   href={workDetailHref(work.slug)}
                   key={work.id}
                   onClick={(event) => handleWorkClick(event, work.slug)}
