@@ -42,7 +42,7 @@ npm run upload
 npm run deploy
 ```
 
-The default production release is a push to `main`. GitHub Actions builds the OpenNext bundle, prefills the prerendered route/data cache in `NEXT_INC_CACHE_KV`, and then deploys the Worker. The Cloudflare API token therefore needs Workers Scripts and Workers KV edit access. Do not bypass cache prefill: making runtime traffic populate a new build leaves the first visitor on the expensive cold-render path. Use manual `npm run deploy` only for an explicitly requested emergency release or when GitHub Actions is unavailable, then push the exact deployed source so GitHub remains the source of truth.
+The default production release is a push to `main`. GitHub Actions builds the OpenNext bundle and deploys it with Wrangler. The `NEXT_INC_CACHE_KV` and `NEXT_TAG_CACHE_KV` bindings remain available to the Worker at runtime, but Actions does not bulk-prefill them, so the existing Cloudflare API token only needs Worker deployment access. Use manual `npm run deploy` only for an explicitly requested emergency release or when GitHub Actions is unavailable, then push the exact deployed source so GitHub remains the source of truth.
 
 ## Runtime Data
 

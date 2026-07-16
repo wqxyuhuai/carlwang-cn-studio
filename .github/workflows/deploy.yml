@@ -37,10 +37,11 @@ jobs:
           echo "Cloudflare token is present. Wrangler will use account_id from wrangler.jsonc."
       - name: Build OpenNext bundle
         run: npx opennextjs-cloudflare build
-      - name: Prefill cache and deploy Cloudflare Worker
-        # OpenNext uploads the prerendered route/data cache before Wrangler switches
-        # production traffic to the new Worker version. This keeps first visitors
-        # off the expensive cold-render path.
-        run: npx opennextjs-cloudflare deploy
+      - name: Deploy Cloudflare Worker
+        # The OpenNext bundle is built above. Deploying with Wrangler preserves the
+        # KV bindings but skips OpenNext's optional KV bulk prefill, which would
+        # otherwise require an additional API-token permission in GitHub Actions.
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          OPEN_NEXT_DEPLOY: "true"
