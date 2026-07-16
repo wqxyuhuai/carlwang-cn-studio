@@ -1,5 +1,6 @@
 export const workReturnHrefKey = "cw-work-return-href";
 export const lastWorksHrefKey = "cw-last-works-href";
+export const lastWorksIndexHrefKey = "cw-last-works-index-href";
 export const workReturnScrollKey = "cw-work-return-scroll";
 export const workReturnHrefParam = "from";
 const workNavigationEntryKey = "cw-work-navigation-entry";
@@ -82,7 +83,11 @@ export function rememberLastWorksHref(href: string) {
     (url.hash === "#works" || url.hash === "#works-index" || url.hash === "#works-list");
 
   if (isWorksSurface) {
-    window.sessionStorage.setItem(lastWorksHrefKey, normalizeWorksHref(validHref));
+    const normalizedHref = normalizeWorksHref(validHref);
+    window.sessionStorage.setItem(lastWorksHrefKey, normalizedHref);
+    if (url.hash === "#works-index" || url.hash === "#works-list") {
+      window.sessionStorage.setItem(lastWorksIndexHrefKey, normalizedHref);
+    }
   }
 }
 

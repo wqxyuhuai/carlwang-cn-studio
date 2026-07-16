@@ -5,7 +5,13 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { FeaturedCanvasMotionContext } from "@/components/home/featured-work-canvas";
 import { GradualBlur } from "@/components/home/gradual-blur";
 import { LiquidGlassFilter, useLiquidGlassSurface as useBottomNavGlassSurface } from "@/components/liquid-glass-surface";
-import { lastWorksHrefKey, normalizeWorksHref, rememberLastWorksHref, replaceCurrentHistoryHref } from "@/lib/work-detail-return";
+import {
+  lastWorksHrefKey,
+  lastWorksIndexHrefKey,
+  normalizeWorksHref,
+  rememberLastWorksHref,
+  replaceCurrentHistoryHref
+} from "@/lib/work-detail-return";
 
 type MainTab = "works" | "about";
 type WorkTab = "featured" | "list";
@@ -46,7 +52,9 @@ function rememberWorksHref(href = normalizedCurrentHref()) {
 }
 
 function lastIndexHref() {
-  const remembered = window.sessionStorage.getItem(lastWorksHrefKey);
+  const remembered =
+    window.sessionStorage.getItem(lastWorksIndexHrefKey) ??
+    window.sessionStorage.getItem(lastWorksHrefKey);
   if (remembered?.includes("#works-index")) return normalizeWorksHref(remembered);
   return "/?view=grid#works-index";
 }

@@ -17,7 +17,6 @@ import {
   rememberWorkNavigation,
   rememberWorkReturnHref,
   rememberWorkReturnScroll,
-  readWorkReturnScroll,
   replaceCurrentHistoryHref,
   workDetailHrefWithReturn
 } from "@/lib/work-detail-return";
@@ -86,6 +85,7 @@ export function WorksBrowser({
   const pageRef = useRef<HTMLElement>(null);
   const prefetchedDetailHrefs = useRef(new Set<string>());
   const pendingDetailHrefRef = useRef<string | null>(null);
+  const pendingReturnScrollRef = useRef<ReturnType<typeof consumeWorkReturnScroll> & { href: string } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const worksRightRef = useRef<HTMLDivElement>(null);
   const searchInputId = useId();
@@ -190,15 +190,17 @@ export function WorksBrowser({
     if (!worksRight) return;
 
     const returnHref = browserHref(filter, mode, searchQuery);
-    const scrollState = readWorkReturnScroll(returnHref);
+    const pendingScroll = pendingReturnScrollRef.current;
+    const scrollState = pendingScroll?.href === returnHref
+      ? pendingScroll
+      : consumeWorkReturnScroll(returnHref);
     if (!scrollState) return;
+    pendingReturnScrollRef.current = { ...scrollState, href: returnHref };
     pageRef.current?.classList.add("is-detail-return");
     const scrollTarget = worksRight;
     const savedScroll = scrollState;
 
     let settledFrame: number | null = null;
-    let isCancelled = false;
-    const settledTimers: number[] = [];
     const root = document.documentElement;
     const previousScrollBehavior = root.style.scrollBehavior;
     root.style.scrollBehavior = "auto";
@@ -218,31 +220,14 @@ export function WorksBrowser({
       applyScrollPosition();
       settledFrame = window.requestAnimationFrame(() => {
         applyScrollPosition();
+        pendingReturnScrollRef.current = null;
+        root.style.scrollBehavior = previousScrollBehavior;
       });
-    });
-    const resizeObserver = new ResizeObserver(applyScrollPosition);
-    resizeObserver.observe(scrollTarget);
-    if (worksSurface) resizeObserver.observe(worksSurface);
-
-    [120, 360, 800].forEach((delay) => {
-      settledTimers.push(window.setTimeout(applyScrollPosition, delay));
-    });
-    settledTimers.push(window.setTimeout(() => {
-      applyScrollPosition();
-      resizeObserver.disconnect();
-      consumeWorkReturnScroll(returnHref);
-      root.style.scrollBehavior = previousScrollBehavior;
-    }, 1200));
-    void document.fonts?.ready.then(() => {
-      if (!isCancelled) applyScrollPosition();
     });
 
     return () => {
-      isCancelled = true;
       window.cancelAnimationFrame(firstFrame);
       if (settledFrame !== null) window.cancelAnimationFrame(settledFrame);
-      settledTimers.forEach((timer) => window.clearTimeout(timer));
-      resizeObserver.disconnect();
       root.style.scrollBehavior = previousScrollBehavior;
     };
   }, [browserHref, filter, mode, searchQuery]);
