@@ -3202,7 +3202,6 @@ html .custom-cursor {
   background: rgb(0 0 0 / 24%);
 }
 
-.pw-works-grid-card.is-navigating,
 .pw-list-row.is-navigating {
   pointer-events: none;
 }
@@ -3375,7 +3374,8 @@ html .custom-cursor {
 
 
 .pw-works-grid-card:hover .pw-works-grid-card-inner,
-.pw-works-grid-card:focus-visible .pw-works-grid-card-inner {
+.pw-works-grid-card:focus-visible .pw-works-grid-card-inner,
+.pw-works-grid-card.is-navigating .pw-works-grid-card-inner {
   transform: rotateY(180deg);
   will-change: transform;
 }
@@ -3383,7 +3383,9 @@ html .custom-cursor {
 .pw-works-grid-card:hover .pw-works-grid-card-back-layer img,
 .pw-works-grid-card:hover .pw-works-grid-card-back-image,
 .pw-works-grid-card:focus-visible .pw-works-grid-card-back-layer img,
-.pw-works-grid-card:focus-visible .pw-works-grid-card-back-image {
+.pw-works-grid-card:focus-visible .pw-works-grid-card-back-image,
+.pw-works-grid-card.is-navigating .pw-works-grid-card-back-layer img,
+.pw-works-grid-card.is-navigating .pw-works-grid-card-back-image {
   filter: blur(12px) saturate(1) brightness(0.98) contrast(1.02);
 }
 
