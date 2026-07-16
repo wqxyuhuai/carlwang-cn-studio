@@ -2911,12 +2911,21 @@ html .custom-cursor {
   align-items: center;
   animation: works-left-entry 420ms cubic-bezier(0.16, 1, 0.3, 1) 120ms both;
   display: flex;
-  gap: 1.375rem;
+  min-block-size: 2.5rem;
   margin-bottom: 2.0625rem;
+  position: relative;
 }
 
-.pw-view-toggle a,
-.pw-view-toggle button {
+.pw-view-toggle-modes {
+  align-items: center;
+  display: flex;
+  gap: 1.375rem;
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-base) var(--ease-out);
+}
+
+.pw-view-toggle-modes button {
   align-items: center;
   color: var(--color-black-40);
   display: inline-flex;
@@ -2927,8 +2936,7 @@ html .custom-cursor {
   transition: color var(--motion-base) var(--ease-out);
 }
 
-.pw-view-toggle a::after,
-.pw-view-toggle button::after {
+.pw-view-toggle-modes button::after {
   background: currentColor;
   block-size: 2px;
   content: "";
@@ -2940,42 +2948,221 @@ html .custom-cursor {
   transition: transform var(--motion-base) var(--ease-out);
 }
 
-.pw-view-toggle img {
+.pw-view-toggle-modes img {
   border-radius: 0.125rem;
   opacity: 0.4;
   transition: opacity var(--motion-base) var(--ease-out);
 }
 
-.pw-view-toggle a:hover,
-.pw-view-toggle a:focus-visible,
-.pw-view-toggle button:hover,
-.pw-view-toggle button:focus-visible {
+.pw-view-toggle-modes button:hover,
+.pw-view-toggle-modes button:focus-visible {
   color: var(--color-black);
 }
 
-.pw-view-toggle a:hover img,
-.pw-view-toggle a:focus-visible img,
-.pw-view-toggle button:hover img,
-.pw-view-toggle button:focus-visible img,
-.pw-view-toggle .is-active img {
+.pw-view-toggle-modes button:hover img,
+.pw-view-toggle-modes button:focus-visible img,
+.pw-view-toggle-modes .is-active img {
   opacity: 1;
 }
 
-.pw-view-toggle a:hover::after,
-.pw-view-toggle a:focus-visible::after,
-.pw-view-toggle button:hover::after,
-.pw-view-toggle button:focus-visible::after {
+.pw-view-toggle-modes button:hover::after,
+.pw-view-toggle-modes button:focus-visible::after {
   transform: scaleX(1);
 }
 
-.pw-view-toggle .is-active {
+.pw-view-toggle-modes .is-active {
   color: var(--color-black);
 }
 
-.pw-view-toggle .is-active::after,
-.pw-view-toggle .is-active:hover::after,
-.pw-view-toggle .is-active:focus-visible::after {
+.pw-view-toggle-modes .is-active::after,
+.pw-view-toggle-modes .is-active:hover::after,
+.pw-view-toggle-modes .is-active:focus-visible::after {
   transform: scaleX(0);
+}
+
+.pw-visually-hidden {
+  block-size: 1px;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  inline-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.pw-works-search {
+  block-size: 2.5rem;
+  inline-size: 2.5rem;
+  margin-inline-start: auto;
+  position: relative;
+  z-index: 5;
+}
+
+.pw-works-search-trigger {
+  align-items: center;
+  block-size: 2.5rem;
+  color: var(--color-black-40);
+  display: inline-flex;
+  inline-size: 2.5rem;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  transition:
+    color var(--motion-base) var(--ease-out),
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-base) var(--ease-out);
+  z-index: 2;
+}
+
+.pw-works-search-trigger:hover,
+.pw-works-search-trigger:focus-visible {
+  color: var(--color-black);
+  outline: none;
+}
+
+.pw-works-search-trigger:active {
+  transform: scale(0.92);
+}
+
+.pw-view-toggle.is-search-open .pw-works-search-trigger {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.78) rotate(-8deg);
+}
+
+.pw-works-search-icon {
+  background: currentColor;
+  block-size: 1rem;
+  display: block;
+  inline-size: 1rem;
+  -webkit-mask: url("/figma/pw2-search.svg") center / contain no-repeat;
+  mask: url("/figma/pw2-search.svg") center / contain no-repeat;
+}
+
+.pw-works-search-panel {
+  align-items: center;
+  block-size: 2.5rem;
+  border-radius: var(--radius-site-sm);
+  color: var(--color-black);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1rem minmax(0, 1fr) 2rem;
+  inline-size: min(17rem, calc(50vw - var(--figma-pad-desktop)));
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 0 var(--space-1) 0 var(--space-3);
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(0.375rem) scaleX(0.14);
+  transform-origin: right center;
+  transition:
+    opacity 160ms var(--ease-out),
+    transform 360ms var(--ease-out);
+  z-index: 1;
+}
+
+.pw-view-toggle.is-search-open .pw-works-search-panel {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0) scaleX(1);
+}
+
+.pw-works-search-icon--leading,
+.pw-works-search-panel input,
+.pw-works-search-close {
+  opacity: 0;
+  transform: translateX(0.375rem);
+  transition:
+    opacity var(--motion-fast) var(--ease-out),
+    transform var(--motion-base) var(--ease-out);
+}
+
+.pw-view-toggle.is-search-open .pw-works-search-icon--leading,
+.pw-view-toggle.is-search-open .pw-works-search-panel input,
+.pw-view-toggle.is-search-open .pw-works-search-close {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 90ms;
+}
+
+.pw-works-search-panel input {
+  background: transparent;
+  border: 0;
+  caret-color: currentColor;
+  inline-size: 100%;
+  min-inline-size: 0;
+  outline: none;
+  padding: 0;
+}
+
+.pw-works-search-panel input::placeholder {
+  color: var(--color-black-40);
+  opacity: 1;
+}
+
+.pw-works-search-panel input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.pw-works-search-close {
+  align-items: center;
+  block-size: 2rem;
+  color: var(--color-black-60);
+  display: inline-flex;
+  inline-size: 2rem;
+  justify-content: center;
+  position: relative;
+}
+
+.pw-works-search-close:hover,
+.pw-works-search-close:focus-visible {
+  color: var(--color-black);
+  outline: none;
+}
+
+.pw-works-search-close:active {
+  transform: scale(0.9);
+}
+
+.pw-works-search-close span,
+.pw-works-search-close span::before {
+  background: currentColor;
+  block-size: 0.09375rem;
+  border-radius: 999px;
+  content: "";
+  inline-size: 0.875rem;
+  position: absolute;
+  transform: rotate(45deg);
+}
+
+.pw-works-search-close span::before {
+  inset: 0;
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pw-view-toggle-modes,
+  .pw-works-search-trigger,
+  .pw-works-search-panel,
+  .pw-works-search-icon--leading,
+  .pw-works-search-panel input,
+  .pw-works-search-close {
+    transition-duration: 0.01ms;
+    transition-delay: 0ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .pw-works-search-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--color-page-bg);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
 }
 
 .pw-works-grid {
@@ -2998,15 +3185,21 @@ html .custom-cursor {
   position: relative;
   transform-origin: left center;
   transform-style: preserve-3d;
-  transition:
-    filter 120ms var(--ease-out),
-    opacity 120ms var(--ease-out);
 }
 
-.pw-works-grid-card:active,
-.pw-works-grid-card.is-navigating {
-  filter: brightness(0.72);
-  opacity: 0.82;
+.pw-works-grid-card::after {
+  background: rgb(0 0 0 / 0%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: background-color 120ms var(--ease-out);
+  z-index: 8;
+}
+
+.pw-works-grid-card:active::after,
+.pw-works-grid-card.is-navigating::after {
+  background: rgb(0 0 0 / 24%);
 }
 
 .pw-works-grid-card.is-navigating,
@@ -6325,11 +6518,24 @@ html[data-theme="dark"] .pw-detail-tool.is-dark-inverted img {
 
   .pw-view-toggle {
     font-size: 0.8125rem;
-    gap: 0.75rem;
     margin-bottom: clamp(0.875rem, 3.6vw, 1.25rem);
   }
 
-  .pw-view-toggle img {
+  .pw-view-toggle-modes {
+    gap: 0.75rem;
+  }
+
+  .pw-view-toggle.is-search-open .pw-view-toggle-modes {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-0.5rem);
+  }
+
+  .pw-works-search-panel {
+    inline-size: calc(100vw - var(--figma-pad-mobile) - var(--figma-pad-mobile));
+  }
+
+  .pw-view-toggle-modes img {
     block-size: 0.875rem;
     inline-size: 0.875rem;
   }

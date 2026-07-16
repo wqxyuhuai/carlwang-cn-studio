@@ -123,11 +123,12 @@ Rules:
 ```plain text
 POST /api/revalidate
   -> validate REVALIDATE_SECRET from header or query
-  -> revalidate PUBLIC_CONTENT_CACHE_TAG
-  -> revalidate public routes
+  -> mark PUBLIC_CONTENT_CACHE_TAG stale
+  -> serve the last valid render while content refreshes in the background
 ```
 
 Rules:
 
 - `/api/revalidate` is secret-only.
-- Revalidation covers `/`, `/works`, `/about` and dynamic work detail routes.
+- The shared public-content tag covers `/`, `/works`, `/about` and dynamic work detail routes.
+- Do not expire the root layout synchronously; that moves full-route regeneration onto the next visitor request.

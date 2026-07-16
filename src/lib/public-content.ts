@@ -212,7 +212,9 @@ async function buildPublicContent(): Promise<PublicContent> {
   const baseHasOssWorks = base.sync.source === "oss" && base.works.length > 0;
   const workTypesFromOss = workTypesFromOssData(base.workTypes);
   const workTypes = workTypesFromOss.length > 0 ? workTypesFromOss : workTypesFromWorks(base.works);
-  const works = await applyWorkViewCounts(baseHasOssWorks ? base.works : fallbackData.works);
+  // View counts are detail-page metrics. Keeping D1 out of the shared public
+  // content cache makes homepage regeneration deterministic and cheaper.
+  const works = baseHasOssWorks ? base.works : fallbackData.works;
 
   return {
     settings: base.settings,
@@ -245,7 +247,7 @@ async function buildPublicContent(): Promise<PublicContent> {
   };
 }
 
-const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v13"], {
+const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v14"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG]
 });
 
@@ -262,11 +264,12 @@ async function resolveWorkBySlug(slug: string) {
   const index = works.findIndex((work) => work.slug === slug);
   const work = index >= 0 ? works[index] : undefined;
   if (!work) return null;
+  const [workWithViews] = await applyWorkViewCounts([work]);
 
   return {
     work: {
-      ...work,
-      content: await getWorkContent(work)
+      ...workWithViews,
+      content: await getWorkContent(workWithViews)
     },
     previous: works[(index - 1 + works.length) % works.length],
     next: works[(index + 1) % works.length],

@@ -1,9 +1,9 @@
 "use client";
 
-import type { CSSProperties, MouseEvent, PointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CascadeText } from "@/components/cascade-text";
 import { WorkScrollTop } from "@/components/works/work-scroll-top";
@@ -11,6 +11,7 @@ import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
 import {
   consumeWorkReturnScroll,
+  currentWorkSurfaceHref,
   lastWorksHrefKey,
   rememberLastWorksHref,
   rememberWorkNavigation,
@@ -57,6 +58,15 @@ function initialModeFromLocation(fallbackMode: ViewMode): ViewMode {
   return view === "grid" || view === "list" ? view : fallbackMode;
 }
 
+function initialSearchFromLocation() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("q") || "";
+}
+
+function normalizedSearchValue(value: string) {
+  return value.normalize("NFKC").trim().toLocaleLowerCase();
+}
+
 export function WorksBrowser({
   basePath = "/works",
   initialMode = "grid",
@@ -76,40 +86,64 @@ export function WorksBrowser({
   const pageRef = useRef<HTMLElement>(null);
   const prefetchedDetailHrefs = useRef(new Set<string>());
   const pendingDetailHrefRef = useRef<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const worksRightRef = useRef<HTMLDivElement>(null);
+  const searchInputId = useId();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [pendingDetailSlug, setPendingDetailSlug] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
-  const filteredWorks = useMemo(() => filterWorks(works, filter), [works, filter]);
+  const filteredWorks = useMemo(() => {
+    const worksInFilter = filterWorks(works, filter);
+    const normalizedQuery = normalizedSearchValue(searchQuery);
+    if (!normalizedQuery) return worksInFilter;
+
+    return worksInFilter.filter((work) => normalizedSearchValue(work.title).includes(normalizedQuery));
+  }, [works, filter, searchQuery]);
   const visibleYears = useMemo(() => {
     const yearSource = filteredWorks.length > 0 ? filteredWorks : works;
     return Array.from(new Set(yearSource.map((work) => Number(work.year)).filter((year) => Number.isFinite(year)))).sort((left, right) => left - right);
   }, [filteredWorks, works]);
+  const visibleYearLabel = visibleYears.length === 0
+    ? ""
+    : visibleYears[0] === visibleYears[visibleYears.length - 1]
+      ? String(visibleYears[0])
+      : `${visibleYears[0]}-${visibleYears[visibleYears.length - 1]}`;
   const visibleTypes = useMemo(() => workTypes.filter((type) => type.filterVisible && type.status !== "Archived"), [workTypes]);
   const visibleTypedTypes = useMemo(() => visibleTypes.map((type) => ({ type, count: works.filter((work) => matchesType(work, type.slug)).length })).filter((entry) => entry.count > 0), [visibleTypes, works]);
-  const browserHref = useCallback((nextFilter: Filter, nextMode: ViewMode) => {
+  const browserHref = useCallback((nextFilter: Filter, nextMode: ViewMode, nextSearch = "") => {
     const params = new URLSearchParams();
     if (nextFilter.kind !== "all") params.set(nextFilter.kind, nextFilter.value);
     params.set("view", nextMode);
+    const normalizedSearch = nextSearch.trim();
+    if (normalizedSearch) params.set("q", normalizedSearch);
     const query = params.toString();
     const hash = basePath === "/" ? "#works-index" : "";
     return `${basePath}${query ? `?${query}` : ""}${hash}`;
   }, [basePath]);
 
   useEffect(() => {
-    if (basePath !== "/") return;
-
     function syncFromLocation() {
       const nextMode = initialModeFromLocation(initialMode);
       const nextFilter = initialFilterFromLocation();
+      const nextSearch = initialSearchFromLocation();
       setMode((current) => current === nextMode ? current : nextMode);
       setFilter((current) => current.kind === nextFilter.kind && current.value === nextFilter.value ? current : nextFilter);
+      setSearchQuery(nextSearch);
+      setIsSearchOpen(Boolean(nextSearch));
     }
 
     syncFromLocation();
+    if (basePath !== "/") return;
     window.addEventListener("cw:works-browser-sync", syncFromLocation);
     return () => window.removeEventListener("cw:works-browser-sync", syncFromLocation);
   }, [basePath, initialMode]);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    searchInputRef.current?.focus();
+  }, [isSearchOpen]);
 
   useEffect(() => {
     const page = pageRef.current;
@@ -155,7 +189,7 @@ export function WorksBrowser({
     const worksSurface = pageRef.current?.closest<HTMLElement>(".cw-work-view");
     if (!worksRight) return;
 
-    const returnHref = browserHref(filter, mode);
+    const returnHref = browserHref(filter, mode, searchQuery);
     const scrollState = readWorkReturnScroll(returnHref);
     if (!scrollState) return;
     pageRef.current?.classList.add("is-detail-return");
@@ -211,15 +245,15 @@ export function WorksBrowser({
       resizeObserver.disconnect();
       root.style.scrollBehavior = previousScrollBehavior;
     };
-  }, [browserHref, filter, mode]);
+  }, [browserHref, filter, mode, searchQuery]);
 
-  function rememberBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
+  function rememberBrowserHref(nextFilter: Filter, nextMode: ViewMode, nextSearch = searchQuery) {
     if (basePath !== "/") return;
-    rememberLastWorksHref(browserHref(nextFilter, nextMode));
+    rememberLastWorksHref(browserHref(nextFilter, nextMode, nextSearch));
   }
 
-  function replaceBrowserHref(nextFilter: Filter, nextMode: ViewMode) {
-    const nextHref = browserHref(nextFilter, nextMode);
+  function replaceBrowserHref(nextFilter: Filter, nextMode: ViewMode, nextSearch = searchQuery) {
+    const nextHref = browserHref(nextFilter, nextMode, nextSearch);
     replaceCurrentHistoryHref(nextHref);
     if (basePath === "/") {
       rememberLastWorksHref(nextHref);
@@ -236,8 +270,28 @@ export function WorksBrowser({
     replaceBrowserHref(filter, nextMode);
   }
 
+  function setActiveSearch(nextSearch: string) {
+    setSearchQuery(nextSearch);
+    replaceBrowserHref(filter, mode, nextSearch);
+  }
+
+  function openSearch() {
+    setIsSearchOpen(true);
+  }
+
+  function closeSearch() {
+    setActiveSearch("");
+    setIsSearchOpen(false);
+  }
+
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    closeSearch();
+  }
+
   function rememberCurrentWorkReturnHref(markHistoryEntry = true) {
-    const returnHref = browserHref(filter, mode);
+    const returnHref = browserHref(filter, mode, searchQuery);
     rememberWorkReturnScroll(
       returnHref,
       worksRightRef.current?.scrollTop ?? 0,
@@ -249,19 +303,46 @@ export function WorksBrowser({
     } else {
       rememberWorkReturnHref(returnHref);
     }
-    rememberBrowserHref(filter, mode);
+    rememberBrowserHref(filter, mode, searchQuery);
   }
 
-  function workDetailHref(slug: string) {
-    return workDetailHrefWithReturn(`/works/${slug}`, browserHref(filter, mode));
-  }
+  const workDetailHref = useCallback((slug: string) => {
+    return workDetailHrefWithReturn(`/works/${slug}`, browserHref(filter, mode, searchQuery));
+  }, [browserHref, filter, mode, searchQuery]);
 
-  function prefetchWorkDetail(slug: string) {
-    const href = workDetailHref(slug);
+  const prefetchDetailHref = useCallback((href: string) => {
     if (prefetchedDetailHrefs.current.has(href)) return;
     prefetchedDetailHrefs.current.add(href);
     router.prefetch(href);
-  }
+  }, [router]);
+
+  const prefetchWorkDetail = useCallback((slug: string) => {
+    prefetchDetailHref(workDetailHref(slug));
+  }, [prefetchDetailHref, workDetailHref]);
+
+  useEffect(() => {
+    const firstWork = works[0];
+    if (!firstWork) return;
+
+    // Warm the shared detail route as soon as the index is interactive. The
+    // rest of the first row waits for idle time so large project bodies do not
+    // compete with the index page's initial images.
+    const returnHref = currentWorkSurfaceHref("#works-index");
+    const warmHref = (slug: string) => workDetailHrefWithReturn(`/works/${slug}`, returnHref);
+    prefetchDetailHref(warmHref(firstWork.slug));
+    const warmCount = window.matchMedia("(max-width: 767px)").matches ? 2 : 3;
+    const remainingHrefs = works.slice(1, warmCount).map((work) => warmHref(work.slug));
+    if (remainingHrefs.length === 0) return;
+
+    const warmRemaining = () => remainingHrefs.forEach(prefetchDetailHref);
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(warmRemaining, { timeout: 900 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+
+    const timer = setTimeout(warmRemaining, 240);
+    return () => clearTimeout(timer);
+  }, [prefetchDetailHref, works]);
 
   function shouldUseNativeLink(event: MouseEvent<HTMLAnchorElement> | PointerEvent<HTMLAnchorElement>) {
     return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
@@ -274,7 +355,6 @@ export function WorksBrowser({
     pendingDetailHrefRef.current = href;
     setPendingDetailSlug(slug);
     rememberCurrentWorkReturnHref();
-    prefetchWorkDetail(slug);
     router.push(href);
   }
 
@@ -334,26 +414,71 @@ export function WorksBrowser({
           <h1 className="pw-works-title" style={homeTitleStyle}>
             {title}
             <br />
-            &copy; {visibleYears.length > 0 ? `${visibleYears[0]}-${visibleYears[visibleYears.length - 1]}` : ""}
+            &copy; {visibleYearLabel}
           </h1>
         </aside>
 
         <div className="pw-works-right" ref={worksRightRef}>
           {showViewToggle ? (
-            <div className="pw-view-toggle" aria-label="Works view">
-            <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setActiveMode("grid")} type="button">
-              <Image alt="" height={20} src={gridIcon} width={20} />
-              Grid
-            </button>
-            <button aria-label="Show works as list" className={mode === "list" ? "is-active" : undefined} onClick={() => setActiveMode("list")} type="button">
-              <Image alt="" height={20} src={listIcon} width={20} />
-              List
-            </button>
-          </div>
+            <div className={`pw-view-toggle${isSearchOpen ? " is-search-open" : ""}`} aria-label="Works view">
+              <div className="pw-view-toggle-modes">
+                <button aria-label="Show works as grid" className={mode === "grid" ? "is-active" : undefined} onClick={() => setActiveMode("grid")} type="button">
+                  <Image alt="" height={20} src={gridIcon} width={20} />
+                  Grid
+                </button>
+                <button aria-label="Show works as list" className={mode === "list" ? "is-active" : undefined} onClick={() => setActiveMode("list")} type="button">
+                  <Image alt="" height={20} src={listIcon} width={20} />
+                  List
+                </button>
+              </div>
+              <div className="pw-works-search">
+                <button
+                  aria-controls={searchInputId}
+                  aria-expanded={isSearchOpen}
+                  aria-label="Search works"
+                  className="pw-works-search-trigger"
+                  onClick={openSearch}
+                  tabIndex={isSearchOpen ? -1 : 0}
+                  type="button"
+                >
+                  <span aria-hidden="true" className="pw-works-search-icon" />
+                </button>
+                <div aria-hidden={!isSearchOpen} className="cw-liquid-glass-control pw-works-search-panel" role="search">
+                  <span aria-hidden="true" className="pw-works-search-icon pw-works-search-icon--leading" />
+                  <label className="pw-visually-hidden" htmlFor={searchInputId}>Search works by title</label>
+                  <input
+                    autoComplete="off"
+                    disabled={!isSearchOpen}
+                    id={searchInputId}
+                    onChange={(event) => setActiveSearch(event.currentTarget.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Search titles"
+                    ref={searchInputRef}
+                    spellCheck={false}
+                    type="search"
+                    value={searchQuery}
+                  />
+                  <button
+                    aria-label={searchQuery ? "Clear and close search" : "Close search"}
+                    className="pw-works-search-close"
+                    disabled={!isSearchOpen}
+                    onClick={closeSearch}
+                    type="button"
+                  >
+                    <span aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <span aria-live="polite" className="pw-visually-hidden">
+                {searchQuery.trim() ? `${filteredWorks.length} works found` : ""}
+              </span>
+            </div>
           ) : null}
 
               {filteredWorks.length === 0 ? (
-                <p className="pw-works-empty">No published works match this filter.</p>
+                <p className="pw-works-empty">
+                  {searchQuery.trim() ? `No works match “${searchQuery.trim()}”.` : "No published works match this filter."}
+                </p>
               ) : mode === "grid" ? (
                 <div className="pw-works-grid">
                   {filteredWorks.map((work, index) => (

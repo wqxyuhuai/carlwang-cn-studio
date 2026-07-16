@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/cache-tags";
 
@@ -17,11 +17,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid revalidate secret." }, { status: 401 });
   }
 
-  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, { expire: 0 });
-  revalidatePath("/", "layout");
-  revalidatePath("/works", "page");
-  revalidatePath("/works/[slug]", "page");
-  revalidatePath("/about", "page");
+  // Keep the last valid render available while the first request refreshes
+  // published content in the background. Expiring the root layout here made
+  // that visitor synchronously rebuild every public route in the Worker.
+  revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");
 
-  return NextResponse.json({ ok: true, revalidatedAt: new Date().toISOString() });
+  return NextResponse.json({
+    ok: true,
+    mode: "stale-while-revalidate",
+    revalidatedAt: new Date().toISOString()
+  });
 }
