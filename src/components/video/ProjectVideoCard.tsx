@@ -1,9 +1,10 @@
 "use client";
 
 import type { CSSProperties, MouseEvent, PointerEvent } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { RevealMedia } from "@/components/common/RevealMedia";
+import { optimizedImageUrl } from "@/lib/media-url";
 import { VideoFullscreenPlayer } from "./VideoFullscreenPlayer";
 import type { ProjectVideo } from "@/lib/video/videoTypes";
 
@@ -28,7 +29,10 @@ export function ProjectVideoCard({
   const currentRef = useRef({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const previewKey = `${video.src}|${video.poster || ""}`;
+  const poster = useMemo(() => (video.poster ? optimizedImageUrl(video.poster, 1920) : undefined), [video.poster]);
+  const spriteSrc = useMemo(() => (video.spriteSrc ? optimizedImageUrl(video.spriteSrc, 2048) : undefined), [video.spriteSrc]);
+  const playerVideo = useMemo(() => ({ ...video, poster, spriteSrc }), [poster, spriteSrc, video]);
+  const previewKey = `${video.src}|${poster || ""}`;
   const [posterReadyKey, setPosterReadyKey] = useState<string | null>(null);
   const [videoReadyKey, setVideoReadyKey] = useState<string | null>(null);
   const [posterFailedKey, setPosterFailedKey] = useState<string | null>(null);
@@ -36,11 +40,11 @@ export function ProjectVideoCard({
   const isPosterReady = posterReadyKey === previewKey;
   const isVideoReady = videoReadyKey === previewKey;
   const hasPosterFailed = posterFailedKey === previewKey;
-  const hasPoster = Boolean(video.poster && !hasPosterFailed);
+  const hasPoster = Boolean(poster && !hasPosterFailed);
   const isPreviewReady = hasPoster ? isPosterReady : isVideoReady;
-  const mediaStyle = video.poster
+  const mediaStyle = poster
     ? ({
-        "--project-video-poster": `url("${video.poster}")`
+        "--project-video-poster": `url("${poster}")`
       } as CSSProperties)
     : undefined;
 
@@ -162,14 +166,14 @@ export function ProjectVideoCard({
           <span
             className={[
               "project-video-card-media",
-              video.poster ? "has-poster" : "",
+              poster ? "has-poster" : "",
               isPreviewReady ? "is-preview-ready" : "is-preview-loading"
             ]
               .filter(Boolean)
               .join(" ")}
             style={mediaStyle}
           >
-            {video.poster ? (
+            {poster ? (
               // eslint-disable-next-line @next/next/no-img-element -- decorative arbitrary external poster, loaded only as a preview layer
               <img
                 alt=""
@@ -178,7 +182,7 @@ export function ProjectVideoCard({
                 onError={() => setPosterFailedKey(previewKey)}
                 onLoad={() => setPosterReadyKey(previewKey)}
                 ref={handlePosterRef}
-                src={video.poster}
+                src={poster}
               />
             ) : null}
             {!hasPoster ? (
@@ -209,7 +213,7 @@ export function ProjectVideoCard({
         onClose={() => {
           setIsOpen(false);
         }}
-        video={video}
+        video={playerVideo}
       />
     </>
   );

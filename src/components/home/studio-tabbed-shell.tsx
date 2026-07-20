@@ -83,6 +83,8 @@ export function StudioTabbedShell({
   list: ReactNode;
 }) {
   const [tabs, setTabs] = useState<{ mainTab: MainTab; workTab: WorkTab }>({ mainTab: "works", workTab: "featured" });
+  const [hasAboutMounted, setHasAboutMounted] = useState(false);
+  const [hasListMounted, setHasListMounted] = useState(false);
   const [isLocationSynced, setIsLocationSynced] = useState(false);
   const [isAutoFlightEnabled, setIsAutoFlightEnabled] = useState(true);
   const [isLogoShaking, setIsLogoShaking] = useState(false);
@@ -110,6 +112,8 @@ export function StudioTabbedShell({
         replaceCurrentHistoryHref(normalizedHref);
       }
       const nextTabs = tabsFromHash();
+      if (nextTabs.mainTab === "about") setHasAboutMounted(true);
+      if (nextTabs.workTab === "list") setHasListMounted(true);
       setTabs(nextTabs);
       syncDocumentWorkTab(nextTabs.workTab);
       if (window.location.hash === "#works-list") {
@@ -167,6 +171,7 @@ export function StudioTabbedShell({
 
     if (nextTab === "about") {
       rememberWorksHref();
+      setHasAboutMounted(true);
       setTabs((current) => ({ mainTab: "about", workTab: current.workTab }));
       replaceCurrentHistoryHref("#about");
       return;
@@ -174,6 +179,7 @@ export function StudioTabbedShell({
 
     const targetHref = lastWorksHref();
     const nextWorkTab = targetHref.includes("#works-index") ? "list" : "featured";
+    if (nextWorkTab === "list") setHasListMounted(true);
     setTabs({ mainTab: "works", workTab: nextWorkTab });
     syncDocumentWorkTab(nextWorkTab);
     replaceCurrentHistoryHref(targetHref);
@@ -198,6 +204,7 @@ export function StudioTabbedShell({
 
   function selectWorkTab(nextTab: WorkTab) {
     const targetHref = nextTab === "list" ? lastIndexHref() : "/#works";
+    if (nextTab === "list") setHasListMounted(true);
     setTabs({ mainTab: "works", workTab: nextTab });
     syncDocumentWorkTab(nextTab);
     replaceCurrentHistoryHref(targetHref);
@@ -367,7 +374,7 @@ export function StudioTabbedShell({
           id="cw-list-panel"
           role="tabpanel"
         >
-          {list}
+          {hasListMounted ? list : null}
         </div>
       </section>
 
@@ -378,7 +385,7 @@ export function StudioTabbedShell({
         id="cw-about-panel"
         role="tabpanel"
       >
-        {about}
+        {hasAboutMounted ? about : null}
       </section>
 
       <div className="cw-bottom-blur" aria-hidden="true" style={{ blockSize: bottomBlurBlockSize }}>

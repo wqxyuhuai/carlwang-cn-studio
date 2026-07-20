@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { noStoreJson } from "@/lib/api-response";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ function rateLimited(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     if (rateLimited(request)) {
-      return NextResponse.json({ error: "Too many messages. Try again later." }, { status: 429 });
+      return noStoreJson({ error: "Too many messages. Try again later." }, { status: 429 });
     }
 
     const body = (await request.json()) as {
@@ -42,16 +43,16 @@ export async function POST(request: NextRequest) {
     const message = String(body.message || "").trim();
 
     if (body.website) {
-      return NextResponse.json({ ok: true });
+      return noStoreJson({ ok: true });
     }
 
-    if (!name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Valid email is required." }, { status: 400 });
-    if (!message) return NextResponse.json({ error: "Message is required." }, { status: 400 });
-    if (message.length > 2000) return NextResponse.json({ error: "Message is too long." }, { status: 400 });
+    if (!name) return noStoreJson({ error: "Name is required." }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return noStoreJson({ error: "Valid email is required." }, { status: 400 });
+    if (!message) return noStoreJson({ error: "Message is required." }, { status: 400 });
+    if (message.length > 2000) return noStoreJson({ error: "Message is too long." }, { status: 400 });
 
-    return NextResponse.json({ ok: true });
+    return noStoreJson({ ok: true });
   } catch {
-    return NextResponse.json({ error: "Message failed." }, { status: 500 });
+    return noStoreJson({ error: "Message failed." }, { status: 500 });
   }
 }

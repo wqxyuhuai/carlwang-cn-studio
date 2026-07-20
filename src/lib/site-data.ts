@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { PUBLIC_CONTENT_CACHE_TAG, PUBLIC_CONTENT_REVALIDATE_SECONDS } from "./cache-tags";
+import { proxyOssMediaUrl } from "./media-url";
 import type { Experience, MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 
 export const CONTENT_URL =
@@ -282,22 +283,11 @@ type OssProjectData = {
   capabilities?: unknown[];
 };
 
-function proxiedOssUrl(src: string) {
-  try {
-    const url = new URL(src);
-    if (/^[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(url.hostname)) {
-      return `/api/media/oss?url=${encodeURIComponent(src)}`;
-    }
-  } catch {
-    return src;
-  }
-  return src;
-}
-
 function mediaFromUrl(src: string, alt: string, caption?: string): MediaItem {
+  const type = /\.(mp4|webm)(\?|$)/i.test(src) ? "video" : "image";
   return {
-    type: /\.(mp4|webm)(\?|$)/i.test(src) ? "video" : "image",
-    src: proxiedOssUrl(src),
+    type,
+    src: type === "video" ? proxyOssMediaUrl(src) : src,
     alt,
     caption
   };
@@ -308,13 +298,14 @@ function normalizeMedia(value: unknown, alt: string): MediaItem | null {
   if (!value || typeof value !== "object") return null;
   const media = value as Partial<MediaItem>;
   if (!media.src) return null;
+  const type = media.type === "video" || /\.(mp4|webm)(\?|$)/i.test(media.src) ? "video" : "image";
   return {
-    type: media.type === "video" || /\.(mp4|webm)(\?|$)/i.test(media.src) ? "video" : "image",
-    src: proxiedOssUrl(media.src),
+    type,
+    src: type === "video" ? proxyOssMediaUrl(media.src) : media.src,
     alt: media.alt || alt,
     caption: media.caption,
-    poster: media.poster ? proxiedOssUrl(media.poster) : undefined,
-    spriteSrc: media.spriteSrc ? proxiedOssUrl(media.spriteSrc) : undefined,
+    poster: media.poster,
+    spriteSrc: media.spriteSrc,
     spriteFrameCount: media.spriteFrameCount,
     spriteColumns: media.spriteColumns,
     spriteRows: media.spriteRows,
@@ -533,7 +524,7 @@ function normalizeWorkType(value: unknown): WorkType | null {
     shortLabel: stringFromUnknown(record.shortLabel) || name,
     descriptionEn: stringFromUnknown(record.descriptionEn),
     descriptionCn: stringFromUnknown(record.descriptionCn),
-    iconUrl: proxiedOssUrl(stringFromUnknown(record.iconUrl) || stringFromUnknown(record.cover)),
+    iconUrl: stringFromUnknown(record.iconUrl) || stringFromUnknown(record.cover),
     homeVisible: booleanFromUnknown(record.homeVisible, true),
     filterVisible: booleanFromUnknown(record.filterVisible, true),
     order: Number(record.order || 999),
@@ -551,7 +542,7 @@ function normalizeTool(value: unknown): Tool | null {
     id: tool.id,
     name: tool.name,
     category: tool.category || "Design",
-    iconUrl: tool.iconUrl ? proxiedOssUrl(tool.iconUrl) : "",
+    iconUrl: tool.iconUrl || "",
     description: tool.description || "",
     descriptionCn: tool.descriptionCn || "",
     homeVisible: tool.homeVisible !== false,
@@ -582,11 +573,11 @@ function normalizeSocial(value: unknown): SocialLink | null {
     handle: social.handle,
     group,
     type: social.type || group,
-    cardImageUrl: social.cardImageUrl ? proxiedOssUrl(social.cardImageUrl) : legacyAssets.cardImageUrl,
-    iconUrl: social.iconUrl ? proxiedOssUrl(social.iconUrl) : legacyAssets.iconUrl,
-    colorIconUrl: social.colorIconUrl ? proxiedOssUrl(social.colorIconUrl) : legacyAssets.colorIconUrl,
-    lightColorIconUrl: social.lightColorIconUrl ? proxiedOssUrl(social.lightColorIconUrl) : legacyAssets.lightColorIconUrl,
-    footerIconUrl: social.footerIconUrl ? proxiedOssUrl(social.footerIconUrl) : legacyAssets.footerIconUrl,
+    cardImageUrl: social.cardImageUrl ? proxyOssMediaUrl(social.cardImageUrl) : legacyAssets.cardImageUrl,
+    iconUrl: social.iconUrl ? proxyOssMediaUrl(social.iconUrl) : legacyAssets.iconUrl,
+    colorIconUrl: social.colorIconUrl ? proxyOssMediaUrl(social.colorIconUrl) : legacyAssets.colorIconUrl,
+    lightColorIconUrl: social.lightColorIconUrl ? proxyOssMediaUrl(social.lightColorIconUrl) : legacyAssets.lightColorIconUrl,
+    footerIconUrl: social.footerIconUrl ? proxyOssMediaUrl(social.footerIconUrl) : legacyAssets.footerIconUrl,
     cardBackgroundColor: social.cardBackgroundColor || legacyAssets.cardBackgroundColor,
     cardLogoColor: social.cardLogoColor || legacyAssets.cardLogoColor,
     footerVisible: social.footerVisible ?? (group === "Footer" || group === "Portfolio" || group === "Social"),
@@ -691,7 +682,7 @@ function normalizeExperience(value: unknown): Experience | null {
     descriptionEn: item.descriptionEn || "",
     descriptionCn: item.descriptionCn || "",
     tags: Array.isArray(item.tags) ? item.tags : [],
-    imageUrl: item.imageUrl ? proxiedOssUrl(item.imageUrl) : "",
+    imageUrl: item.imageUrl || "",
     order: Number(item.order || 999),
     visible: item.visible !== false
   };

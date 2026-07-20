@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { noStoreJson } from "@/lib/api-response";
 import { PUBLIC_CONTENT_CACHE_TAG } from "@/lib/cache-tags";
 
 export const runtime = "nodejs";
@@ -14,7 +15,7 @@ function hasValidSecret(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   if (!hasValidSecret(request)) {
-    return NextResponse.json({ ok: false, error: "Invalid revalidate secret." }, { status: 401 });
+    return noStoreJson({ ok: false, error: "Invalid revalidate secret." }, { status: 401 });
   }
 
   // Keep the last valid render available while the first request refreshes
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
   // that visitor synchronously rebuild every public route in the Worker.
   revalidateTag(PUBLIC_CONTENT_CACHE_TAG, "max");
 
-  return NextResponse.json({
+  return noStoreJson({
     ok: true,
     mode: "stale-while-revalidate",
     revalidatedAt: new Date().toISOString()

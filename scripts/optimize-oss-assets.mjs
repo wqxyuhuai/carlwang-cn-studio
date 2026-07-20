@@ -8,6 +8,7 @@ import {
   optimizedObjectKeyFor,
   shouldSkipImageOptimization
 } from "./lib/asset-optimizer.mjs";
+import { revalidatePublicContent } from "./lib/revalidate-public-content.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
 const DEFAULT_CONTENT_KEY = "uploads/admin/site-content.json";
@@ -130,7 +131,7 @@ async function putJsonObject(client, objectKey, value, dryRun) {
   await withTimeout(client.put(objectKey, body, {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=60"
+      "Cache-Control": "public, max-age=300"
     }
   }), `write ${objectKey}`);
 }
@@ -374,6 +375,9 @@ async function main() {
   if (siteChanged) {
     await putJsonObject(client, contentKey, siteContent, options.dryRun);
     console.log(`[content] ${options.dryRun ? "would update" : "updated"} ${contentKey}`);
+  }
+  if (!options.dryRun && (siteChanged || projectDocs.some((document) => document.changed))) {
+    await revalidatePublicContent("optimize");
   }
 
   report.finishedAt = new Date().toISOString();

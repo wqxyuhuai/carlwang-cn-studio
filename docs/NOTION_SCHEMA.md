@@ -1,6 +1,6 @@
 # Notion Schema
 
-This project now uses the `PW2 web key database` page as the Notion source. The current production Notion model intentionally keeps only five databases.
+This project uses the `PW2 web key database` page as its editorial source. The current production model contains six active databases. Five are synchronized to OSS for public content, while `Studio Contact Messages` is write-only from the public contact form.
 
 ## Active Databases
 
@@ -10,6 +10,7 @@ This project now uses the `PW2 web key database` page as the Notion source. The 
 | Works | `Studio Projects` | Works list, Home featured works and Work Detail source. |
 | Tools | `Studio Tools` | About tools and project tool icon lookup. |
 | Social Links | `Studio Social Links` | About, Footer and Contact links. |
+| Experience | `Studio Experience` | About experience timeline. |
 | Contact Messages | `Studio Contact Messages` | Contact form submissions. |
 
 `Studio Site Settings` has been removed and is not read by the application. Static site metadata and fallback copy stay in code/local fallback data.
@@ -24,15 +25,21 @@ The app uses Notion data source IDs in `.env.local`.
 | Studio Project Categories | `NOTION_WORK_TYPES_DATABASE_ID` |
 | Studio Tools | `NOTION_TOOLS_DATABASE_ID` |
 | Studio Social Links | `NOTION_SOCIAL_LINKS_DATABASE_ID` |
+| Studio Experience | `NOTION_ABOUT_EXPERIENCE_DATABASE_ID` |
 | Studio Contact Messages | `NOTION_CONTACT_MESSAGES_DATABASE_ID` |
 
-The user-facing key file may also contain these aliases, which are supported by the app:
+Older local key files may still contain the aliases below:
 
 - `NOTION_STUDIO_PROJECTS_DATABASE_ID`
 - `NOTION_STUDIO_PROJECT_CATEGORIES_DATABASE_ID`
 - `NOTION_STUDIO_TOOLS_DATABASE_ID`
 - `NOTION_STUDIO_SOCIAL_LINKS_DATABASE_ID`
+- `NOTION_STUDIO_ABOUT_EXPERIENCE_DATABASE_ID`
 - `NOTION_STUDIO_CONTACT_MESSAGES_DATABASE_ID`
+
+These aliases are retained only for legacy reference. The current sync and
+publishing scripts require the preferred variables in the table above; an alias
+must not be used as a substitute.
 
 ## 1. Studio Project Categories
 
@@ -85,7 +92,8 @@ Frontend rules:
 - `Order` is deprecated for Projects; public ordering uses `Date` descending.
 - `Status` is deprecated; public visibility uses `展示状态`.
 - `Tools` is multi-select, not a relation.
-- Work Detail reads the Notion page body from the Project page.
+- The sync script reads the Project's Notion page body, preserves its supported block structure, rewrites media to OSS URLs, and publishes it as the project's `content.json`.
+- Work Detail reads the published OSS `content.json`; public pages never query Notion directly.
 
 Supported page body blocks:
 
@@ -149,7 +157,38 @@ Frontend rules:
 - External links open in a new tab.
 - Email links use `mailto:` when configured.
 
-## 5. Studio Contact Messages
+## 5. Studio Experience
+
+Purpose: About page experience timeline. This table is synchronized to OSS public content.
+
+| Field | Type | Required | Editable | Website use |
+| --- | --- | --- | --- | --- |
+| Title | Title | Yes | Yes | Experience or role title. |
+| Company | Rich text | No | Yes | Organization name. |
+| Start Date | Date | No | Yes | Timeline start date. |
+| End Date | Date | No | Yes | Timeline end date. |
+| Date Label | Rich text | No | Yes | Optional authored date label. |
+| Type | Select | No | Yes | Experience type; published as a tag when present. |
+| Description | Rich text | No | Yes | Public experience description. |
+| Company Logo | Files | No | Yes | Organization visual synchronized to OSS. |
+| Order | Number | No | Yes | Experience sort order. |
+| Active | Checkbox | No | Yes | Only active entries are shown. |
+| 同步状态 | Select | No | Yes | Uses the shared synchronization state rules. |
+
+Published field mapping:
+
+- `Title` -> `title`
+- `Company` -> `organization`
+- `Start Date` -> `startDate`
+- `End Date` -> `endDate`
+- `Date Label` -> `dateLabel`
+- `Type` -> `tags`
+- `Description` -> `descriptionEn`
+- `Company Logo` -> `imageUrl`
+- `Order` -> `order`
+- `Active` -> `visible`
+
+## 6. Studio Contact Messages
 
 Purpose: contact form destination. This table is not a public content source.
 
@@ -185,19 +224,25 @@ The following tables use `同步状态`:
 - Studio Projects
 - Studio Tools
 - Studio Social Links
+- Studio Experience
 
-| 同步状态 | Runtime behavior |
+| 同步状态 | Sync behavior |
 | --- | --- |
-| 编辑中 | Skip from public rendering. |
-| 待同步 | Eligible for public rendering. |
-| 待更新 | Eligible for public rendering. |
-| 已同步 | Eligible for public rendering. |
+| 编辑中 | Skip. Do not upload, publish or change status. |
+| 待同步 | Create or synchronize the item in OSS. |
+| 待更新 | Update the existing website item using the same Notion page ID. |
+| 已同步 | Skip by default. |
 
 Notion page ID is the stable record ID. The app should not depend on Title alone.
+For Projects, `展示状态` controls public visibility independently from `同步状态`.
+After all media and the per-project `content.json` publish successfully, the
+sync script changes that Project to `已同步` immediately. See
+`docs/CONTENT_SYNC_RULES.md` for the required transaction order.
 
 ## OSS Rules
 
 - Aliyun AccessKey values stay server-side in `.env.local`.
-- Public pages consume URLs from Notion Files or server-generated OSS URLs.
+- Notion is the editorial source, but public pages consume only published OSS JSON and OSS media URLs.
 - Uploads use safe generated filenames under `ALIYUN_OSS_UPLOAD_PREFIX`.
 - Tools, social icons, category covers and project covers can all be Files in Notion.
+- Existing OSS media must be reused before local or Notion downloads are attempted.

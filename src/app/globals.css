@@ -3597,6 +3597,7 @@ html[data-work-tab="list"] #cw-list-tab {
 }
 
 html[data-work-tab="list"] .cw-work-view--featured {
+  display: none;
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -3604,6 +3605,7 @@ html[data-work-tab="list"] .cw-work-view--featured {
 }
 
 html[data-work-tab="list"] .cw-work-view--list {
+  display: block;
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
@@ -4177,6 +4179,7 @@ html[data-work-tab="list"] .cw-work-view--list {
 
 .cw-work-view {
   block-size: 100%;
+  display: none;
   inline-size: 100%;
   inset: 0;
   opacity: 0;
@@ -4195,6 +4198,7 @@ html[data-work-tab="list"] .cw-work-view--list {
 }
 
 .cw-work-view.is-active {
+  display: block;
   opacity: 1;
   pointer-events: auto;
   transition: none;

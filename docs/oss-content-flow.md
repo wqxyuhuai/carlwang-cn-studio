@@ -15,13 +15,16 @@ If that JSON fails or does not match the PW2 shape, the front end falls back to 
 ```plain text
 Notion databases and page bodies
   -> server-side sync service
-  -> download Notion media
-  -> upload images and videos to Aliyun OSS
-  -> write preview JSON
-  -> validate
-  -> publish public index JSON and per-project body JSON
+  -> reuse an existing OSS optimized object when available
+  -> copy an existing old-path OSS object inside OSS when rehoming
+  -> use local or Notion downloads only when OSS recovery is impossible
+  -> publish each project body JSON before marking it 已同步
+  -> publish the public index JSON
   -> public front end reads the index and resolves work bodies from contentUrl
 ```
+
+The canonical priority, status, timeout, optimization and deletion rules are in
+`docs/CONTENT_SYNC_RULES.md`.
 
 ## Security Rules
 

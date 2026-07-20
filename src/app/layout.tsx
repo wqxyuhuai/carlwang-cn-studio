@@ -46,6 +46,27 @@ export default function RootLayout({
   return (
     <html data-scroll-behavior="smooth" data-theme="dark" lang="en" suppressHydrationWarning>
       <head>
+        <link
+          as="font"
+          crossOrigin="anonymous"
+          href="/fonts/bebas-neue/BebasNeue-Bold.woff2?v=576ce7f040fa"
+          rel="preload"
+          type="font/woff2"
+        />
+        <link
+          as="font"
+          crossOrigin="anonymous"
+          href="/fonts/sf-pro/SF-Pro-Display-Regular.woff2?v=c41e3c28bca0"
+          rel="preload"
+          type="font/woff2"
+        />
+        <link
+          as="font"
+          crossOrigin="anonymous"
+          href="/fonts/sf-pro/SF-Pro-Display-Medium.woff2?v=6bad112c5e4a"
+          rel="preload"
+          type="font/woff2"
+        />
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>

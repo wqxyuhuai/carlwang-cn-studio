@@ -11,7 +11,6 @@ import type { Work } from "@/lib/types";
 import type { PublicWorkType } from "@/lib/public-content";
 import {
   consumeWorkReturnScroll,
-  currentWorkSurfaceHref,
   lastWorksHrefKey,
   rememberLastWorksHref,
   rememberWorkNavigation,
@@ -305,30 +304,6 @@ export function WorksBrowser({
     prefetchDetailHref(workDetailHref(slug));
   }, [prefetchDetailHref, workDetailHref]);
 
-  useEffect(() => {
-    const firstWork = works[0];
-    if (!firstWork) return;
-
-    // Warm the shared detail route as soon as the index is interactive. The
-    // rest of the first row waits for idle time so large project bodies do not
-    // compete with the index page's initial images.
-    const returnHref = currentWorkSurfaceHref("#works-index");
-    const warmHref = (slug: string) => workDetailHrefWithReturn(`/works/${slug}`, returnHref);
-    prefetchDetailHref(warmHref(firstWork.slug));
-    const warmCount = window.matchMedia("(max-width: 767px)").matches ? 2 : 3;
-    const remainingHrefs = works.slice(1, warmCount).map((work) => warmHref(work.slug));
-    if (remainingHrefs.length === 0) return;
-
-    const warmRemaining = () => remainingHrefs.forEach(prefetchDetailHref);
-    if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(warmRemaining, { timeout: 900 });
-      return () => window.cancelIdleCallback(idleId);
-    }
-
-    const timer = setTimeout(warmRemaining, 240);
-    return () => clearTimeout(timer);
-  }, [prefetchDetailHref, works]);
-
   function shouldUseNativeLink(event: MouseEvent<HTMLAnchorElement> | PointerEvent<HTMLAnchorElement>) {
     return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
   }
@@ -482,7 +457,7 @@ export function WorksBrowser({
                     >
                       <span className="pw-works-grid-card-inner">
                         <span className="pw-works-grid-card-face pw-works-grid-card-front">
-                          <Image alt={work.cover.alt || work.title} height={400} priority={index < 3} src={work.cover.src} width={400} />
+                          <Image alt={work.cover.alt || work.title} height={400} src={work.cover.src} width={400} />
                           {work.featured ? (
                             <span aria-label="Featured work" className="pw-works-featured-mark" role="img">
                               {/* eslint-disable-next-line @next/next/no-img-element -- Fixed-size local SVG icon. */}

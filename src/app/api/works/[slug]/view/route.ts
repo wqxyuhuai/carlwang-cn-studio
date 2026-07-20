@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { noStoreJson } from "@/lib/api-response";
 import { getOssConfig, hasOssConfig, ossPublicUrl, putJsonToOss } from "@/lib/oss";
 import { getPublicContent } from "@/lib/public-content";
 import { incrementWorkViewCount } from "@/lib/work-view-counts";
@@ -36,17 +37,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   const publicWork = publicContent.works.find((work) => work.slug === slug);
 
   if (!publicWork) {
-    return NextResponse.json({ ok: false, error: "Work not found." }, { status: 404 });
+    return noStoreJson({ ok: false, error: "Work not found." }, { status: 404 });
   }
 
   const baseViewCount = numberValue(publicWork.viewCount);
   const d1ViewCount = await incrementWorkViewCount(slug, baseViewCount);
   if (d1ViewCount !== null) {
-    return NextResponse.json({ ok: true, slug, viewCount: d1ViewCount });
+    return noStoreJson({ ok: true, slug, viewCount: d1ViewCount });
   }
 
   if (!hasOssConfig()) {
-    return NextResponse.json({ ok: true, persisted: false, slug, viewCount: baseViewCount + 1 });
+    return noStoreJson({ ok: true, persisted: false, slug, viewCount: baseViewCount + 1 });
   }
 
   const contentKey = getOssConfig().contentKey;
@@ -60,5 +61,5 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     await putJsonToOss(contentKey, content);
   }
 
-  return NextResponse.json({ ok: true, slug, viewCount });
+  return noStoreJson({ ok: true, slug, viewCount });
 }

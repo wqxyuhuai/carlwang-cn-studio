@@ -78,6 +78,7 @@ async function putObjectToOss(objectKey: string, body: Buffer, contentType: stri
     method: "PUT",
     headers: {
       Authorization: ossAuthorization("PUT", objectKey, contentType, date),
+      "Cache-Control": "public, max-age=300",
       Date: date,
       "Content-Type": contentType
     },

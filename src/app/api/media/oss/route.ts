@@ -65,6 +65,15 @@ function mediaResponse(media: CachedMedia, cacheStatus: string) {
   });
 }
 
+function uncachedError(body: BodyInit | null, status: number) {
+  return new Response(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store"
+    }
+  });
+}
+
 function runtimeCacheKey(url: string) {
   return new Request(url, { method: "GET" });
 }
@@ -153,6 +162,7 @@ function rangeResponseFromFullMedia(media: CachedMedia, rangeHeader: string | nu
     return new Response(null, {
       status: 416,
       headers: {
+        "Cache-Control": "no-store",
         "Content-Range": `bytes */${media.body.byteLength}`
       }
     });
@@ -203,6 +213,15 @@ async function getRuntimeCache() {
   };
   if (cacheStorage.default) return cacheStorage.default;
   return cacheStorage.open?.("oss-media") || null;
+}
+
+async function putRuntimeCache(cache: RuntimeMediaCache | null, key: Request, response: Response) {
+  try {
+    await cache?.put(key, response);
+  } catch {
+    // Runtime cache writes are best-effort. Never fail a media response when
+    // the cache is unavailable or rejects an entry.
+  }
 }
 
 async function diskPaths(sourceUrl: string) {
@@ -269,17 +288,17 @@ async function writeDiskCache(sourceUrl: string, media: CachedMedia) {
 
 export async function GET(request: NextRequest) {
   const rawUrl = request.nextUrl.searchParams.get("url");
-  if (!rawUrl) return new Response("Missing url.", { status: 400 });
+  if (!rawUrl) return uncachedError("Missing url.", 400);
 
   let sourceUrl: URL;
   try {
     sourceUrl = new URL(rawUrl);
   } catch {
-    return new Response("Invalid url.", { status: 400 });
+    return uncachedError("Invalid url.", 400);
   }
 
   if (!isAllowedOssUrl(sourceUrl)) {
-    return new Response("Unsupported media host.", { status: 400 });
+    return uncachedError("Unsupported media host.", 400);
   }
 
   const rangeHeader = request.headers.get("range");
@@ -317,19 +336,42 @@ export async function GET(request: NextRequest) {
     }
 
     const response = mediaResponse(diskHit, "disk-hit");
-    await runtimeCache?.put(fullCacheKey, response.clone());
+    await putRuntimeCache(runtimeCache, fullCacheKey, response.clone());
     return response;
   }
 
-  const upstream = await fetch(sourceUrl, {
-    headers: upstreamRangeHeader ? { Range: upstreamRangeHeader } : undefined
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(sourceUrl, {
+      headers: upstreamRangeHeader ? { Range: upstreamRangeHeader } : undefined
+    });
+  } catch {
+    return uncachedError("Media fetch failed.", 502);
+  }
 
   if (!upstream.ok && upstream.status !== 206) {
-    return new Response(await upstream.text().catch(() => "Media fetch failed."), { status: upstream.status });
+    return uncachedError(await upstream.text().catch(() => "Media fetch failed."), upstream.status);
   }
 
   if (hasRange && upstream.status === 206 && upstream.body) {
+    const contentLength = Number(upstream.headers.get("content-length") || 0);
+    if (rangeCacheKey && contentLength > 0 && contentLength <= RANGE_RUNTIME_CACHE_MAX_BYTES) {
+      const bytes = new Uint8Array(await upstream.arrayBuffer());
+      const media: CachedMedia = {
+        body: bytes,
+        contentType: contentTypeFromUrl(sourceUrl, upstream.headers.get("content-type")?.split(";")[0] || ""),
+        status: 206,
+        contentRange: upstream.headers.get("content-range") || undefined,
+        acceptRanges: upstream.headers.get("accept-ranges") || "bytes"
+      };
+      const response = mediaResponse(media, "range-miss");
+      await putRuntimeCache(runtimeCache, rangeCacheKey, mediaResponse({
+        ...media,
+        status: 200
+      }, "range-partial-store"));
+      return response;
+    }
+
     return streamedUpstreamResponse(upstream, sourceUrl);
   }
 
@@ -349,10 +391,10 @@ export async function GET(request: NextRequest) {
   if (!hasRange) {
     await Promise.all([
       writeDiskCache(sourceUrl.href, media),
-      runtimeCache?.put(fullCacheKey, response.clone()) || Promise.resolve()
+      putRuntimeCache(runtimeCache, fullCacheKey, response.clone())
     ]);
   } else if (rangeCacheKey && media.status === 206 && media.body.byteLength <= RANGE_RUNTIME_CACHE_MAX_BYTES) {
-    await runtimeCache?.put(rangeCacheKey, mediaResponse({
+    await putRuntimeCache(runtimeCache, rangeCacheKey, mediaResponse({
       ...media,
       status: 200,
       acceptRanges: media.acceptRanges || "bytes"

@@ -87,18 +87,6 @@ export type PublicContent = {
   };
 };
 
-function proxiedOssUrl(src: string) {
-  try {
-    const url = new URL(src);
-    if (/^[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(url.hostname)) {
-      return `/api/media/oss?url=${encodeURIComponent(src)}`;
-    }
-  } catch {
-    return src;
-  }
-  return src;
-}
-
 function fallbackSections(): PublicSection[] {
   return [
     {
@@ -196,7 +184,7 @@ function workTypesFromOssData(workTypes: WorkType[] | undefined) {
         shortLabel: type.shortLabel || name,
         descriptionEn: type.descriptionEn || "",
         descriptionCn: type.descriptionCn || "",
-        iconUrl: proxiedOssUrl(type.iconUrl || ""),
+        iconUrl: type.iconUrl || "",
         homeVisible: type.homeVisible !== false,
         filterVisible: type.filterVisible !== false,
         order: Number(type.order || 999),
@@ -265,12 +253,15 @@ async function resolveWorkBySlug(slug: string) {
   const index = works.findIndex((work) => work.slug === slug);
   const work = index >= 0 ? works[index] : undefined;
   if (!work) return null;
-  const [workWithViews] = await applyWorkViewCounts([work]);
+  const [[workWithViews], workContent] = await Promise.all([
+    applyWorkViewCounts([work]),
+    getWorkContent(work)
+  ]);
 
   return {
     work: {
       ...workWithViews,
-      content: await getWorkContent(workWithViews)
+      content: workContent
     },
     previous: works[(index - 1 + works.length) % works.length],
     next: works[(index + 1) % works.length],

@@ -35,6 +35,7 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 
 ## Data And Cache Rules
 
+- `docs/PERFORMANCE_CACHE_RULES.md` is the canonical performance and cache decision record. Read it before changing cache keys, TTLs, image delivery, the OSS media proxy, route prefetch or lazy mounting.
 - `src/lib/public-content.ts` is the public aggregation layer and owns the published works, work types, tools, socials and experience data consumed by pages.
 - `src/lib/site-data.ts` reads the public OSS index JSON and per-project `contentUrl` JSON. Keep per-project content fetches cacheable unless a task explicitly needs uncached debugging.
 - Cache only successfully fetched, valid per-project content JSON. A transient OSS error must not be converted into a long-lived cached `null` or empty body; failed reads should remain observable, safely fall back for that request, and be retried on a later request. When cache semantics change, invalidate or version the affected cache entries.
@@ -43,14 +44,22 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - `src/lib/oss.ts` contains minimal server-side OSS helpers used by public runtime fallbacks. Browser code must never receive Aliyun credentials.
 - `/api/revalidate` is secret-only and replaces the removed admin revalidation endpoint.
 - The OSS folder name `uploads/admin/...` is retained for compatibility with already published assets and JSON. Do not rename the remote path casually.
+- Use responsive optimized variants for OSS raster images and provide layout-accurate `sizes`. Keep remote SVG icons direct instead of forcing them through raster conversion.
+- Cache video ranges only under the exact requested range. The initial byte-zero open-ended probe may be bounded, later open-ended ranges must remain intact, small partial responses may be cached, and large responses must stream.
+- Long immutable TTLs require a stable or versioned URL. Mutation responses, user input, transient errors and invalid media requests remain `no-store`.
+- `public/_headers` governs Cloudflare static assets, not Worker-rendered pages or APIs. Verify those headers in a Workers preview.
 
 ## Content Publishing Rules
 
 - Notion is the editorial source, but public pages do not query Notion directly from client components.
+- `docs/CONTENT_SYNC_RULES.md` is the canonical Notion-to-OSS sync and publishing contract. Read it before changing sync, optimization, publishing, status, OSS paths or public-content cache behavior.
 - Use `npm run content:sync-all` or the narrower `content:sync-*` scripts to sync Notion assets to OSS.
 - Use `npm run content:publish` after sync to write the public index JSON.
 - Project sync generates and persists selected video posters. Use `npm run content:update-all` for a complete refresh or `npm run content:update-projects` for project-only updates; do not use the first video frame as a public preview when a generated poster is available.
-- Use `/api/revalidate` with `REVALIDATE_SECRET` after publishing when immediate cache refresh is needed.
+- For Projects, preserve the per-item order: sync media, update Notion block URLs, publish that project's `content.json`, then set `同步状态 = 已同步`. Never mark a project synced before its JSON publish succeeds.
+- Existing OSS media always wins over local recovery. If an OSS object is in an old path, copy it inside OSS; do not read a local OneDrive file. Load `本地地址` only when the OSS object is missing or the source is not OSS.
+- Prefer an existing `-optimized.webp`. Upload-time optimization stays opt-in; normal sync must not recompress local files.
+- Public content must have a TTL fallback through `PUBLIC_CONTENT_REVALIDATE_SECONDS`. `/api/revalidate` is an optional acceleration path and its failure must not invalidate a successful OSS publish.
 - Keep Notion and OSS scripts server/local only. Do not move tokens, AccessKeys or publishing operations into client components.
 
 ## Component Naming

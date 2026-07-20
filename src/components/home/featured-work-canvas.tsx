@@ -5,6 +5,7 @@ import type { RefObject } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { useRouter } from "next/navigation";
 import * as THREE from "three";
+import { optimizedImageUrl } from "@/lib/media-url";
 import type { Work } from "@/lib/types";
 import { currentWorkSurfaceHref, rememberWorkNavigation, workDetailHrefWithReturn } from "@/lib/work-detail-return";
 
@@ -791,7 +792,7 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
       works
         .filter((work) => work.cover.src)
         .map((work) => ({
-          src: work.cover.src,
+          src: optimizedImageUrl(work.cover.src),
           alt: work.cover.alt || `${work.title} cover`,
           title: work.title,
           href: `/works/${work.slug}`
@@ -807,17 +808,6 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
     if (!featuredActive || !playEntry) return;
     window.sessionStorage.setItem(featuredEntryPlayedKey, "1");
   }, [featuredActive, playEntry]);
-
-  useEffect(() => {
-    if (!isCanvasReady || !clientSettings) return;
-
-    const warmupImages = canvasImages.slice(0, isCompact ? 3 : 2);
-    const timeout = window.setTimeout(() => {
-      warmupImages.forEach((image) => prefetchWork(image.href));
-    }, isCompact ? 120 : 360);
-
-    return () => window.clearTimeout(timeout);
-  }, [canvasImages, clientSettings, isCanvasReady, isCompact, prefetchWork]);
 
   return (
     <section className={`cw-featured-canvas notion-rb-infinite-canvas-stage ${isCanvasReady ? "is-canvas-ready" : ""}`} aria-label="Featured works">

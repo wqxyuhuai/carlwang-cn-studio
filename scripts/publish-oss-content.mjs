@@ -4,6 +4,7 @@ import process from "node:process";
 import OSS from "ali-oss";
 import { Client } from "@notionhq/client";
 import { configureProxyFromEnv } from "./lib/proxy.mjs";
+import { revalidatePublicContent } from "./lib/revalidate-public-content.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
 const DEFAULT_CONTENT_KEY = "uploads/admin/site-content.json";
@@ -520,7 +521,7 @@ async function readProjects(notion, categoryById, missingOss, options = {}) {
           updatedAt: new Date().toISOString(),
           blocks: content
         };
-        contentUrl = await uploadJsonObject(contentKey, body, "public, max-age=60");
+        contentUrl = await uploadJsonObject(contentKey, body, "public, max-age=300");
         console.log(`[publish] project content ${slug} -> ${contentUrl}`);
       }
     }
@@ -672,10 +673,10 @@ async function readExperiences(notion, missingOss) {
 }
 
 async function uploadContentJson(data) {
-  return uploadJsonObject(getOssConfig().contentKey, data, "public, max-age=60");
+  return uploadJsonObject(getOssConfig().contentKey, data, "public, max-age=300");
 }
 
-async function uploadJsonObject(key, data, cacheControl = "public, max-age=60") {
+async function uploadJsonObject(key, data, cacheControl = "public, max-age=300") {
   const client = createOssClient();
   const body = Buffer.from(`${JSON.stringify(data, null, 2)}\n`, "utf8");
   await client.put(key, body, {
@@ -741,6 +742,7 @@ async function main() {
   const publicUrl = await uploadContentJson(nextContent);
   console.log(`[publish] uploaded ${publicUrl}`);
   console.log(`[publish] works=${nextContent.works.length} workTypes=${nextContent.workTypes.length} tools=${nextContent.tools.length} socials=${nextContent.socials.length} experiences=${nextContent.experiences.length}`);
+  await revalidatePublicContent();
 }
 
 main().catch((error) => {

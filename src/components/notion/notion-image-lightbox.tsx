@@ -12,12 +12,16 @@ export function NotionImageLightbox({
   alt,
   height,
   index,
+  priority = false,
+  sizes = "(max-width: 900px) 100vw, 50vw",
   src,
   width
 }: {
   alt: string;
   height: number;
   index: number;
+  priority?: boolean;
+  sizes?: string;
   src: string;
   width: number;
 }) {
@@ -93,7 +97,7 @@ export function NotionImageLightbox({
         type="button"
       >
         <RevealMedia className="notion-media-frame" index={index}>
-          <Image alt={alt} height={height} sizes="(max-width: 900px) 100vw, 50vw" src={src} width={width} />
+          <Image alt={alt} height={height} priority={priority} sizes={sizes} src={src} width={width} />
         </RevealMedia>
       </button>
 

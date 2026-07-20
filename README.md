@@ -48,11 +48,11 @@ The default production release is a push to `main`. GitHub Actions builds the Op
 
 - `src/lib/public-content.ts` is the public page data layer.
 - `src/lib/site-data.ts` reads the public OSS index JSON and per-project `contentUrl` JSON.
-- Public content is cached with the `public-content` tag and a short TTL.
+- Public content is cached with the `public-content` tag and a five-minute fallback TTL.
 - Work detail page bodies are cached by `contentUrl` to avoid refetching project multimedia metadata on every navigation.
 - Work view counts use the `WORK_METRICS_DB` D1 binding and fall back to OSS JSON only when D1 is unavailable.
 - View-count writes never invalidate the full public content cache; the detail page applies the API response immediately.
-- `/api/revalidate` refreshes public content caches with `REVALIDATE_SECRET`.
+- Publishing and media-maintenance scripts request `/api/revalidate` automatically when `REVALIDATE_SECRET` is configured; the TTL remains the safe fallback.
 
 The current OSS object path still contains `uploads/admin/...` for backward compatibility with already published content. It is only an OSS folder name now, not an active admin route.
 
@@ -72,6 +72,8 @@ Do not expose Notion tokens or Aliyun AccessKeys through client code, logs, publ
 - `AGENTS.md` defines project guardrails for Codex and future coding agents.
 - `HARNESS.md` is the canonical validation checklist before publishing.
 - `docs/DATA_FLOW.md` documents Notion-to-OSS publishing, public reads, caching and metrics.
+- `docs/PERFORMANCE_CACHE_RULES.md` records cache keys, media delivery tradeoffs, exceptions and performance verification.
+- `docs/CONTENT_SYNC_RULES.md` defines the mandatory sync priority, per-project transaction, media optimization, OSS layout, cache fallback and verification rules.
 - `docs/NOTION_SCHEMA.md` maps the Notion source fields.
 - `docs/UX_DECISIONS.md` records approved responsive, Works, detail-media and contact interaction decisions.
 - `docs/cleanup-notes.md` records cleanup decisions and deferred cleanup.

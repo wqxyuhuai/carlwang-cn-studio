@@ -1,6 +1,4 @@
-import Image from "next/image";
 import type { CSSProperties } from "react";
-import { RevealMedia } from "@/components/common/RevealMedia";
 import { NotionImageLightbox } from "@/components/notion/notion-image-lightbox";
 import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
 import type { NotionBlock, RichTextSpan } from "@/lib/types";
@@ -49,25 +47,58 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
   );
 }
 
+function imageSizesForColumnDenominator(columnDenominator: number) {
+  const denominator = Math.max(1, columnDenominator);
+  const format = (value: number) => Number(value.toFixed(4));
+  const mobileViewportWidth = format(100 / denominator);
+  const mobileReservedRem = format((denominator + 3) / denominator);
+  const desktopViewportWidth = format(50 / denominator);
+
+  return `(max-width: 900px) calc(${mobileViewportWidth}vw - ${mobileReservedRem}rem), ${desktopViewportWidth}vw`;
+}
+
 export function NotionRenderer({
   blocks,
   className = "",
+  columnDenominator = 1,
   fallbackVideoPoster
 }: {
   blocks: NotionBlock[];
   className?: string;
+  columnDenominator?: number;
   fallbackVideoPoster?: string;
 }) {
+  const firstImageIndex = blocks.findIndex((block) => block.type === "image");
+
   return (
     <div className={["notion-body", className].filter(Boolean).join(" ")}>
       {blocks.map((block, index) => (
-        <NotionBlockView block={block} fallbackVideoPoster={fallbackVideoPoster} index={index} key={`${block.type}-${index}`} />
+        <NotionBlockView
+          block={block}
+          columnDenominator={columnDenominator}
+          fallbackVideoPoster={fallbackVideoPoster}
+          index={index}
+          key={`${block.type}-${index}`}
+          priorityImage={index === firstImageIndex}
+        />
       ))}
     </div>
   );
 }
 
-function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionBlock; fallbackVideoPoster?: string; index: number }) {
+function NotionBlockView({
+  block,
+  columnDenominator,
+  fallbackVideoPoster,
+  index,
+  priorityImage
+}: {
+  block: NotionBlock;
+  columnDenominator: number;
+  fallbackVideoPoster?: string;
+  index: number;
+  priorityImage: boolean;
+}) {
   switch (block.type) {
     case "paragraph":
       return (
@@ -137,6 +168,8 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
             alt={block.media.alt}
             height={block.media.height || 1000}
             index={index}
+            priority={priorityImage}
+            sizes={imageSizesForColumnDenominator(columnDenominator)}
             src={block.media.src}
             width={block.media.width || 1600}
           />
@@ -171,6 +204,7 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
         </a>
       );
     case "column_list":
+      const nestedColumnDenominator = Math.max(1, columnDenominator) * Math.max(1, block.columns.length);
       const columnStyle = {
         "--notion-column-count": String(Math.max(1, block.columns.length))
       } as CSSProperties;
@@ -178,7 +212,12 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
       return (
         <div className="notion-columns" style={columnStyle}>
           {block.columns.map((column, index) => (
-            <NotionRenderer blocks={column} fallbackVideoPoster={fallbackVideoPoster} key={index} />
+            <NotionRenderer
+              blocks={column}
+              columnDenominator={nestedColumnDenominator}
+              fallbackVideoPoster={fallbackVideoPoster}
+              key={index}
+            />
           ))}
         </div>
       );
@@ -188,7 +227,11 @@ function NotionBlockView({ block, fallbackVideoPoster, index }: { block: NotionB
           <summary>
             <RichText spans={block.title} />
           </summary>
-          <NotionRenderer blocks={block.children} fallbackVideoPoster={fallbackVideoPoster} />
+          <NotionRenderer
+            blocks={block.children}
+            columnDenominator={columnDenominator}
+            fallbackVideoPoster={fallbackVideoPoster}
+          />
         </details>
       );
     case "unsupported":

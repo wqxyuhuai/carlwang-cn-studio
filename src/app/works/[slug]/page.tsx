@@ -34,10 +34,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-function DetailImage({ media, className = "", priority = false, revealIndex = 0 }: { media: MediaItem; className?: string; priority?: boolean; revealIndex?: number }) {
+function DetailImage({
+  media,
+  className = "",
+  priority = false,
+  revealIndex = 0,
+  sizes
+}: {
+  media: MediaItem;
+  className?: string;
+  priority?: boolean;
+  revealIndex?: number;
+  sizes: string;
+}) {
   return (
     <RevealMedia className={`pw-detail-image ${className}`} element="figure" index={revealIndex}>
-      <Image alt={media.alt} height={868} priority={priority} src={media.src} width={868} />
+      <Image alt={media.alt} height={868} priority={priority} sizes={sizes} src={media.src} width={868} />
     </RevealMedia>
   );
 }
@@ -103,7 +115,13 @@ export default async function WorkDetailPage({
       <WorkScrollTop />
       <aside className="pw-detail-left" aria-label="Work summary">
         <div className="pw-detail-summary">
-          <DetailImage className="is-cover" media={work.cover} priority revealIndex={0} />
+          <DetailImage
+            className="is-cover"
+            media={work.cover}
+            priority
+            revealIndex={0}
+            sizes="(max-width: 900px) calc(100vw - 2rem), 300px"
+          />
 
           <WorkDetailHeading
             publishedLabel={workPublishedLabel(work)}
@@ -130,7 +148,14 @@ export default async function WorkDetailPage({
           ) : (
             <div className="pw-detail-fallback-flow" aria-label="Fallback work body">
               {fallbackGallery.map((item, index) => (
-                <DetailImage className="is-flow" key={item.src} media={item} priority={index === 0} revealIndex={index} />
+                <DetailImage
+                  className="is-flow"
+                  key={item.src}
+                  media={item}
+                  priority={index === 0}
+                  revealIndex={index}
+                  sizes="(max-width: 900px) calc(100vw - 2rem), 50vw"
+                />
               ))}
               <div className="pw-detail-copy">
                 {work.intro ? <p>{work.intro}</p> : null}

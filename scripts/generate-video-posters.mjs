@@ -9,6 +9,7 @@ import ffmpegPath from "ffmpeg-static";
 import ffprobe from "ffprobe-static";
 import sharp from "sharp";
 import { configureProxyFromEnv } from "./lib/proxy.mjs";
+import { revalidatePublicContent } from "./lib/revalidate-public-content.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
 const DEFAULT_CONTENT_KEY = "uploads/admin/site-content.json";
@@ -322,7 +323,7 @@ async function processProject(client, config, work, options, tempRoot) {
       await client.put(contentKey, Buffer.from(`${JSON.stringify(content, null, 2)}\n`, "utf8"), {
         headers: {
           "Content-Type": "application/json; charset=utf-8",
-          "Cache-Control": "public, max-age=60"
+          "Cache-Control": "public, max-age=300"
         }
       });
     }
@@ -366,6 +367,7 @@ async function main() {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
   console.log(`[poster] complete generated=${total.generated} skipped=${total.skipped} failed=${total.failed}${options.dryRun ? " dryRun=true" : ""}`);
+  if (!options.dryRun && total.generated > 0) await revalidatePublicContent("poster");
   if (!options.dryRun && total.failed > 0) process.exitCode = 1;
 }
 

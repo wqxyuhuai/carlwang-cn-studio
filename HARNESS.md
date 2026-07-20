@@ -44,6 +44,8 @@ Every modification should verify:
 
 ## Performance Checks
 
+The rationale, cache map and exception rules are documented in `docs/PERFORMANCE_CACHE_RULES.md`.
+
 Before release, verify:
 
 1. Opening a work detail page does not trigger repeated `site-content.json` refetches on every navigation.
@@ -58,6 +60,12 @@ Before release, verify:
 10. Index forwards wheel input to its nested right-panel scroller with a passive, animation-frame-coalesced listener. Scrolling a populated grid/list must not have a noticeable input delay.
 11. Only the initial visible Index cards run the staggered entrance. Off-screen cards use containment/content visibility and idle card backs keep no active blur filter or permanent `will-change` layer.
 12. The bottom gradual-blur treatment remains visually continuous without stacking a large number of fixed backdrop-filter layers.
+13. About and Index do not start their media work before first use, but remain mounted after that visit so state and scroll are preserved.
+14. Narrow Notion columns request materially smaller responsive image candidates than full-width media; remote SVG icons still load directly.
+15. Repeating the same video byte range can produce a runtime range hit with the same 206 status, `Content-Range` and byte length. A different range must never receive that cached chunk.
+16. The initial byte-zero open-ended video probe may be bounded, while later open-ended ranges and large streamed ranges still play correctly.
+17. Contact, view-count, revalidation and media-error responses explicitly return `Cache-Control: no-store`.
+18. One-year font and static headers are verified in an OpenNext/Workers preview because local Next servers do not apply `public/_headers`.
 
 ## Content Checks
 
