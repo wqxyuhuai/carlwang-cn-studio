@@ -1,7 +1,7 @@
 ﻿import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { fallbackData, getStudioData, getWorkContent } from "./site-data";
-import { PUBLIC_CONTENT_CACHE_TAG } from "./cache-tags";
+import { PUBLIC_CONTENT_CACHE_TAG, PUBLIC_CONTENT_REVALIDATE_SECONDS } from "./cache-tags";
 import type { SiteSettings, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 import { applyWorkViewCounts } from "./work-view-counts";
 
@@ -247,8 +247,9 @@ async function buildPublicContent(): Promise<PublicContent> {
   };
 }
 
-const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v14"], {
-  tags: [PUBLIC_CONTENT_CACHE_TAG]
+const getPublicContentFromCache = unstable_cache(buildPublicContent, ["public-content-v15"], {
+  tags: [PUBLIC_CONTENT_CACHE_TAG],
+  revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS
 });
 
 export const getPublicContent = cache(getPublicContentFromCache);

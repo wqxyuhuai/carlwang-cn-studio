@@ -32,6 +32,8 @@ const BODY_FALLBACK_EXCLUDED_STEMS = new Set(["cover", "poster", "thumbnail"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "svg", "avif"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v"]);
 const DOCUMENT_EXTENSIONS = new Set(["pdf"]);
+// Prefer web-ready local variants when the source folder retains an original GIF.
+const LOCAL_IMAGE_EXTENSION_PRIORITY = ["webp", "avif", "jpg", "jpeg", "png", "svg", "gif"];
 
 const tables = {
   categories: {
@@ -346,6 +348,22 @@ function normalizeFileStem(value) {
   return slugify(String(value || "").replace(/\.[^.]+$/, ""), "asset");
 }
 
+function comparableLocalStem(value) {
+  return normalizeFileStem(value).replace(/-(compressed|optimized)$/i, "");
+}
+
+function localMatchPriority(file) {
+  if (file.kind !== "image") return 0;
+  const index = LOCAL_IMAGE_EXTENSION_PRIORITY.indexOf(file.extension);
+  return index === -1 ? LOCAL_IMAGE_EXTENSION_PRIORITY.length : index;
+}
+
+function preferLocalAsset(a, b) {
+  return localMatchPriority(a) - localMatchPriority(b)
+    || a.depth - b.depth
+    || naturalCompare(a.fullPath, b.fullPath);
+}
+
 function mediaKindFromExtension(extension) {
   const ext = String(extension || "").toLowerCase();
   if (IMAGE_EXTENSIONS.has(ext)) return "image";
@@ -409,7 +427,8 @@ function scanLocalAssetFolder(folderPath) {
         extension,
         kind,
         size,
-        stem: normalizeFileStem(entry.name)
+        stem: normalizeFileStem(entry.name),
+        comparableStem: comparableLocalStem(entry.name)
       });
     }
   }
@@ -417,11 +436,14 @@ function scanLocalAssetFolder(folderPath) {
   files.sort((a, b) => a.depth - b.depth || naturalCompare(a.fullPath, b.fullPath));
   const byKind = new Map();
   const byStem = new Map();
+  const byComparableStem = new Map();
   for (const file of files) {
     if (!byKind.has(file.kind)) byKind.set(file.kind, []);
     byKind.get(file.kind).push(file);
     if (!byStem.has(file.stem)) byStem.set(file.stem, []);
     byStem.get(file.stem).push(file);
+    if (!byComparableStem.has(file.comparableStem)) byComparableStem.set(file.comparableStem, []);
+    byComparableStem.get(file.comparableStem).push(file);
   }
 
   console.log(`[local] indexed ${files.length} media files from ${resolvedFolder}`);
@@ -430,6 +452,7 @@ function scanLocalAssetFolder(folderPath) {
     files,
     byKind,
     byStem,
+    byComparableStem,
     used: new Set()
   };
 }
@@ -473,9 +496,9 @@ function candidateStemsFromMedia(media, blockId) {
 
 function markLocalVariantsUsed(localIndex, file) {
   if (!localIndex || !file) return;
-  const baseStem = normalizeFileStem(file.name).replace(/-(compressed|optimized)$/i, "");
+  const baseStem = comparableLocalStem(file.name);
   for (const candidate of localIndex.byKind.get(file.kind) || []) {
-    const candidateStem = normalizeFileStem(candidate.name).replace(/-(compressed|optimized)$/i, "");
+    const candidateStem = comparableLocalStem(candidate.name);
     if (candidateStem === baseStem) localIndex.used.add(candidate.fullPath);
   }
 }
@@ -483,15 +506,20 @@ function markLocalVariantsUsed(localIndex, file) {
 function matchLocalAsset(localIndex, media, blockId, mediaKind, sequenceByKind) {
   if (!localIndex || !mediaKind) return null;
   for (const stem of candidateStemsFromMedia(media, blockId)) {
-    const candidates = localIndex.byStem.get(stem) || [];
-    const match = candidates.find((file) => file.kind === mediaKind && !localIndex.used.has(file.fullPath));
+    const candidates = [
+      ...(localIndex.byStem.get(stem) || []),
+      ...(localIndex.byComparableStem.get(comparableLocalStem(stem)) || [])
+    ];
+    const match = [...new Map(candidates.map((file) => [file.fullPath, file])).values()]
+      .filter((file) => file.kind === mediaKind && !localIndex.used.has(file.fullPath))
+      .sort(preferLocalAsset)[0];
     if (match) {
       markLocalVariantsUsed(localIndex, match);
       return { file: match, strategy: `name:${stem}` };
     }
   }
 
-  const candidates = localIndex.byKind.get(mediaKind) || [];
+  const candidates = [...(localIndex.byKind.get(mediaKind) || [])].sort(preferLocalAsset);
   const sequence = sequenceByKind[mediaKind] || 0;
   const match = candidates.find((file) => !localIndex.used.has(file.fullPath) && !BODY_FALLBACK_EXCLUDED_STEMS.has(file.stem))
     || candidates.find((file) => !localIndex.used.has(file.fullPath));
@@ -751,6 +779,15 @@ async function listChildren(notion, blockId) {
 async function processBlockTree(notion, client, manifest, pageId, tableFolder, itemFolder, itemLabel, stats, dryRun, options = {}) {
   const stack = await listChildren(notion, pageId);
   const localSequenceByKind = { image: 0, video: 0, document: 0 };
+  let localAssetIndex = options.localAssetIndex || null;
+  let localAssetIndexLoaded = Boolean(options.localAssetIndex);
+  const getLocalAssetIndex = () => {
+    if (!localAssetIndexLoaded) {
+      localAssetIndex = options.loadLocalAssetIndex?.() || null;
+      localAssetIndexLoaded = true;
+    }
+    return localAssetIndex;
+  };
   while (stack.length) {
     if (stats.failedMedia >= MAX_FAILED_MEDIA_PER_ITEM) {
       console.log(`[body] ${itemLabel} skipped remaining media after ${stats.failedMedia} failures`);
@@ -766,28 +803,58 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
       const mediaKind = mediaKindFromBlockType(media.blockType);
       console.log(`[body] ${itemLabel} media #${stats.seen} ${media.blockType}`);
       const existingObjectKey = objectKeyFromOssUrl(media.url);
+      const existingOssObjectAvailable = existingObjectKey
+        ? await ossObjectExists(client, existingObjectKey)
+        : false;
+      const optimizedObjectKey = mediaKind === "image"
+        && existingObjectKey
+        && !existingObjectKey.endsWith("-optimized.webp")
+        ? optimizedObjectKeyFor(existingObjectKey)
+        : "";
+      const optimizedOssObjectAvailable = optimizedObjectKey
+        ? await ossObjectExists(client, optimizedObjectKey)
+        : false;
       const isExpectedOssObject = isOssUrl(media.url) && (!options.rehomeOss || existingObjectKey.startsWith(`${objectBasePath}/`));
-      if (isExpectedOssObject && await ossObjectExists(client, existingObjectKey)) {
-        matchLocalAsset(options.localAssetIndex, media, block.id, mediaKind, localSequenceByKind);
+      if (optimizedOssObjectAvailable) {
+        const nextUrl = publicUrlForObject(optimizedObjectKey);
+        if (!dryRun) {
+          await notion.blocks.update({
+            block_id: block.id,
+            [media.blockType]: {
+              external: { url: nextUrl },
+              caption: media.caption
+            }
+          });
+        }
+        stats.reused += 1;
+        console.log(`[body] ${itemLabel} media #${stats.seen} ${dryRun ? "would-use" : "using"} optimized-oss`);
+      } else if (isExpectedOssObject && existingOssObjectAvailable) {
         stats.skipped += 1;
-        console.log(`[body] ${itemLabel} media #${stats.seen} skipped`);
+        console.log(`[body] ${itemLabel} media #${stats.seen} skipped existing-oss`);
       } else {
         if (isExpectedOssObject) {
           console.log(`[body] ${itemLabel} media #${stats.seen} missing OSS object; attempting recovery`);
         }
-        const localMatch = matchLocalAsset(options.localAssetIndex, media, block.id, mediaKind, localSequenceByKind);
+        if (existingOssObjectAvailable) {
+          console.log(`[body] ${itemLabel} media #${stats.seen} rehome existing-oss`);
+        }
+        const localMatch = existingOssObjectAvailable
+          ? null
+          : matchLocalAsset(getLocalAssetIndex(), media, block.id, mediaKind, localSequenceByKind);
         if (localMatch) {
           console.log(`[local] matched ${itemLabel} media #${stats.seen} ${localMatch.strategy} -> ${localMatch.file.fullPath}`);
         }
         try {
           if (!dryRun) {
-            const uploaded = localMatch
-              ? await uploadLocalFileToOss(client, manifest, localMatch.file, objectBasePath, options)
-              : existingObjectKey
-                ? (() => {
-                    throw new Error("missing OSS object has no local recovery source");
-                  })()
-              : await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
+            const uploaded = existingOssObjectAvailable
+              ? await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options)
+              : localMatch
+                ? await uploadLocalFileToOss(client, manifest, localMatch.file, objectBasePath, options)
+                : existingObjectKey
+                  ? (() => {
+                      throw new Error("missing OSS object has no local recovery source");
+                    })()
+                  : await uploadUrlToOss(client, manifest, media.url, objectBasePath, originalName, options);
             const nextPayload = {
               external: { url: uploaded.url },
               caption: media.caption
@@ -1135,10 +1202,9 @@ async function runTable(tableKey, options = {}) {
       }
 
       if (tableConfig.includeBodyMedia && !options.skipBody) {
-        const localAssetIndex = localAssetIndexFromPage(page, tableConfig);
         await processBlockTree(notion, client, manifest, page.id, tableConfig.tableFolder, itemFolder, title, stats, options.dryRun, {
           ...options,
-          localAssetIndex
+          loadLocalAssetIndex: () => localAssetIndexFromPage(page, tableConfig)
         });
       }
 

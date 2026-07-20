@@ -35,6 +35,12 @@ function hasArg(name) {
   return value === "true" || value === "1";
 }
 
+function argValue(name) {
+  const arg = process.argv.find((item) => item.startsWith(`--${name}=`))?.split("=").slice(1).join("=") || "";
+  if (arg) return arg;
+  return process.env[`npm_config_${name.replace(/-/g, "_")}`] || "";
+}
+
 function getOssConfig() {
   return {
     accessKeyId: envValue("ALIYUN_OSS_ACCESS_KEY_ID", "ALIYUN_ACCESS_KEY_ID"),
@@ -101,6 +107,12 @@ function titleFromPage(page) {
     if (property?.type === "title") return textFromRichText(property.title);
   }
   return page.id;
+}
+
+function slugFromPage(page) {
+  const property = page.properties?.Slug;
+  if (property?.type !== "rich_text") return "";
+  return textFromRichText(property.rich_text);
 }
 
 function mediaPayload(block) {
@@ -245,10 +257,11 @@ async function main() {
   const missing = requiredEnv().filter(([, ok]) => !ok).map(([name]) => name);
   if (missing.length) throw new Error(`Missing env: ${missing.join(", ")}`);
 
-  const options = { dryRun: hasArg("dry-run") };
+  const options = { dryRun: hasArg("dry-run"), slug: argValue("slug") };
   const notion = new Client({ auth: process.env.NOTION_TOKEN });
   const ossClient = createOssClient();
-  const pages = await listAllPages(notion, process.env.NOTION_WORKS_DATABASE_ID);
+  const allPages = await listAllPages(notion, process.env.NOTION_WORKS_DATABASE_ID);
+  const pages = allPages.filter((page) => !options.slug || slugFromPage(page) === options.slug);
   const totals = {
     pages: pages.length,
     seenMedia: 0,
@@ -259,7 +272,7 @@ async function main() {
     skippedUnsupported: 0
   };
 
-  console.log(`[notion] pages=${pages.length} dryRun=${options.dryRun}`);
+  console.log(`[notion] pages=${pages.length} dryRun=${options.dryRun}${options.slug ? ` slug=${options.slug}` : ""}`);
   for (const page of pages) {
     const stats = await updatePageBody(notion, ossClient, page, options);
     for (const key of Object.keys(totals)) {

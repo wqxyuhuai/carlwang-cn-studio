@@ -277,7 +277,8 @@ async function main() {
     minSavingRatio: Number(argValue("min-saving-ratio") || process.env.OPTIMIZE_MIN_SAVING_RATIO || 0.05),
     gifMinSavingRatio: Number(argValue("gif-min-saving-ratio") || process.env.OPTIMIZE_GIF_MIN_SAVING_RATIO || 0),
     includeOptimized: hasArg("include-optimized"),
-    limit: Number(argValue("limit") || 0)
+    limit: Number(argValue("limit") || 0),
+    slug: argValue("slug")
   };
 
   const client = createOssClient();
@@ -290,7 +291,9 @@ async function main() {
 
   const projectDocs = [];
   let discoveredCandidates = candidateCount(siteRefs, options);
-  for (const work of Array.isArray(siteContent.works) ? siteContent.works : []) {
+  const works = (Array.isArray(siteContent.works) ? siteContent.works : [])
+    .filter((work) => !options.slug || work.slug === options.slug);
+  for (const work of works) {
     if (options.limit && discoveredCandidates >= options.limit) {
       console.log(`[content] limit satisfied by discovered refs (${discoveredCandidates})`);
       break;
@@ -310,11 +313,11 @@ async function main() {
   }
 
   const refs = [
-    ...siteRefs.filter((ref) => !isProjectContentUrl(ref.url)),
+    ...(options.slug ? [] : siteRefs.filter((ref) => !isProjectContentUrl(ref.url))),
     ...projectDocs.flatMap((document) => document.refs)
   ];
 
-  console.log(`[optimize] refs=${refs.length} dryRun=${options.dryRun} quality=${options.quality} maxWidth=${options.maxWidth} maxHeight=${options.maxHeight} includeOptimized=${options.includeOptimized}`);
+  console.log(`[optimize] refs=${refs.length} dryRun=${options.dryRun} quality=${options.quality} maxWidth=${options.maxWidth} maxHeight=${options.maxHeight} includeOptimized=${options.includeOptimized}${options.slug ? ` slug=${options.slug}` : ""}`);
   const cache = new Map();
   const report = {
     options,

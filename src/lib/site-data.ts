@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { PUBLIC_CONTENT_CACHE_TAG } from "./cache-tags";
+import { PUBLIC_CONTENT_CACHE_TAG, PUBLIC_CONTENT_REVALIDATE_SECONDS } from "./cache-tags";
 import type { Experience, MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 
 export const CONTENT_URL =
@@ -359,8 +359,9 @@ async function readJsonUrl(url: string) {
   return await response.json();
 }
 
-const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v3"], {
-  tags: [PUBLIC_CONTENT_CACHE_TAG]
+const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v4"], {
+  tags: [PUBLIC_CONTENT_CACHE_TAG],
+  revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS
 });
 
 export async function getWorkContent(work: Work): Promise<NotionBlock[]> {
