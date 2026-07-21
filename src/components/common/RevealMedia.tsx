@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode, SyntheticEvent } from "react";
 import Image, { type ImageProps } from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { detailMediaRevealConfig } from "@/lib/motion-config";
 
 type RevealElement = "div" | "figure" | "span";
 
@@ -34,7 +35,10 @@ type RevealMediaProps = RevealWrapperProps | RevealImageProps;
 
 function revealDelay({ delay, groupIndex, index }: Pick<RevealBaseProps, "delay" | "groupIndex" | "index">) {
   if (typeof delay === "number") return Math.max(0, delay);
-  return Math.min((groupIndex ?? index ?? 0) * 90, 480);
+  return Math.min(
+    (groupIndex ?? index ?? 0) * detailMediaRevealConfig.staggerMs,
+    detailMediaRevealConfig.maxDelayMs
+  );
 }
 
 function elementIsLoaded(element: Element) {
@@ -62,7 +66,12 @@ function elementInViewport(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-  return rect.top < viewportHeight * 0.92 && rect.bottom > 0 && rect.left < viewportWidth && rect.right > 0;
+  return (
+    rect.top < viewportHeight * (1 + detailMediaRevealConfig.triggerLeadViewportRatio) &&
+    rect.bottom > 0 &&
+    rect.left < viewportWidth &&
+    rect.right > 0
+  );
 }
 
 export function RevealMedia(props: RevealMediaProps) {
@@ -80,7 +89,11 @@ export function RevealMedia(props: RevealMediaProps) {
   const [isInView, setIsInView] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const computedDelay = revealDelay({ delay, groupIndex, index });
-  const revealStyle = { ...style, "--reveal-delay": `${computedDelay}ms` } as CSSProperties;
+  const revealStyle = {
+    ...style,
+    "--reveal-delay": `${computedDelay}ms`,
+    "--reveal-duration": `${detailMediaRevealConfig.durationMs}ms`
+  } as CSSProperties;
   const isVisible = isInView && isLoaded;
   const rootClassName = ["reveal-media", isVisible ? "is-visible" : "", className].filter(Boolean).join(" ");
 
@@ -111,7 +124,11 @@ export function RevealMedia(props: RevealMediaProps) {
           setIsInView(false);
         }
       },
-      { root: null, rootMargin: "0px 0px -8% 0px", threshold: 0.15 }
+      {
+        root: null,
+        rootMargin: detailMediaRevealConfig.triggerRootMargin,
+        threshold: detailMediaRevealConfig.triggerThreshold
+      }
     );
 
     observer.observe(node);

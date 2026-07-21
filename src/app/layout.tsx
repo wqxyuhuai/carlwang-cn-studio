@@ -5,6 +5,7 @@ import "@/components/video/video-player.css";
 import { GlassDistortionFilter } from "@/components/glass-distortion-filter";
 import { ImageProtection } from "@/components/image-protection";
 import { SiteCursor } from "@/components/site-cursor";
+import { SmoothWheelScroll } from "@/components/common/smooth-wheel-scroll";
 
 const themeInitScript = `(() => {
   try {
@@ -70,6 +71,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
+        <SmoothWheelScroll />
         <GlassDistortionFilter />
         <ImageProtection />
         <SiteCursor />

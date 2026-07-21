@@ -88,11 +88,11 @@ export function WorksBrowser({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const worksRightRef = useRef<HTMLDivElement>(null);
   const searchInputId = useId();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(() => Boolean(initialSearchFromLocation()));
   const [pendingDetailSlug, setPendingDetailSlug] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [mode, setMode] = useState<ViewMode>(initialMode);
-  const [filter, setFilter] = useState<Filter>({ kind: "all", value: "All" });
+  const [searchQuery, setSearchQuery] = useState(initialSearchFromLocation);
+  const [mode, setMode] = useState<ViewMode>(() => initialModeFromLocation(initialMode));
+  const [filter, setFilter] = useState<Filter>(initialFilterFromLocation);
   const filteredWorks = useMemo(() => {
     const worksInFilter = filterWorks(works, filter);
     const normalizedQuery = normalizedSearchValue(searchQuery);
