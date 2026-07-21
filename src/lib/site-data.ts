@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { PUBLIC_CONTENT_CACHE_TAG, PUBLIC_CONTENT_REVALIDATE_SECONDS } from "./cache-tags";
 import { proxyOssMediaUrl } from "./media-url";
-import type { Experience, MediaItem, NotionBlock, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
+import type { Experience, MediaItem, NotionBlock, RichTextSpan, SocialLink, StudioData, Tool, Work, WorkType } from "./types";
 
 export const CONTENT_URL =
   process.env.NEXT_PUBLIC_CONTENT_URL ||
@@ -321,12 +321,61 @@ function normalizeNotionBlocks(value: unknown): NotionBlock[] {
   return value.map(normalizeNotionBlock).filter((block): block is NotionBlock => Boolean(block));
 }
 
+function safeExternalVideoEmbed(provider: string, value: string) {
+  const expectedHosts: Record<string, string> = {
+    youtube: "www.youtube-nocookie.com",
+    vimeo: "player.vimeo.com",
+    bilibili: "player.bilibili.com"
+  };
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === expectedHosts[provider] ? url.href : "";
+  } catch {
+    return "";
+  }
+}
+
 function normalizeNotionBlock(value: unknown): NotionBlock | null {
   if (!value || typeof value !== "object") return null;
   const block = value as NotionBlock;
   if (block.type === "image" || block.type === "video") {
     const media = normalizeMedia(block.media, `Notion ${block.type}`);
     return media ? { ...block, media } : null;
+  }
+  if (block.type === "external_video") {
+    const providers = new Set(["youtube", "vimeo", "bilibili"]);
+    const embedUrl = safeExternalVideoEmbed(block.provider, block.embedUrl);
+    if (!providers.has(block.provider) || !block.url || !embedUrl) return null;
+    return {
+      type: "external_video",
+      provider: block.provider,
+      url: String(block.url),
+      embedUrl,
+      title: String(block.title || `${block.provider} video`),
+      ...(block.posterUrl ? { posterUrl: String(block.posterUrl) } : {}),
+      ...(block.caption ? { caption: String(block.caption) } : {})
+    };
+  }
+  if (block.type === "bulleted_list" || block.type === "numbered_list" || block.type === "to_do_list") {
+    return {
+      type: block.type,
+      items: Array.isArray(block.items)
+        ? block.items.map((item) => {
+            if (Array.isArray(item)) return { text: item as RichTextSpan[] };
+            return {
+              text: Array.isArray(item?.text) ? item.text : [],
+              children: normalizeNotionBlocks(item?.children),
+              ...(block.type === "to_do_list" ? { checked: Boolean(item?.checked) } : {})
+            };
+          })
+        : []
+    };
+  }
+  if (block.type === "callout") {
+    return {
+      ...block,
+      children: normalizeNotionBlocks(block.children)
+    };
   }
   if (block.type === "column_list") {
     return {
@@ -350,7 +399,7 @@ async function readJsonUrl(url: string) {
   return await response.json();
 }
 
-const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v4"], {
+const readWorkContentJson = unstable_cache(readJsonUrl, ["work-content-json-v7"], {
   tags: [PUBLIC_CONTENT_CACHE_TAG],
   revalidate: PUBLIC_CONTENT_REVALIDATE_SECONDS
 });

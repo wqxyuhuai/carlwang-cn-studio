@@ -57,14 +57,14 @@ export default function RootLayout({
         <link
           as="font"
           crossOrigin="anonymous"
-          href="/fonts/sf-pro/SF-Pro-Display-Regular.woff2?v=c41e3c28bca0"
+          href="/fonts/pingfang-sc/PingFangSC-Regular-Latin.woff2?v=9563205202b7"
           rel="preload"
           type="font/woff2"
         />
         <link
           as="font"
           crossOrigin="anonymous"
-          href="/fonts/sf-pro/SF-Pro-Display-Medium.woff2?v=6bad112c5e4a"
+          href="/fonts/pingfang-sc/PingFangSC-Medium-Latin.woff2?v=3f5ead81e71c"
           rel="preload"
           type="font/woff2"
         />

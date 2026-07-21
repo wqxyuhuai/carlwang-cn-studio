@@ -20,10 +20,10 @@ Key measured values from `PW2-design`:
 
 - Header: desktop `82px`, mobile `116px`.
 - Page horizontal padding: desktop `64px`, mobile `32px`.
-- Navigation: `16px` SF Pro Display Medium, desktop gap `32px`, mobile vertical gap `4px`.
+- Navigation: `16px` PingFang SC Medium implementation override, desktop gap `32px`, mobile vertical gap `4px`.
 - Home hero: desktop content frame `998px`, mobile hero `912px`.
 - Hero display text: Bebas Neue Bold, desktop `100px`, mobile `60px`.
-- Section titles: SF Pro Display Medium, desktop `36px`, mobile `18px`.
+- Section titles: PingFang SC Medium implementation override, desktop `36px`, mobile `18px`.
 - Field labels: Bebas Neue Bold, desktop `100px` wide / `80px` 1280 / `40px` mobile.
 - Works grid entry: desktop two columns with `50px` gap, right mosaic four columns with `20px` gap.
 
@@ -39,7 +39,7 @@ The preview exposes the active page `/`, with Figma preview links `/works-grid` 
 - Hard square mark in Figma green.
 - Pale `bg` background.
 - Bebas Neue display type for large English labels.
-- SF Pro for UI and body text.
+- PingFang SC Web for UI and body text, replacing the original SF Pro mapping while retaining the measured sizes and hierarchy.
 - No dark theme toggle.
 - No rounded-card portfolio template.
 - Image rhythm based on square work thumbnails, long white space and oversized page labels.

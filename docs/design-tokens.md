@@ -26,9 +26,9 @@ The Home hero gradient is also tokenized as `--gradient-home-hero`. Its three gr
 ## Typography
 
 - Display: `Bebas Neue Local`
-- Body and UI: `SF Pro Local`
+- Body and UI: `PingFang SC Web`
 
-Current SF Pro source is SF Pro Display. Do not add another SF Pro family unless the Figma file introduces and uses it.
+PingFang SC Web is split into Latin and CJK WOFF2 subsets for Regular, Medium and Semibold. Do not add another body/UI family; use the existing semantic type tokens.
 
 Figma text-style mapping:
 
@@ -61,6 +61,12 @@ Figma text-style mapping:
 --type-title-line: 1.2;
 --type-title-tracking: -0.025rem;
 
+/* Compact list/detail title */
+--type-title-s-tracking: -0.005em;
+
+/* Work-detail Notion copy and headings */
+--type-detail-copy-tracking: -0.01em;
+
 /* 小标题 */
 --type-subtitle-family: var(--font-body);
 --type-subtitle-size: clamp(1.125rem, 2.8125vw, 2.25rem);
@@ -76,6 +82,11 @@ Figma text-style mapping:
 ```
 
 Usage constraints:
+
+- Works empty-search text and work-detail `Previous` / `Next` pager labels
+  use the regular body UI token (`16px`, `font-weight: 400`).
+- The Works mode switch and bottom primary navigation labels use the medium
+  body UI token (`16px`, `font-weight: 510`) and should stay visually matched.
 
 - Body copy, footer copy, footer links and ordinary UI text use `正文 r` through `.body-copy` or `.caption-copy`.
 - Navigation, footer group titles and emphasized UI labels use `正文 m`.

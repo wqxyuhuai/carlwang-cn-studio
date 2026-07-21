@@ -30,6 +30,7 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - A video scrub timeline must show real distributed video frames or correctly cropped sprite frames. A poster may be used only as a temporary fallback while frames load; do not repeat one poster as the finished timeline. Generate thumbnails only while the fullscreen player is active.
 - Inline project-video hover must ease into and out of its brightness/scale treatment. The Play affordance rests at the lower-left, follows the pointer with a soft inertial response, and eases back to rest after pointer leave; do not snap it on entry or exit. Preserve the reduced-motion fallback.
 - Keep ordinary work-detail body media unframed. Do not add a universal border around Notion media cards; when an individual dark or low-contrast asset cannot be distinguished from the page background, use only a localized, very subtle inner outline without changing the shared media rhythm.
+- Work details with two or more body headings use a desktop page outline at the right edge: collapsed hierarchical ticks, hover/focus expansion, scroll-synchronized active state and smooth in-panel heading navigation. Compact outlines expand around the collapsed rail; only scrollable outlines shift downward to stay clear of the detail close control. Align its right edge with the close control and inset its scrollbar from the glass edge. The scrollbar hover tone must ease in and out at low contrast and must never snap to white. Keep it out of document flow, hide it on touch/coarse-pointer and mobile layouts, and preserve reduced-motion behavior.
 - The featured star is an unframed icon in the upper-right of a work card. Do not reintroduce a glass, border, shadow, or background container behind it.
 - Do not enable default viewport prefetch for every work card if it causes many detail pages to load at once. Prefer intent-based hover/focus prefetch.
 
@@ -74,20 +75,23 @@ Carl Wang Studio is a personal portfolio and lightweight public content platform
 - Prefer existing CSS variables for color, type, spacing, motion and radius.
 - Do not introduce random component-level hex values for public pages unless they become named tokens.
 - The current radius system is intentionally square or near-square. Do not add rounded card systems to public pages casually.
-- Keep the local Bebas Neue and SF Pro font stack intact.
+- Keep the local Bebas Neue and PingFang SC Web font stack intact. PingFang SC Web replaces the earlier SF Pro web font across public UI and body copy.
 - Keep fullscreen video inset and visibly rounded; its controls must not overlap the frame. Close and Escape return to the current detail page, not the works browser.
 - Detail Notion media layouts use a single horizontal/vertical media gap token. Preserve authored spacer blocks and body-copy spacing when adjusting it.
 
 ## Typography Rules
 
-Use the Figma `PW2 design` text styles as the source of truth. Do not add new public-page font families or ad hoc font-size/line-height pairs unless Figma is updated first.
+Use the Figma `PW2 design` text sizes and hierarchy as the source of truth. The approved implementation-level family override is PingFang SC Web for all former SF Pro roles. Do not add additional public-page font families or ad hoc font-size/line-height pairs.
 
-- `正文 r`: SF Pro Display Regular, 16px, 125%, 0 tracking. Use for body copy, footer links/copy, meta copy that is not explicitly small, form text and ordinary UI text. CSS source: `--type-body-r-*`; utility class: `.body-copy` or `.caption-copy`.
-- `正文 m`: SF Pro Display Medium, 16px, 125%, 0 tracking. Use for navigation, footer group headings, medium UI labels and text links that need emphasis. CSS source: `--type-body-m-*`; apply explicitly in component CSS.
-- `小字`: SF Pro Regular, 12px, 22px, 0 tracking. Use only for compact metadata, image captions, status text and dense list stats. CSS source: `--type-small-*` / `--text-caption`.
-- `小标题`: SF Pro Display Medium, 36px, 145%, -0.5% tracking. Use for `Featured Works`, `About` link headings and comparable public-page link headings. CSS source: `--type-subtitle-*`.
-- `标题`: SF Pro Medium, 26px, approximately 120%, -0.4px tracking. Use for work titles, detail headings and card titles. CSS source: `--type-title-*` / `--text-title`.
+- `正文 r`: PingFang SC Regular, 16px, 125%, 0 tracking. Detail paragraphs marked `zh-CN` use the named 150% CJK line-height token. Use for body copy, footer links/copy, meta copy that is not explicitly small, form text and ordinary UI text. CSS source: `--type-body-r-*`; utility class: `.body-copy` or `.caption-copy`.
+- `正文 m`: PingFang SC Medium, 16px, 125%, 0 tracking. Use for navigation, footer group headings, medium UI labels and text links that need emphasis. CSS source: `--type-body-m-*`; apply explicitly in component CSS.
+- `小字`: PingFang SC Regular, 12px, 22px, 0 tracking. Use only for compact metadata, image captions, status text and dense list stats. CSS source: `--type-small-*` / `--text-caption`.
+- `小标题`: PingFang SC Medium, 36px, 145%, -0.5% tracking. Use for `Featured Works`, `About` link headings and comparable public-page link headings. CSS source: `--type-subtitle-*`.
+- `标题`: PingFang SC Medium, 26px, approximately 120%, -0.4px tracking. Use for work titles, detail headings and card titles. CSS source: `--type-title-*` / `--text-title`.
+- Compact list/detail titles use proportional `-0.5%` tracking through `--type-title-s-tracking`; work-detail Notion headings and copy use proportional `-1%` tracking through `--type-detail-copy-tracking`. Keep these values in `em` so they scale with font size.
 - `be 大标题`, `be 中标题`, `be 小标题`: Bebas Neue Bold with -0.5% tracking. Use only for hero, category, large display and section kicker typography. CSS source: `--type-display-*` plus the existing display-size tokens.
+
+Primary Works mode tabs and bottom primary navigation labels use the medium body style (`16px`, `font-weight: 510`) and should stay visually matched. Works empty-search text and work-detail `Previous` / `Next` pager labels use the regular body style (`16px`, `font-weight: 400`) and must not be promoted to subtitle, display or primary-navigation weight.
 
 Do not repurpose `.caption-copy` for 12px text. It intentionally maps to Figma `正文 r` because footer and meta text in the design are 16px. Use `--text-caption` directly in scoped CSS for true small text.
 

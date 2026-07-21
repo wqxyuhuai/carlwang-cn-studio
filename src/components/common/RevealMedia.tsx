@@ -62,15 +62,30 @@ function hasTrackedMedia(root: HTMLElement | null) {
   return Boolean(root?.querySelector("img, video"));
 }
 
-function elementInViewport(element: HTMLElement) {
+function scrollRootFor(element: HTMLElement) {
+  let node = element.parentElement;
+
+  while (node && node !== document.body && node !== document.documentElement) {
+    const styles = window.getComputedStyle(node);
+    if (/(auto|scroll)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight + 1) return node;
+    node = node.parentElement;
+  }
+
+  return null;
+}
+
+function elementInViewport(element: HTMLElement, root: HTMLElement | null) {
   const rect = element.getBoundingClientRect();
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+  const rootRect = root?.getBoundingClientRect();
+  const viewportHeight = rootRect?.height ?? window.innerHeight ?? document.documentElement.clientHeight;
+  const viewportWidth = rootRect?.width ?? window.innerWidth ?? document.documentElement.clientWidth;
+  const viewportTop = rootRect?.top ?? 0;
+  const viewportLeft = rootRect?.left ?? 0;
   return (
-    rect.top < viewportHeight * (1 + detailMediaRevealConfig.triggerLeadViewportRatio) &&
-    rect.bottom > 0 &&
-    rect.left < viewportWidth &&
-    rect.right > 0
+    rect.top < viewportTop + viewportHeight * (1 + detailMediaRevealConfig.triggerLeadViewportRatio) &&
+    rect.bottom > viewportTop &&
+    rect.left < viewportLeft + viewportWidth &&
+    rect.right > viewportLeft
   );
 }
 
@@ -104,10 +119,13 @@ export function RevealMedia(props: RevealMediaProps) {
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
+    const root = scrollRootFor(node);
+    const rootHeight = root?.clientHeight ?? window.innerHeight ?? document.documentElement.clientHeight;
+    const triggerLeadPx = Math.round(rootHeight * detailMediaRevealConfig.triggerLeadViewportRatio);
 
     const markInView = () => setIsInView(true);
     const frame = window.requestAnimationFrame(() => {
-      if (elementInViewport(node)) markInView();
+      if (elementInViewport(node, root)) markInView();
     });
 
     if (!("IntersectionObserver" in window)) {
@@ -125,8 +143,8 @@ export function RevealMedia(props: RevealMediaProps) {
         }
       },
       {
-        root: null,
-        rootMargin: detailMediaRevealConfig.triggerRootMargin,
+        root,
+        rootMargin: `0px 0px ${triggerLeadPx}px 0px`,
         threshold: detailMediaRevealConfig.triggerThreshold
       }
     );

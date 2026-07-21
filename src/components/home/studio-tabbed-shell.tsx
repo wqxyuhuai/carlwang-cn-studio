@@ -533,8 +533,32 @@ export function StudioTabbedShell({
           </span>
           <span className="cw-bottom-contact-arrow" aria-hidden="true">
             <span className="cw-nav-arrow-mask">
-              <span className="cw-nav-arrow-icon cw-nav-arrow-icon-current">&#8599;</span>
-              <span className="cw-nav-arrow-icon cw-nav-arrow-icon-next">&#8599;</span>
+              <svg
+                className="cw-nav-arrow-icon cw-nav-arrow-icon-current"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M6.75 17.25 17.25 6.75M8.25 6.75h9v9"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+              <svg
+                className="cw-nav-arrow-icon cw-nav-arrow-icon-next"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M6.75 17.25 17.25 6.75M8.25 6.75h9v9"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
             </span>
           </span>
         </a>

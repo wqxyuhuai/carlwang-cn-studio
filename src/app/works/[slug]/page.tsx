@@ -2,9 +2,10 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { RevealMedia } from "@/components/common/RevealMedia";
-import { NotionRenderer } from "@/components/notion/notion-renderer";
+import { collectNotionHeadings, NotionRenderer } from "@/components/notion/notion-renderer";
 import { WorkDetailClose } from "@/components/works/work-detail-close";
 import { WorkDetailHeading } from "@/components/works/work-detail-heading";
+import { WorkDetailOutline } from "@/components/works/work-detail-outline";
 import { WorkDetailPagerLink } from "@/components/works/work-detail-pager-link";
 import { WorkScrollTop } from "@/components/works/work-scroll-top";
 import { WorkDetailTools } from "@/components/works/work-detail-tools";
@@ -105,6 +106,7 @@ export default async function WorkDetailPage({
   const gallery = (work.gallery.length > 0 ? work.gallery : [work.cover]).filter((item) => item.type === "image");
   const fallbackGallery = Array.from(new Map([work.cover, ...gallery].filter((item) => item.type === "image").map((item) => [item.src, item])).values());
   const hasBodyContent = work.content.length > 0;
+  const bodyHeadings = hasBodyContent ? collectNotionHeadings(work.content) : [];
   const visibleTools = work.tools
     .map((tool) => ({ icon: toolIconFor(tool, content.tools), inverted: darkThemeInvertedToolIcons.has(toolKey(tool)), name: tool }))
     .filter((tool) => tool.icon);
@@ -113,6 +115,7 @@ export default async function WorkDetailPage({
     <main className="pw-detail-page">
       <WorkDetailClose />
       <WorkScrollTop />
+      <WorkDetailOutline headings={bodyHeadings} />
       <aside className="pw-detail-left" aria-label="Work summary">
         <div className="pw-detail-summary">
           <DetailImage

@@ -62,8 +62,10 @@ const INFINITE_AUTO_FLIGHT_BOOST = 0.0065;
 const INFINITE_COMPACT_ENTRY_BOOST = 0.08;
 const INFINITE_COMPACT_AUTO_FLIGHT_BOOST = 0.018;
 const INFINITE_PLANE_GEOMETRY = new THREE.PlaneGeometry(1, 1);
-const INFINITE_MOBILE_TEXTURE_LIMIT = 6;
+const INFINITE_MOBILE_TEXTURE_LIMIT = 10;
 const INFINITE_DESKTOP_TEXTURE_LIMIT = 10;
+const INFINITE_MOBILE_TEXTURE_WIDTH = 750;
+const INFINITE_DESKTOP_TEXTURE_WIDTH = 1080;
 const INFINITE_RADIUS_MASK_SIZE = 128;
 const INFINITE_RADIUS_NOMINAL_CARD_SIZE = 192;
 const INFINITE_MOBILE_NEAR_DEPTH = 12;
@@ -208,10 +210,17 @@ function hashKey(value: string) {
   return Math.abs(hash);
 }
 
-function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean): InfinitePlaneData[] {
+function generateInfiniteChunkPlanes(
+  cx: number,
+  cy: number,
+  cz: number,
+  mediaCount: number,
+  compact: boolean,
+  mobile: boolean
+): InfinitePlaneData[] {
   const seed = hashKey(`${cx},${cy},${cz}`);
   const isCenterChunk = cx === 0 && cy === 0;
-  const count = compact ? 4 : 6;
+  const count = mobile ? 6 : compact ? 4 : 6;
   const safeMediaCount = Math.max(mediaCount, 1);
 
   return Array.from({ length: count }, (_, index) => {
@@ -259,13 +268,16 @@ function generateInfiniteChunkPlanes(cx: number, cy: number, cz: number, mediaCo
 
 function buildInfinitePlanes(cx: number, cy: number, cz: number, mediaCount: number, compact: boolean, mobile: boolean) {
   const offsets = mobile ? INFINITE_MOBILE_CHUNK_OFFSETS : compact ? INFINITE_COMPACT_CHUNK_OFFSETS : INFINITE_CHUNK_OFFSETS;
-  const planes = offsets.flatMap(([dx, dy, dz]) => generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact));
+  const planes = offsets.flatMap(([dx, dy, dz]) =>
+    generateInfiniteChunkPlanes(cx + dx, cy + dy, cz + dz, mediaCount, compact, mobile)
+  );
   if (!compact || mediaCount < 2) return planes;
 
   if (mobile) {
-    return planes.map((plane) => ({
+    const mediaOffset = hashKey(`${cx},${cy},${cz},mobile`) % mediaCount;
+    return planes.map((plane, index) => ({
       ...plane,
-      mediaIndex: hashKey(`${plane.id},mobile-media`) % mediaCount
+      mediaIndex: (mediaOffset + index) % mediaCount
     }));
   }
 
@@ -330,8 +342,8 @@ function InfiniteCanvasPlane({
       : rawForwardDepth;
     const renderedZ = mobile ? cameraGrid.camZ - forwardDepth : plane.position[2];
     const depthDistance = mobile ? forwardDepth : Math.abs(rawForwardDepth);
-    const fullOpacityDepth = compact ? 78 : 62;
-    const depthFadeRange = compact ? 82 : 68;
+    const fullOpacityDepth = mobile ? 92 : compact ? 78 : 62;
+    const depthFadeRange = mobile ? 94 : compact ? 82 : 68;
     const depthFade = depthDistance < fullOpacityDepth ? 1 : clampNumber(1 - (depthDistance - fullOpacityDepth) / depthFadeRange, 0, 1);
     const nearFade = compact ? clampNumber((forwardDepth - 12) / 10, 0, 1) : 1;
     const targetOpacity = chunkFade * depthFade * depthFade * nearFade;
@@ -792,12 +804,15 @@ export function FeaturedWorkCanvas({ works }: { works: Work[] }) {
       works
         .filter((work) => work.cover.src)
         .map((work) => ({
-          src: optimizedImageUrl(work.cover.src),
+          src: optimizedImageUrl(
+            work.cover.src,
+            isMobile ? INFINITE_MOBILE_TEXTURE_WIDTH : INFINITE_DESKTOP_TEXTURE_WIDTH
+          ),
           alt: work.cover.alt || `${work.title} cover`,
           title: work.title,
           href: `/works/${work.slug}`
         })),
-    [works]
+    [isMobile, works]
   );
   const canvasImages = useMemo(
     () => selectCanvasImages(images, isCompact ? INFINITE_MOBILE_TEXTURE_LIMIT : INFINITE_DESKTOP_TEXTURE_LIMIT),

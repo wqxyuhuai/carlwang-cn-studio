@@ -1,6 +1,6 @@
 # 内容同步与发布规则
 
-更新日期：2026-07-20
+更新日期：2026-07-21
 
 本文档是 Notion、阿里云 OSS 与公开网站之间内容同步的规范。后续修改同步脚本、发布脚本、缓存或媒体处理时必须遵守本文。
 
@@ -72,6 +72,12 @@ Notion（编辑源）
 5. 只有 OSS 文件不存在或 Notion URL 不是 OSS URL 时，才允许延迟读取 `本地地址`。
 6. 本地无法匹配时，最后才下载 Notion 临时文件并上传 OSS。
 
+托管平台视频是例外：
+
+- Vimeo、Bilibili、YouTube 的页面或播放器 URL 必须保留为外链视频，不得当作二进制视频下载、上传 OSS 或回写 Notion。
+- 发布脚本把受支持的平台 URL 转为受控的 HTTPS 播放器地址，并只从平台公开元数据获取平台原始封面，不得用项目素材代替。正文预览只显示干净封面、右上角反白平台 Logo，以及与内部视频一致的左下角惯性跟随 Play；不在初始页面加载平台播放器控件。用户点击后才进入与内部视频一致的全屏深色遮罩，点击播放器外部或按 Escape 退出。普通 MP4/WebM 仍使用现有项目视频播放器。
+- 外链视频不参与 OSS 缺失媒体审计，也不参与视频 poster 生成。
+
 关键约束：
 
 - 有效 OSS URL 的存在性检查必须发生在扫描本地文件夹之前。
@@ -140,7 +146,8 @@ uploads/admin/notion-sync/
 - 下载、上传和 OSS 操作必须有超时。
 - 单个项目连续媒体失败达到上限后跳过剩余媒体，继续下一个项目。
 - 一个项目失败不能阻塞其他项目。
-- 汇总必须包含 `uploaded`、`reused`、`skipped`、`failedRows` 和状态跳过数量。
+- 汇总必须包含 `uploaded`、`reused`、`skipped`、`failedRows`、`failedMedia` 和状态跳过数量。
+- 任一项目存在媒体失败时，整批仍继续处理其他项目，但命令最终必须返回非零退出状态，避免自动化把不完整同步判为成功。
 - `skipped existing-oss` 表示云端资源已存在并被复用，不是错误。
 
 ## 9. 发布与缓存
@@ -154,7 +161,8 @@ uploads/admin/site-content.json
 
 规则：
 
-- `content.json` 保留 Notion 正文顺序、标题、段落、链接、图片、视频、列表、引用、caption、多栏和支持的嵌套结构。
+- `content.json` 保留 Notion 正文顺序、四级标题、段落与富文本颜色、链接、图片、内部/外链视频、嵌套列表、任务列表、引用、Callout、目录、表格、代码、公式、caption、多栏和支持的嵌套结构。
+- Bookmark 发布时应尽力保存标题、说明、站点名和预览图；Vimeo Showcase 链接需从 `video` 参数解析实际视频后请求 oEmbed。预览获取失败时安全退回普通链接，不能阻断项目发布。
 - 不支持的 Notion block 要安全跳过，不能让页面崩溃。
 - `Studio Projects` 发布按 Slug 更新同一个项目 JSON。
 - 网站使用 `PUBLIC_CONTENT_CACHE_TAG` 和 `PUBLIC_CONTENT_REVALIDATE_SECONDS`。

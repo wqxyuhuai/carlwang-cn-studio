@@ -104,7 +104,7 @@ Cloudflare Cache Reserve is not the default answer for this path. The current wo
 
 ## 7. Static Assets And Fonts
 
-The local Bebas Neue and SF Pro files are WOFF2 subsets referenced with content hashes. `/fonts/*` and `/_next/static/*` therefore use a one-year immutable policy.
+The local Bebas Neue and PingFang SC Web files are WOFF2 subsets referenced with content hashes. PingFang is split by weight and Latin/CJK character coverage so the large CJK subsets load only when required. `/fonts/*` and `/_next/static/*` therefore use a one-year immutable policy.
 
 `/figma/*` and `/field-media/*` are easier to replace without renaming, so they use a one-day TTL with seven-day stale-while-revalidate. This accepts some repeat transfer to reduce the risk of a year-long stale editable asset.
 

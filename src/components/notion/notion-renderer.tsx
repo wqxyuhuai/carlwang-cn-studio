@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
+import { ExternalVideoCard } from "@/components/notion/external-video-card";
 import { NotionImageLightbox } from "@/components/notion/notion-image-lightbox";
 import { ProjectVideoCard } from "@/components/video/ProjectVideoCard";
-import type { NotionBlock, RichTextSpan } from "@/lib/types";
+import type { NotionBlock, NotionListItem, RichTextSpan } from "@/lib/types";
 
 function spanColorClass(color: RichTextSpan["color"]) {
   if (!color) return "";
@@ -9,7 +10,12 @@ function spanColorClass(color: RichTextSpan["color"]) {
   if (color === "black40") return "text-muted";
   if (color === "black20") return "text-soft";
   if (color === "green") return "text-green";
-  return "";
+  if (!color || color === "default" || color === "black") return "";
+  return `notion-color-${color.replaceAll("_", "-")}`;
+}
+
+function containsCjkText(spans: RichTextSpan[]) {
+  return spans.some((span) => /[\u3400-\u9fff]/u.test(span.text));
 }
 
 function RichText({ spans }: { spans: RichTextSpan[] }) {
@@ -21,7 +27,8 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
             className={[
               span.bold ? "font-semibold" : "",
               span.italic ? "italic" : "",
-              span.code ? "font-mono" : "",
+              span.code ? "notion-inline-code" : "",
+              span.equation ? "notion-inline-equation" : "",
               span.underline ? "underline underline-offset-4" : "",
               span.strike ? "line-through" : "",
               spanColorClass(span.color)
@@ -35,7 +42,7 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
 
         if (span.href) {
           return (
-            <a className="link-line" href={span.href} key={`${span.text}-${index}`} rel="noreferrer" target="_blank">
+            <a className="notion-link" href={span.href} key={`${span.text}-${index}`} rel="noreferrer" target="_blank">
               {content}
             </a>
           );
@@ -44,6 +51,66 @@ function RichText({ spans }: { spans: RichTextSpan[] }) {
         return <span key={`${span.text}-${index}`}>{content}</span>;
       })}
     </>
+  );
+}
+
+function plainText(spans: RichTextSpan[]) {
+  return spans.map((span) => span.text).join("");
+}
+
+function hostnameFromUrl(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return value;
+  }
+}
+
+function headingId(block: Extract<NotionBlock, { type: "heading_1" | "heading_2" | "heading_3" | "heading_4" }>) {
+  return `notion-${block.id || plainText(block.text).toLowerCase().replace(/[^a-z0-9\u3400-\u9fff]+/gu, "-")}`;
+}
+
+export type NotionHeadingEntry = { id: string; level: number; text: string };
+
+export function collectNotionHeadings(blocks: NotionBlock[], entries: NotionHeadingEntry[] = []) {
+  for (const block of blocks) {
+    if (["heading_1", "heading_2", "heading_3", "heading_4"].includes(block.type)) {
+      const heading = block as Extract<NotionBlock, { type: "heading_1" | "heading_2" | "heading_3" | "heading_4" }>;
+      entries.push({ id: headingId(heading), level: Number(heading.type.slice(-1)), text: plainText(heading.text) });
+    }
+    if (block.type === "column_list") block.columns.forEach((column) => collectNotionHeadings(column, entries));
+    if (block.type === "toggle" || block.type === "callout") collectNotionHeadings(block.children, entries);
+    if (block.type === "bulleted_list" || block.type === "numbered_list" || block.type === "to_do_list") {
+      block.items.forEach((item) => collectNotionHeadings(item.children || [], entries));
+    }
+  }
+  return entries;
+}
+
+function NotionList({
+  fallbackVideoPoster,
+  items,
+  type
+}: {
+  fallbackVideoPoster?: string;
+  items: NotionListItem[];
+  type: "bulleted_list" | "numbered_list" | "to_do_list";
+}) {
+  const List = type === "numbered_list" ? "ol" : "ul";
+  return (
+    <List className={["notion-list", `notion-list--${type}`, "notion-rich-text", "text-muted"].join(" ")}>
+      {items.map((item, index) => (
+        <li className={item.checked ? "is-checked" : ""} key={index}>
+          {type === "to_do_list" ? (
+            <span aria-checked={Boolean(item.checked)} className="notion-checkbox" role="checkbox" />
+          ) : null}
+          <span className="notion-list-copy">
+            <RichText spans={item.text} />
+          </span>
+          {item.children?.length ? <NotionRenderer blocks={item.children} fallbackVideoPoster={fallbackVideoPoster} /> : null}
+        </li>
+      ))}
+    </List>
   );
 }
 
@@ -69,6 +136,7 @@ export function NotionRenderer({
   fallbackVideoPoster?: string;
 }) {
   const firstImageIndex = blocks.findIndex((block) => block.type === "image");
+  const tableOfContents = collectNotionHeadings(blocks);
 
   return (
     <div className={["notion-body", className].filter(Boolean).join(" ")}>
@@ -80,6 +148,7 @@ export function NotionRenderer({
           index={index}
           key={`${block.type}-${index}`}
           priorityImage={index === firstImageIndex}
+          tableOfContents={tableOfContents}
         />
       ))}
     </div>
@@ -91,18 +160,21 @@ function NotionBlockView({
   columnDenominator,
   fallbackVideoPoster,
   index,
-  priorityImage
+  priorityImage,
+  tableOfContents
 }: {
   block: NotionBlock;
   columnDenominator: number;
   fallbackVideoPoster?: string;
   index: number;
   priorityImage: boolean;
+  tableOfContents: NotionHeadingEntry[];
 }) {
   switch (block.type) {
     case "paragraph":
+      const language = containsCjkText(block.text) ? "zh-CN" : undefined;
       return (
-        <p className="notion-rich-text text-muted">
+        <p className="notion-rich-text text-muted" lang={language}>
           <RichText spans={block.text} />
         </p>
       );
@@ -116,51 +188,88 @@ function NotionBlockView({
       );
     case "heading_1":
       return (
-        <h2 className="display-type notion-rich-text">
+        <h2 className="notion-heading notion-heading--1 notion-rich-text" id={headingId(block)}>
           <RichText spans={block.text} />
         </h2>
       );
     case "heading_2":
       return (
-        <h3 className="subtitle-type notion-rich-text">
+        <h3 className="notion-heading notion-heading--2 notion-rich-text" id={headingId(block)}>
           <RichText spans={block.text} />
         </h3>
       );
     case "heading_3":
       return (
-        <h4 className="body-copy notion-rich-text">
+        <h4 className="notion-heading notion-heading--3 notion-rich-text" id={headingId(block)}>
           <RichText spans={block.text} />
         </h4>
       );
+    case "heading_4":
+      return (
+        <h5 className="notion-heading notion-heading--4 notion-rich-text" id={headingId(block)}>
+          <RichText spans={block.text} />
+        </h5>
+      );
     case "bulleted_list":
-      return (
-        <ul className="notion-rich-text text-muted">
-          {block.items.map((item, index) => (
-            <li key={index}>
-              <RichText spans={item} />
-            </li>
-          ))}
-        </ul>
-      );
+      return <NotionList fallbackVideoPoster={fallbackVideoPoster} items={block.items} type="bulleted_list" />;
     case "numbered_list":
-      return (
-        <ol className="notion-rich-text text-muted">
-          {block.items.map((item, index) => (
-            <li key={index}>
-              <RichText spans={item} />
-            </li>
-          ))}
-        </ol>
-      );
+      return <NotionList fallbackVideoPoster={fallbackVideoPoster} items={block.items} type="numbered_list" />;
+    case "to_do_list":
+      return <NotionList fallbackVideoPoster={fallbackVideoPoster} items={block.items} type="to_do_list" />;
     case "quote":
-    case "callout":
       return (
-        <blockquote className="notion-callout">
+        <blockquote className="notion-quote notion-rich-text text-muted">
           <RichText spans={block.text} />
         </blockquote>
       );
+    case "callout":
+      return (
+        <aside className="notion-callout" data-color={block.color || "default"}>
+          {block.icon ? <span className="notion-callout-icon">{block.icon}</span> : null}
+          <div className="notion-callout-content">
+            <p className="notion-rich-text"><RichText spans={block.text} /></p>
+            {block.children.length ? <NotionRenderer blocks={block.children} fallbackVideoPoster={fallbackVideoPoster} /> : null}
+          </div>
+        </aside>
+      );
     case "divider":
       return <hr className="notion-divider" />;
+    case "table_of_contents":
+      return (
+        <nav aria-label="Table of contents" className="notion-table-of-contents">
+          {tableOfContents.map((heading) => (
+            <a className={`is-level-${heading.level}`} href={`#${heading.id}`} key={heading.id}>{heading.text}</a>
+          ))}
+        </nav>
+      );
+    case "code":
+      return (
+        <figure className="notion-code">
+          {block.language && block.language !== "plain text" ? <figcaption>{block.language}</figcaption> : null}
+          <pre><code>{block.code}</code></pre>
+          {block.caption?.length ? <div className="notion-caption text-muted"><RichText spans={block.caption} /></div> : null}
+        </figure>
+      );
+    case "equation":
+      return <div aria-label={`Equation: ${block.expression}`} className="notion-equation">{block.expression}</div>;
+    case "table":
+      return (
+        <div className="notion-table-wrap">
+          <table className="notion-table">
+            <tbody>
+              {block.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, cellIndex) => {
+                    const isHeader = (block.hasColumnHeader && rowIndex === 0) || (block.hasRowHeader && cellIndex === 0);
+                    const Cell = isHeader ? "th" : "td";
+                    return <Cell key={cellIndex}><RichText spans={cell} /></Cell>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
     case "image":
       return (
         <figure className="notion-media">
@@ -196,11 +305,30 @@ function NotionBlockView({
           {block.media.caption ? <figcaption className="notion-caption text-muted">{block.media.caption}</figcaption> : null}
         </figure>
       );
+    case "external_video":
+      return (
+        <figure className="notion-media">
+          <ExternalVideoCard
+            embedUrl={block.embedUrl}
+            posterUrl={block.posterUrl}
+            provider={block.provider}
+            title={block.title}
+          />
+          {block.caption ? <figcaption className="notion-caption text-muted">{block.caption}</figcaption> : null}
+        </figure>
+      );
     case "bookmark":
       return (
         <a className="notion-bookmark" href={block.url} rel="noreferrer" target="_blank">
-          <span>{block.title}</span>
-          {block.description ? <small>{block.description}</small> : null}
+          <span className="notion-bookmark-copy">
+            <strong>{block.title}</strong>
+            {block.description ? <small>{block.description}</small> : null}
+            <span className="notion-bookmark-site">{block.siteName || hostnameFromUrl(block.url)}</span>
+          </span>
+          {block.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- published Open Graph preview can be hosted on the linked site's CDN
+            <img alt="" aria-hidden="true" className="notion-bookmark-preview" src={block.imageUrl} />
+          ) : null}
         </a>
       );
     case "column_list":
@@ -223,7 +351,7 @@ function NotionBlockView({
       );
     case "toggle":
       return (
-        <details className="notion-rich-text">
+        <details className="notion-rich-text notion-toggle">
           <summary>
             <RichText spans={block.title} />
           </summary>

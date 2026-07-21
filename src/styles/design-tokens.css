@@ -7,30 +7,57 @@
 }
 
 @font-face {
-  font-family: "SF Pro Local";
-  src: url("/fonts/sf-pro/SF-Pro-Display-Regular.woff2?v=c41e3c28bca0") format("woff2");
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Regular-Latin.woff2?v=9563205202b7") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  unicode-range: U+0000-024F, U+0300-052F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-218F, U+2190-27BF, U+2B00-2BFF, U+FB00-FB06, U+FEFF, U+FFFD;
+  unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-21FF;
 }
 
 @font-face {
-  font-family: "SF Pro Local";
-  src: url("/fonts/sf-pro/SF-Pro-Display-Medium.woff2?v=6bad112c5e4a") format("woff2");
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Regular-CJK.woff2?v=93e81094f6de") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+2E80-303F, U+3400-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
+}
+
+@font-face {
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Medium-Latin.woff2?v=3f5ead81e71c") format("woff2");
   font-style: normal;
   font-weight: 510;
   font-display: swap;
-  unicode-range: U+0000-024F, U+0300-052F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-218F, U+2190-27BF, U+2B00-2BFF, U+FB00-FB06, U+FEFF, U+FFFD;
+  unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-21FF;
 }
 
 @font-face {
-  font-family: "SF Pro Local";
-  src: url("/fonts/sf-pro/SF-Pro-Display-Bold.woff2?v=3cfcf4523eba") format("woff2");
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Medium-CJK.woff2?v=4416ff26e343") format("woff2");
+  font-style: normal;
+  font-weight: 510;
+  font-display: swap;
+  unicode-range: U+2E80-303F, U+3400-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
+}
+
+@font-face {
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Semibold-Latin.woff2?v=d9a08065f9ea") format("woff2");
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  unicode-range: U+0000-024F, U+0300-052F, U+1E00-1EFF, U+2000-206F, U+20A0-20CF, U+2100-218F, U+2190-27BF, U+2B00-2BFF, U+FB00-FB06, U+FEFF, U+FFFD;
+  unicode-range: U+0000-024F, U+2000-206F, U+20A0-20CF, U+2100-21FF;
+}
+
+@font-face {
+  font-family: "PingFang SC Web";
+  src: url("/fonts/pingfang-sc/PingFangSC-Semibold-CJK.woff2?v=bebc32fd500c") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+2E80-303F, U+3400-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
 }
 
 :root {
@@ -57,6 +84,17 @@
   --color-green: var(--figma-green);
   --color-line: var(--color-black-40);
   --color-error: #ff5a5a;
+  --notion-color-gray: #6b6f68;
+  --notion-color-brown: #795548;
+  --notion-color-orange: #9a5a2b;
+  --notion-color-yellow: #806b25;
+  --notion-color-green: #4d744d;
+  --notion-color-blue: #3f6eaa;
+  --notion-color-purple: #7656a6;
+  --notion-color-pink: #a34f78;
+  --notion-color-red: #a4474e;
+  --notion-surface: color-mix(in srgb, var(--figma-black) 5%, transparent);
+  --notion-surface-strong: color-mix(in srgb, var(--figma-black) 9%, transparent);
   --gradient-home-hero: linear-gradient(
       180deg,
       transparent 0%,
@@ -72,12 +110,13 @@
     );
 
   --font-display: "Bebas Neue Local", "Arial Narrow", sans-serif;
-  --font-body: "SF Pro Local", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "PingFang SC Web", "PingFang SC", "Microsoft YaHei", sans-serif;
 
   --type-body-r-family: var(--font-body);
   --type-body-r-size: 1rem;
   --type-body-r-weight: 400;
   --type-body-r-line: 1.25;
+  --type-body-cjk-line: 1.5;
   --type-body-r-tracking: 0;
   --type-body-m-family: var(--font-body);
   --type-body-m-size: 1rem;
@@ -98,7 +137,8 @@
   --type-title-s-size: 1.25rem;
   --type-title-s-weight: 510;
   --type-title-s-line: 1.2;
-  --type-title-s-tracking: -0.025rem;
+  --type-title-s-tracking: -0.005em;
+  --type-detail-copy-tracking: -0.01em;
   --type-subtitle-family: var(--font-body);
   --type-subtitle-size: clamp(1.125rem, 2.8125vw, 2.25rem);
   --type-subtitle-weight: 510;
@@ -173,6 +213,7 @@
   --figma-pad-mobile: 2rem;
   --radius-none: 0;
   --radius-site-sm: 0.5rem;
+  --radius-site-lg: 0.8125rem;
   --radius-fullscreen-media: clamp(0.875rem, 1.1vw, 1.5rem);
 
   --motion-fast: 120ms;
@@ -194,6 +235,17 @@ html[data-theme="dark"] {
   --color-bg: var(--color-page-bg);
   --color-line: rgb(244 245 239 / 26%);
   --color-error: #ff5a5a;
+  --notion-color-gray: rgb(244 245 239 / 58%);
+  --notion-color-brown: #c6a388;
+  --notion-color-orange: #e8a06b;
+  --notion-color-yellow: #dcc16b;
+  --notion-color-green: #a8c979;
+  --notion-color-blue: #83afe8;
+  --notion-color-purple: #b49be2;
+  --notion-color-pink: #e58fb6;
+  --notion-color-red: #ee8d91;
+  --notion-surface: color-mix(in srgb, var(--figma-white) 7%, transparent);
+  --notion-surface-strong: color-mix(in srgb, var(--figma-white) 12%, transparent);
   --gradient-home-hero: linear-gradient(
       180deg,
       transparent 0%,

@@ -3,6 +3,8 @@ import path from "node:path";
 import process from "node:process";
 import OSS from "ali-oss";
 import { Client } from "@notionhq/client";
+import { fetchBookmarkPreview } from "./lib/bookmark-preview.mjs";
+import { externalVideoInfo } from "./lib/external-video.mjs";
 import { configureProxyFromEnv } from "./lib/proxy.mjs";
 import { revalidatePublicContent } from "./lib/revalidate-public-content.mjs";
 
@@ -155,8 +157,37 @@ function spansFromRichText(value) {
     italic: Boolean(part?.annotations?.italic),
     code: Boolean(part?.annotations?.code),
     underline: Boolean(part?.annotations?.underline),
-    strike: Boolean(part?.annotations?.strikethrough)
+    strike: Boolean(part?.annotations?.strikethrough),
+    equation: part?.type === "equation",
+    color: part?.annotations?.color && part.annotations.color !== "default" ? part.annotations.color : undefined
   })).filter((span) => span.text || span.href);
+}
+
+async function bookmarkBlock(url, caption = "") {
+  const preview = await fetchBookmarkPreview(url);
+  return {
+    type: "bookmark",
+    title: caption || preview.title || url,
+    url,
+    description: preview.description || "",
+    imageUrl: preview.imageUrl || "",
+    siteName: preview.siteName || ""
+  };
+}
+
+async function listItemBlock(notion, block, type, missingOss, projectTitle) {
+  const payload = block[block.type] || {};
+  const children = block.has_children
+    ? await blocksToContent(notion, await listChildren(notion, block.id), missingOss, projectTitle)
+    : [];
+  return {
+    type,
+    items: [{
+      text: spansFromRichText(payload.rich_text),
+      children,
+      ...(block.type === "to_do" ? { checked: Boolean(payload.checked) } : {})
+    }]
+  };
 }
 
 function titleFromProperty(property) {
@@ -210,6 +241,21 @@ function mediaFromUrl(url, alt, caption = "") {
     type: /\.(mp4|webm)(\?|$)/i.test(url) ? "video" : "image",
     src: url,
     alt,
+    ...(caption ? { caption } : {})
+  };
+}
+
+async function externalVideoBlock(url, projectTitle, caption = "") {
+  const video = externalVideoInfo(url);
+  if (!video) return null;
+  const preview = await fetchBookmarkPreview(video.url);
+  return {
+    type: "external_video",
+    provider: video.provider,
+    url: video.url,
+    embedUrl: video.embedUrl,
+    title: caption || `${projectTitle} ${video.provider} video`,
+    posterUrl: preview.imageUrl || "",
     ...(caption ? { caption } : {})
   };
 }
@@ -297,20 +343,62 @@ async function blockToContent(notion, block, missingOss, projectTitle) {
     case "heading_1":
     case "heading_2":
     case "heading_3":
-      return { type: block.type, text: spansFromRichText(payload.rich_text) };
+    case "heading_4":
+      return { type: block.type, id: block.id, text: spansFromRichText(payload.rich_text) };
     case "bulleted_list_item":
-      return { type: "bulleted_list", items: [spansFromRichText(payload.rich_text)] };
+      return await listItemBlock(notion, block, "bulleted_list", missingOss, projectTitle);
     case "numbered_list_item":
-      return { type: "numbered_list", items: [spansFromRichText(payload.rich_text)] };
+      return await listItemBlock(notion, block, "numbered_list", missingOss, projectTitle);
+    case "to_do":
+      return await listItemBlock(notion, block, "to_do_list", missingOss, projectTitle);
     case "quote":
-    case "callout":
-      return { type: block.type, text: spansFromRichText(payload.rich_text) };
+      return { type: "quote", text: spansFromRichText(payload.rich_text) };
+    case "callout": {
+      const children = block.has_children
+        ? await blocksToContent(notion, await listChildren(notion, block.id), missingOss, projectTitle)
+        : [];
+      return {
+        type: "callout",
+        text: spansFromRichText(payload.rich_text),
+        icon: payload.icon?.type === "emoji" ? payload.icon.emoji : "",
+        color: payload.color || "default",
+        children
+      };
+    }
     case "divider":
       return { type: "divider" };
+    case "table_of_contents":
+      return { type: "table_of_contents" };
+    case "code":
+      return {
+        type: "code",
+        code: textFromRichText(payload.rich_text),
+        language: payload.language || "plain text",
+        caption: spansFromRichText(payload.caption)
+      };
+    case "equation":
+      return { type: "equation", expression: payload.expression || "" };
+    case "table": {
+      const rows = [];
+      for (const child of await listChildren(notion, block.id)) {
+        if (child.type !== "table_row") continue;
+        rows.push((child.table_row?.cells || []).map((cell) => spansFromRichText(cell)));
+      }
+      return {
+        type: "table",
+        rows,
+        hasColumnHeader: Boolean(payload.has_column_header),
+        hasRowHeader: Boolean(payload.has_row_header)
+      };
+    }
     case "image":
     case "video": {
       const media = blockMediaPayload(block);
       if (!media) return null;
+      if (block.type === "video") {
+        const hostedVideo = await externalVideoBlock(media.url, projectTitle, media.caption);
+        if (hostedVideo) return hostedVideo;
+      }
       assertOssUrls([media.url], `${projectTitle} page body ${block.type}`, missingOss);
       return {
         type: block.type === "video" ? "video" : "image",
@@ -330,20 +418,17 @@ async function blockToContent(notion, block, missingOss, projectTitle) {
       };
     }
     case "bookmark":
-      return {
-        type: "bookmark",
-        title: payload.caption?.length ? textFromRichText(payload.caption) : payload.url,
-        url: payload.url || "",
-        description: ""
-      };
+      return await bookmarkBlock(payload.url || "", payload.caption?.length ? textFromRichText(payload.caption) : "");
     case "embed":
-    case "link_preview":
-      return {
-        type: "bookmark",
-        title: payload.caption?.length ? textFromRichText(payload.caption) : payload.url,
-        url: payload.url || "",
-        description: ""
-      };
+    case "link_preview": {
+      const hostedVideo = await externalVideoBlock(
+        payload.url || "",
+        projectTitle,
+        payload.caption?.length ? textFromRichText(payload.caption) : ""
+      );
+      if (hostedVideo) return hostedVideo;
+      return await bookmarkBlock(payload.url || "", payload.caption?.length ? textFromRichText(payload.caption) : "");
+    }
     case "column_list": {
       const columns = [];
       for (const child of await listChildren(notion, block.id)) {
@@ -381,7 +466,7 @@ async function blocksToContent(notion, blocks, missingOss, projectTitle) {
     if (
       previous &&
       converted.type === previous.type &&
-      (converted.type === "bulleted_list" || converted.type === "numbered_list")
+      (converted.type === "bulleted_list" || converted.type === "numbered_list" || converted.type === "to_do_list")
     ) {
       previous.items.push(...converted.items);
     } else {

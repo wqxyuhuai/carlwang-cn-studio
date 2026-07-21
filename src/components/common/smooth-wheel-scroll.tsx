@@ -24,49 +24,57 @@ function normalizedWheelDelta(event: WheelEvent) {
   return event.deltaY;
 }
 
-function nestedScrollerCanConsume(target: Element, delta: number) {
-  let node = target.parentElement;
+function isFeaturedHomepage(pathname: string) {
+  if (pathname !== "/") return false;
+
+  const view = new URLSearchParams(window.location.search).get("view");
+  const hash = window.location.hash;
+  const isWorksIndex = view === "grid" || view === "list" || hash === "#works-index" || hash === "#works-list";
+  return !isWorksIndex;
+}
+
+function canConsumeWheel(element: HTMLElement, delta: number) {
+  const maxScrollTop = element.scrollHeight - element.clientHeight;
+  return (delta < 0 && element.scrollTop > 0) || (delta > 0 && element.scrollTop < maxScrollTop - 1);
+}
+
+function scrollTargetFor(target: Element, delta: number, pageScroller: HTMLElement) {
+  let node: Element | null = target;
 
   while (node && node !== document.body && node !== document.documentElement) {
     const styles = window.getComputedStyle(node);
     const isScrollable = /(auto|scroll)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight + 1;
-    if (isScrollable) {
-      const maxScrollTop = node.scrollHeight - node.clientHeight;
-      if ((delta < 0 && node.scrollTop > 0) || (delta > 0 && node.scrollTop < maxScrollTop - 1)) {
-        return true;
-      }
-    }
+    if (isScrollable && node instanceof HTMLElement && canConsumeWheel(node, delta)) return node;
     node = node.parentElement;
   }
 
-  return false;
+  return canConsumeWheel(pageScroller, delta) ? pageScroller : null;
 }
 
 export function SmoothWheelScroll() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/") return;
-
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarsePointer = window.matchMedia("(pointer: coarse)");
     if (reduceMotion.matches || coarsePointer.matches) return;
 
-    const scrollingElement = document.scrollingElement || document.documentElement;
+    const pageScroller = (document.scrollingElement || document.documentElement) as HTMLElement;
 
-    let current = scrollingElement.scrollTop;
+    let activeScroller = pageScroller;
+    let current = activeScroller.scrollTop;
     let target = current;
     let animationFrame: number | null = null;
     let previousFrameTime = 0;
 
     function maximumScrollTop() {
-      return Math.max(0, scrollingElement.scrollHeight - scrollingElement.clientHeight);
+      return Math.max(0, activeScroller.scrollHeight - activeScroller.clientHeight);
     }
 
     function stopAnimation() {
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
       animationFrame = null;
-      current = scrollingElement.scrollTop;
+      current = activeScroller.scrollTop;
       target = current;
       previousFrameTime = 0;
     }
@@ -81,27 +89,36 @@ export function SmoothWheelScroll() {
       const remaining = target - current;
       if (Math.abs(remaining) <= smoothWheelConfig.stopEpsilonPx) {
         current = target;
-        scrollingElement.scrollTop = target;
+        activeScroller.scrollTop = target;
         animationFrame = null;
         previousFrameTime = 0;
         return;
       }
 
-      scrollingElement.scrollTop = current;
+      activeScroller.scrollTop = current;
       animationFrame = window.requestAnimationFrame(animate);
     }
 
     function handleWheel(event: WheelEvent) {
+      if (isFeaturedHomepage(pathname)) return;
       if (event.defaultPrevented || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
       if (!(event.target instanceof Element) || event.target.closest(nativeWheelSelector)) return;
 
       const delta = normalizedWheelDelta(event);
       if (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && Math.abs(delta) < smoothWheelConfig.activationThresholdPx) return;
-      if (nestedScrollerCanConsume(event.target, delta)) return;
+      const nextScroller = scrollTargetFor(event.target, delta, pageScroller);
+      if (!nextScroller) return;
 
       event.preventDefault();
 
-      const actualScrollTop = scrollingElement.scrollTop;
+      if (nextScroller !== activeScroller) {
+        stopAnimation();
+        activeScroller = nextScroller;
+        current = activeScroller.scrollTop;
+        target = current;
+      }
+
+      const actualScrollTop = activeScroller.scrollTop;
       if (animationFrame === null || Math.abs(actualScrollTop - current) > 2) {
         current = actualScrollTop;
         target = actualScrollTop;

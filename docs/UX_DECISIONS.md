@@ -33,6 +33,12 @@ unless a later direction explicitly replaces them.
 - Filtering to a short category must not shift the Works header, top switch or
   category rail down the page. Keep the page shell at least viewport-height
   while the work result area changes.
+- Index search lives at the far right of the Grid/List view toggle row. It
+  starts as a single icon, expands in place with the shared glass language, and
+  currently searches work titles only. Expanding the search scope to type,
+  tools or body text is a separate content-behavior decision.
+- Empty Works search states are quiet body UI. Use the regular body style
+  (`16px`, `font-weight: 400`) rather than subtitle or display text.
 
 ## Responsive Navigation
 
@@ -42,6 +48,11 @@ unless a later direction explicitly replaces them.
   overflow. Reduce mobile label sizes before changing the desktop layout.
 - Desktop bottom navigation and work-view tab sizing are not a mobile tuning
   target and should remain unchanged when making mobile-only adjustments.
+- On phones, the work-view switch and bottom navigation share a 48px outer
+  height. The work-view switch is capped at 12rem wide, while the circular
+  pause/autoflight control is 48px with a 12px gap above the bottom navigation.
+- Tablet and desktop work-view switches keep the wider 13.5rem rhythm unless
+  there is an explicit non-phone adjustment.
 - On phones, the Contact label and its arrow must both remain visible. The
   navigation surface has equal outer padding; do not leave unused space on its
   right edge.
@@ -49,6 +60,9 @@ unless a later direction explicitly replaces them.
   keyboard focus. The label itself must not shift horizontally or vertically.
   The Contact arrow uses the matching diagonal replacement motion inside its
   clipped button.
+- The Works mode switch and bottom primary navigation labels share the medium
+  body UI weight (`16px`, `font-weight: 510`). Keep their weight consistent
+  unless both surfaces are intentionally retuned together.
 - The Works mode switch uses the same glass family as the bottom navigation,
   with a sliding selected surface. It is shown only for Works, and its labels
   retain the same vertical text replacement interaction.
@@ -84,8 +98,9 @@ unless a later direction explicitly replaces them.
   the old oversized layout, but keep the camera close enough for several cards
   to be visible on first paint.
 - Canvas media diversity and route prefetch are separate budgets. The current
-  canvas pools are up to 8 unique covers on mobile and 10 on desktop, with a
-  deterministic mobile rotation to reduce adjacent repeats. Background route
+  canvas pools are up to 10 unique covers on mobile and desktop, with 750px
+  mobile textures and deterministic rotation to reduce adjacent repeats.
+  Background route
   warmup remains limited to 3 details on mobile and 2 on desktop; do not reduce
   visible media diversity merely to reduce route prefetching.
 - Featured entry flight is a first-session-only effect. The initial visit may
@@ -99,6 +114,20 @@ unless a later direction explicitly replaces them.
 - The Featured auto-flight control appears only in Featured. It aligns with
   the bottom navigation, does not move on hover, and shares the same glass
   material as the detail close control.
+
+## Scroll And Reveal Parameters
+
+- Non-Featured mouse-wheel smoothing is centralized in
+  `src/lib/motion-config.ts` as `smoothWheelConfig`. The current tuning is:
+  `activationThresholdPx: 32`, `inputGain: 1.08`, `maxInputStepPx: 180`,
+  `maxLagPx: 300`, `follow: 0.19`, and `stopEpsilonPx: 0.35`. Increase these
+  cautiously; the intent is a short inertial tail that remains under direct
+  wheel control, not a disconnected smooth-scroll layer.
+- Detail media reveal timing is centralized in `detailMediaRevealConfig` in
+  the same file. Current values are `durationMs: 1100`, `staggerMs: 55`,
+  `maxDelayMs: 240`, `triggerLeadViewportRatio: 0.24`, and
+  `triggerThreshold: 0.04`. This makes media begin revealing before the middle
+  of the viewport while keeping the unfold slower and more continuous.
 
 ## Work Detail Media
 
@@ -116,6 +145,16 @@ unless a later direction explicitly replaces them.
 - The back-to-top control appears only after scrolling, sits near the work
   content rather than the browser edge, uses the pager arrow rotated upward,
   and must not translate on hover.
+- Work-detail `Previous` and `Next` pager labels are secondary navigation.
+  Keep them on the regular body style (`16px`, `font-weight: 400`) so they do
+  not compete with the work title or section headings.
+- Work details with two or more body headings use the desktop page outline at
+  the right edge. The collapsed rail and expanded panel align with the detail
+  close control, stay out of document flow, and hide on touch/coarse-pointer
+  layouts. The expanded panel uses the shared glass family with one visible
+  outline, equal content padding, safe inset around its scrollbar, and no text
+  movement on hover. Its scrollbar tone must ease in and out at low contrast
+  and never snap to white.
 - In detail Notion media layouts, horizontal and vertical media spacing share
   `--notion-media-layout-gap`, currently `16px` (`var(--space-4)`). Preserve
   explicit Notion spacer blocks and ordinary text spacing.

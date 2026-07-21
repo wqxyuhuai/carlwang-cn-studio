@@ -7,6 +7,7 @@ import process from "node:process";
 import OSS from "ali-oss";
 import { Client } from "@notionhq/client";
 import { optimizeImageBuffer, optimizedObjectKeyFor } from "./lib/asset-optimizer.mjs";
+import { externalVideoInfo } from "./lib/external-video.mjs";
 import { configureProxyFromEnv } from "./lib/proxy.mjs";
 
 const ENV_PATH = path.resolve(".env.local");
@@ -798,6 +799,13 @@ async function processBlockTree(notion, client, manifest, pageId, tableFolder, i
     const media = mediaPayload(block);
     if (media && ["image", "video", "file", "pdf"].includes(media.blockType)) {
       stats.seen += 1;
+      const hostedVideo = media.blockType === "video" ? externalVideoInfo(media.url) : null;
+      if (hostedVideo) {
+        stats.skipped += 1;
+        localSequenceByKind.video += 1;
+        console.log(`[body] ${itemLabel} media #${stats.seen} skipped hosted-video provider=${hostedVideo.provider}`);
+        continue;
+      }
       const originalName = `${media.blockType}-${block.id}`;
       const objectBasePath = ossPath(tableFolder, itemFolder, "notion-page-body");
       const mediaKind = mediaKindFromBlockType(media.blockType);
@@ -1061,7 +1069,8 @@ async function collectMissingBlockMedia(notion, pageId, tableConfig, itemFolder,
     if (media && ["image", "video", "file", "pdf"].includes(media.blockType)) {
       mediaIndex += 1;
       const objectBasePath = ossPath(tableConfig.tableFolder, itemFolder, "notion-page-body");
-      if (!isExpectedOssUrl(media.url, objectBasePath, options)) {
+      const hostedVideo = media.blockType === "video" ? externalVideoInfo(media.url) : null;
+      if (!hostedVideo && !isExpectedOssUrl(media.url, objectBasePath, options)) {
         rows.push({
           table: tableConfig.label,
           title,
@@ -1180,7 +1189,7 @@ async function runTable(tableKey, options = {}) {
     : eligiblePages;
   const pages = options.limit ? filteredPages.slice(0, options.limit) : filteredPages;
   const skippedByStatus = allPages.length - eligiblePages.length;
-  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, reused: 0, skipped: 0, deletedOld: 0, updatedRows: 0, failedRows: 0 };
+  const totals = { rows: pages.length, skippedByStatus, uploaded: 0, reused: 0, skipped: 0, deletedOld: 0, updatedRows: 0, failedRows: 0, failedMedia: 0 };
 
   console.log(`[${tableConfig.label}] rows=${pages.length} skippedByStatus=${skippedByStatus}${titleContains ? ` titleContains=${titleContains}` : ""}${options.limit ? ` limit=${options.limit}` : ""}`);
 
@@ -1242,7 +1251,9 @@ async function runTable(tableKey, options = {}) {
       totals.reused += stats.reused;
       totals.skipped += stats.skipped;
       totals.deletedOld += stats.deletedOld;
-      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} reused=${stats.reused} skipped=${stats.skipped} deletedOld=${stats.deletedOld}`);
+      totals.failedMedia += stats.failedMedia;
+      if (stats.failedMedia > 0) totals.failedRows += 1;
+      console.log(`[${tableConfig.label}] done ${index}/${pages.length} uploaded=${stats.uploaded} reused=${stats.reused} skipped=${stats.skipped} deletedOld=${stats.deletedOld} failedMedia=${stats.failedMedia}`);
     } catch (error) {
       totals.failedRows += 1;
       console.log(`[${tableConfig.label}] failed ${index}/${pages.length} ${title}: ${error instanceof Error ? error.message : String(error)}`);
@@ -1305,6 +1316,9 @@ async function main() {
   }
 
   console.log(`sync complete ${JSON.stringify(summary)}`);
+  if (Object.values(summary).some((result) => result.failedRows > 0 || result.failedMedia > 0)) {
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {

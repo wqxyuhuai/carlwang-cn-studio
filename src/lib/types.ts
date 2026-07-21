@@ -24,18 +24,64 @@ export type RichTextSpan = {
   code?: boolean;
   underline?: boolean;
   strike?: boolean;
-  color?: "black" | "black60" | "black40" | "black20" | "green";
+  equation?: boolean;
+  color?:
+    | "black"
+    | "black60"
+    | "black40"
+    | "black20"
+    | "default"
+    | "gray"
+    | "brown"
+    | "orange"
+    | "yellow"
+    | "green"
+    | "blue"
+    | "purple"
+    | "pink"
+    | "red"
+    | "gray_background"
+    | "brown_background"
+    | "orange_background"
+    | "yellow_background"
+    | "green_background"
+    | "blue_background"
+    | "purple_background"
+    | "pink_background"
+    | "red_background";
+};
+
+export type ExternalVideoProvider = "youtube" | "vimeo" | "bilibili";
+
+export type NotionListItem = {
+  text: RichTextSpan[];
+  children?: NotionBlock[];
+  checked?: boolean;
 };
 
 export type NotionBlock =
   | { type: "paragraph"; text: RichTextSpan[] }
   | { type: "spacer"; size: number }
-  | { type: "heading_1" | "heading_2" | "heading_3"; text: RichTextSpan[] }
-  | { type: "bulleted_list" | "numbered_list"; items: RichTextSpan[][] }
-  | { type: "quote" | "callout"; text: RichTextSpan[] }
+  | { type: "heading_1" | "heading_2" | "heading_3" | "heading_4"; id?: string; text: RichTextSpan[] }
+  | { type: "bulleted_list" | "numbered_list" | "to_do_list"; items: NotionListItem[] }
+  | { type: "quote"; text: RichTextSpan[] }
+  | { type: "callout"; text: RichTextSpan[]; icon?: string; color?: RichTextSpan["color"]; children: NotionBlock[] }
   | { type: "divider" }
+  | { type: "table_of_contents" }
+  | { type: "code"; code: string; language?: string; caption?: RichTextSpan[] }
+  | { type: "equation"; expression: string }
+  | { type: "table"; rows: RichTextSpan[][][]; hasColumnHeader: boolean; hasRowHeader: boolean }
   | { type: "image" | "video"; media: MediaItem }
-  | { type: "bookmark"; title: string; url: string; description?: string }
+  | {
+      type: "external_video";
+      provider: ExternalVideoProvider;
+      url: string;
+      embedUrl: string;
+      title: string;
+      posterUrl?: string;
+      caption?: string;
+    }
+  | { type: "bookmark"; title: string; url: string; description?: string; imageUrl?: string; siteName?: string }
   | { type: "column_list"; columns: NotionBlock[][] }
   | { type: "toggle"; title: RichTextSpan[]; children: NotionBlock[] }
   | { type: "unsupported"; label: string };
